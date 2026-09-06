@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="icon" href="data:,">
+  <title>Few Moves</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --warm-surface: #f0ece2; --warm-ink: #293238; --warm-muted: #6e736f; --warm-floor: #e5e0d3; --warm-grid: #d2cbbb; --warm-charcoal: #313a3b; --warm-charcoal-edge: #171e1f; --warm-pressed: #151c1d; --warm-focus: #5d8960; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; overflow-y: auto; background: var(--warm-surface); }
+    body { min-height: 100svh; color: var(--warm-ink); }
+    button { min-width: 48px; min-height: 48px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, canvas:focus-visible, textarea:focus-visible { outline: 3px solid var(--warm-focus); outline-offset: 3px; }
+    button:disabled { opacity: .38; cursor: default; }
+    canvas { display: block; object-fit: contain; image-rendering: pixelated; }
+    /* Mobile player UI: the real Unity canvas remains the board. */
+    main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 48px minmax(0, 1fr); gap: 6px; }
+    .utility-bar { min-height: 48px; display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; }
+    .utility-button { min-width: 48px; min-height: 48px; display: inline-grid; place-items: center; padding: 0; color: var(--warm-ink); background: transparent; border: 0; border-radius: 12px; box-shadow: none; }
+    .utility-button:enabled:hover, .utility-button:enabled:active { background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
+    .utility-button svg { width: 19px; height: 19px; stroke: currentColor; stroke-width: 1.9; fill: none; }
+    .play-layout { min-height: 0; height: auto; width: 100%; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 284px; justify-items: center; align-items: stretch; gap: 8px; }
+    .board-stage { grid-row: 1; position: relative; width: 100%; min-width: 0; min-height: 0; container-type: size; }
+    .game { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; }
+    canvas { width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); }
+    @supports (width: 1cqh) { canvas { width: min(100%, 560px, 100cqh); } }
+    .feedback { position: absolute; z-index: 2; bottom: 8px; left: 50%; width: min(calc(100% - 24px), 360px); min-height: 32px; margin: 0; padding: 7px 10px; color: var(--warm-ink); background: color-mix(in srgb, var(--warm-surface) 92%, var(--warm-grid)); border: 1px solid var(--warm-grid); border-radius: 9px; font-size: 12px; line-height: 1.35; text-align: center; transform: translateX(-50%); }
+    .feedback[hidden] { display: none; }
+    .control-slot { grid-row: 2; width: min(100%, 320px); height: 284px; display: grid; align-content: start; justify-items: center; }
+    .play-controls { width: 100%; display: grid; gap: 8px; justify-items: center; }
+    .play-controls[hidden] { display: grid !important; visibility: hidden; pointer-events: none; }
+    .runline { width: 100%; min-height: 48px; display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 4px; }
+    #turn-runline { color: var(--warm-ink); font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: -.04em; white-space: nowrap; }
+    .piece-chips { display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .piece-chip { min-width: 48px; min-height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--warm-grid); border-radius: 9px; background: #fffdf7; }
+    .piece-chip[hidden] { display: none; }
+    .piece-chip[aria-pressed="true"] { border-color: var(--warm-focus); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--warm-focus) 35%, transparent); }
+    .piece-chip:enabled:hover { background: color-mix(in srgb, #fffdf7 88%, var(--warm-grid)); }
+    .piece-mark { width: 22px; height: 22px; display: block; background: #4374b7; border: 2px solid color-mix(in srgb, #4374b7 70%, var(--warm-charcoal)); border-radius: 50%; }
+    .piece-chip[data-piece-index="1"] .piece-mark { background: #d09743; border-radius: 2px; transform: rotate(45deg); }
+    .piece-chip[data-piece-index="2"] .piece-mark { background: #439491; border-radius: 2px; }
+    .quiet-reset { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 7px; color: var(--warm-muted); background: transparent; border: 0; border-radius: 9px; box-shadow: none; font-size: 12px; font-weight: 600; }
+    .quiet-reset svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.8; fill: none; }
+    .quiet-reset:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 5%, transparent); }
+    .quiet-reset:enabled:active { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
+    .direction-console { position: relative; width: 228px; height: 228px; margin: 0 auto; }
+    .direction-button, .wait-button { position: absolute; display: grid; place-items: center; padding: 0; isolation: isolate; color: var(--warm-ink); background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+    .direction-button { width: 72px; height: 72px; }
+    .direction-button::after { position: absolute; inset: 2px; z-index: 0; content: ""; background: var(--warm-charcoal-edge); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
+    .direction-button::before { position: absolute; inset: 5px; z-index: 1; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-charcoal-edge))); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--warm-surface) 42%, transparent); }
+    .direction-button:enabled:hover::before { background: linear-gradient(135deg, #3b4647, var(--warm-charcoal)); }
+    .direction-button:enabled:active::before { background: var(--warm-pressed); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--warm-charcoal-edge) 56%, transparent); }
+    .direction-up { top: 0; left: 78px; } .direction-left { top: 78px; left: 0; } .direction-right { top: 78px; right: 0; } .direction-down { bottom: 0; left: 78px; }
+    .direction-left::before, .direction-left::after { transform: rotate(-90deg); } .direction-right::before, .direction-right::after { transform: rotate(90deg); } .direction-down::before, .direction-down::after { transform: rotate(180deg); }
+    .wait-button { top: 82px; left: 82px; width: 64px; height: 64px; color: #f4f0e6; font-size: 11px; font-weight: 700; letter-spacing: .01em; }
+    .wait-button::before { position: absolute; inset: 3px; z-index: 0; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-charcoal-edge))); clip-path: polygon(14% 0, 86% 0, 86% 14%, 100% 14%, 100% 86%, 86% 86%, 86% 100%, 14% 100%, 14% 86%, 0 86%, 0 14%, 14% 14%); }
+    .wait-button:enabled:hover::before { background: linear-gradient(135deg, #3b4647, var(--warm-charcoal)); }
+    .wait-button span { position: relative; z-index: 1; }
+    .wait-button:enabled:active::before { background: var(--warm-pressed); }
+    .direction-button:disabled, .wait-button:disabled { opacity: .38; }
+    dialog { width: min(328px, calc(100% - 32px)); margin: auto; padding: 0; color: var(--warm-ink); background: var(--warm-surface); border: 1px solid var(--warm-grid); border-radius: 14px; box-shadow: 0 18px 50px color-mix(in srgb, var(--warm-charcoal) 26%, transparent); }
+    dialog::backdrop { background: color-mix(in srgb, var(--warm-charcoal) 30%, transparent); }
+    .dialog-body { display: grid; gap: 12px; padding: 18px; }
+    .dialog-title { margin: 0; font-size: 20px; font-weight: 750; letter-spacing: -.04em; }
+    .dialog-room { margin: 0; color: var(--warm-muted); font-size: 14px; }
+    .menu-panel { display: grid; gap: 12px; }
+    .menu-panel[hidden] { display: none; }
+    .menu-save-status { min-height: 18px; margin: 0; color: var(--warm-muted); font-size: 12px; line-height: 1.35; }
+    .menu-actions { display: grid; gap: 8px; }
+    .menu-secondary { color: var(--warm-ink) !important; background: transparent !important; border: 1px solid var(--warm-grid) !important; }
+    .menu-secondary:enabled:hover { background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent) !important; }
+    .menu-confirm-copy { margin: 0; color: var(--warm-ink); font-size: 14px; line-height: 1.45; }
+    .dialog-body button, .share-actions button { min-height: 48px; padding: 0 12px; color: #f4f0e6; background: var(--warm-charcoal); border: 0; border-radius: 9px; box-shadow: none; font-size: 14px; font-weight: 700; }
+    .dialog-body button:enabled:hover, .share-actions button:enabled:hover { background: #21292a; }
+    .share-record { width: 100%; min-height: 58px; padding: 9px 10px; color: var(--warm-ink); background: #fffdf7; border: 1px solid var(--warm-grid); border-radius: 9px; font: inherit; font-size: 13px; line-height: 1.4; resize: vertical; }
+    .share-panel-feedback { min-height: 18px; margin: 0; color: var(--warm-muted); font-size: 12px; line-height: 1.35; }
+    .share-panel-feedback:empty { display: none; }
+    .share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .share-actions .share-close { color: var(--warm-muted); background: transparent; border: 1px solid var(--warm-grid); }
+    .share-actions .share-close:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
+    .share-actions .share-native[hidden] { display: none; }
+    #result-dialog { width: min(286px, calc(100% - 36px)); background: var(--warm-surface); border-color: var(--warm-charcoal); }
+    #result-dialog::backdrop { background: color-mix(in srgb, var(--warm-charcoal) 36%, transparent); }
+    .result-card { position: relative; display: grid; gap: 12px; padding: 22px 18px 18px; background: var(--warm-surface); }
+    .result-title { margin: 0; color: var(--warm-ink); font-size: 24px; font-weight: 750; letter-spacing: -.05em; text-align: center; }
+    .result-turn { margin: 0; color: var(--warm-ink); font-size: 42px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.08em; text-align: center; }
+    .result-par { margin: -6px 0 0; color: var(--warm-muted); font-size: 13px; text-align: center; }
+    .result-share { position: absolute; top: 8px; right: 8px; width: 48px; height: 48px; display: grid; place-items: center; padding: 0; color: var(--warm-ink); background: transparent; border: 0; border-radius: 9px; }
+    .result-share svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    .result-share:enabled:hover, .result-share:enabled:active { background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
+    .result-share[hidden] { display: none; }
+    .result-menu { position: absolute; top: 8px; left: 8px; width: 48px; height: 48px; padding: 0; color: var(--warm-muted); background: transparent; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700; }
+    .result-menu:enabled:hover, .result-menu:enabled:active { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
+    .result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .result-actions.is-single { grid-template-columns: minmax(0, 1fr); }
+    .result-actions button { min-height: 48px; padding: 0 12px; border-radius: 9px; font-size: 14px; font-weight: 700; }
+    .result-retry { color: var(--warm-muted); background: transparent; border: 1px solid var(--warm-grid); }
+    .result-next { color: #f4f0e6; background: var(--warm-charcoal); border: 0; }
+    .result-retry:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
+    .result-next:enabled:hover { background: #21292a; }
+    @media (max-height: 480px) { main#app { height: auto; min-height: 100svh; } .board-stage { min-height: 180px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <header class="utility-bar">
+      <button id="menu-toggle" class="utility-button" type="button" disabled aria-label="게임 메뉴">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </header>
+    <section class="play-layout" aria-label="Few Moves">
+      <section class="board-stage" aria-label="게임 보드">
+        <section class="game">
+          <canvas id="unity-canvas" tabindex="0" aria-label="Few Moves 보드"></canvas>
+        </section>
+        <p id="feedback" class="feedback" role="status" aria-live="polite" hidden></p>
+      </section>
+      <section class="control-slot">
+        <section id="play-controls" class="play-controls" aria-label="조작">
+          <div id="runline" class="runline">
+            <span id="turn-runline">0수</span>
+            <div class="piece-chips" role="group" aria-label="기물 선택">
+              <button class="piece-chip" type="button" data-piece-index="0" aria-pressed="true" aria-label="목표 기물 선택"><span class="piece-mark" aria-hidden="true"></span></button>
+              <button class="piece-chip" type="button" data-piece-index="1" aria-pressed="false" aria-label="호박색 도움 기물 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
+              <button class="piece-chip" type="button" data-piece-index="2" aria-pressed="false" aria-label="청록 도움 기물 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
+            </div>
+            <button class="quiet-reset" type="button" data-game-action="Restart" disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l4 4a7 7 0 1 1-1.4 8.8"/></svg>
+              <span>다시</span>
+            </button>
+          </div>
+          <div class="direction-console" aria-label="방향 조작">
+            <button class="direction-button direction-up" type="button" data-game-action="Up" disabled aria-label="위로 이동"></button>
+            <button class="direction-button direction-left" type="button" data-game-action="Left" disabled aria-label="왼쪽으로 이동"></button>
+            <button class="wait-button" type="button" data-game-action="Undo" disabled aria-label="한 수 되돌리기"><span>되돌림</span></button>
+            <button class="direction-button direction-right" type="button" data-game-action="Right" disabled aria-label="오른쪽으로 이동"></button>
+            <button class="direction-button direction-down" type="button" data-game-action="Down" disabled aria-label="아래로 이동"></button>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+  <dialog id="result-dialog" aria-labelledby="result-title">
+    <section class="result-card">
+      <button id="result-menu" class="result-menu" type="button">메뉴</button>
+      <button id="result-share" class="result-share" type="button" hidden aria-label="기록 공유">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m0 0 4 4m-4-4L8 7M5 13v6h14v-6"/></svg>
+      </button>
+      <p id="result-title" class="result-title">클리어</p>
+      <p id="result-turn" class="result-turn">0수</p>
+      <p id="result-par" class="result-par">최단 0수</p>
+      <div id="result-actions" class="result-actions">
+        <button id="result-retry" class="result-retry" type="button" data-game-action="Restart" disabled>재도전</button>
+        <button id="result-next" class="result-next" type="button" data-game-action="Next" disabled>다음 스테이지</button>
+      </div>
+    </section>
+  </dialog>
+  <dialog id="menu-dialog" aria-labelledby="menu-title">
+    <div class="dialog-body">
+      <section id="menu-main" class="menu-panel">
+        <p id="menu-title" class="dialog-title">Few Moves</p>
+        <p id="menu-room" class="dialog-room">방 —</p>
+        <p id="menu-save-status" class="menu-save-status" role="status" aria-live="polite"></p>
+        <div class="menu-actions">
+          <button id="menu-save" type="button">저장하기</button>
+          <button id="menu-start-over" class="menu-secondary" type="button">처음부터 하기</button>
+          <button id="menu-continue" class="menu-secondary" type="button">계속</button>
+        </div>
+      </section>
+      <section id="menu-confirmation" class="menu-panel" hidden aria-live="polite">
+        <p class="dialog-title">처음부터 할까요?</p>
+        <p class="menu-confirm-copy">현재 진행은 첫 번째 방의 새 진행으로 바뀝니다.</p>
+        <div class="menu-actions">
+          <button id="menu-start-over-confirm" type="button">처음부터 하기</button>
+          <button id="menu-start-over-cancel" class="menu-secondary" type="button">취소</button>
+        </div>
+      </section>
+    </div>
+  </dialog>
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <div class="dialog-body">
+      <p id="share-title" class="dialog-title">기록 공유</p>
+      <textarea id="share-text" class="share-record" readonly aria-label="현재 클리어 기록" spellcheck="false"></textarea>
+      <p id="share-panel-feedback" class="share-panel-feedback" aria-live="polite"></p>
+      <div class="share-actions">
+        <button id="share-copy" type="button">복사</button>
+        <button id="share-native" class="share-native" type="button" hidden>공유</button>
+        <button id="share-close" class="share-close" type="button">닫기</button>
+      </div>
+    </div>
+  </dialog>
+  <script>
+    var canvas = document.querySelector("#unity-canvas");
+    var unityInstance = null;
+    var gameActionButtons = Array.from(document.querySelectorAll("button[data-game-action]"));
+    var pieceButtons = Array.from(document.querySelectorAll("button[data-piece-index]"));
+    var menuButton = document.querySelector("#menu-toggle");
+    var menuDialog = document.querySelector("#menu-dialog");
+    var menuMain = document.querySelector("#menu-main");
+    var menuConfirmation = document.querySelector("#menu-confirmation");
+    var menuContinueButton = document.querySelector("#menu-continue");
+    var menuSaveButton = document.querySelector("#menu-save");
+    var menuStartOverButton = document.querySelector("#menu-start-over");
+    var menuStartOverConfirmButton = document.querySelector("#menu-start-over-confirm");
+    var menuStartOverCancelButton = document.querySelector("#menu-start-over-cancel");
+    var menuRoom = document.querySelector("#menu-room");
+    var menuSaveStatus = document.querySelector("#menu-save-status");
+    var resultDialog = document.querySelector("#result-dialog");
+    var resultMenuButton = document.querySelector("#result-menu");
+    var resultTitle = document.querySelector("#result-title");
+    var resultTurn = document.querySelector("#result-turn");
+    var resultPar = document.querySelector("#result-par");
+    var resultActions = document.querySelector("#result-actions");
+    var resultRetryButton = document.querySelector("#result-retry");
+    var resultNextButton = document.querySelector("#result-next");
+    var resultShareButton = document.querySelector("#result-share");
+    var shareDialog = document.querySelector("#share-dialog");
+    var shareText = document.querySelector("#share-text");
+    var shareCopyButton = document.querySelector("#share-copy");
+    var shareNativeButton = document.querySelector("#share-native");
+    var shareCloseButton = document.querySelector("#share-close");
+    var sharePanelFeedback = document.querySelector("#share-panel-feedback");
+    var feedback = document.querySelector("#feedback");
+    var playControls = document.querySelector("#play-controls");
+    var turnRunline = document.querySelector("#turn-runline");
+    var currentState = null;
+    var stateRevision = 0;
+    var sharePanelSnapshot = null;
+    var nativeOperation = null;
+    var nativeOperationId = 0;
+    var copyOperation = null;
+    var copyOperationId = 0;
+    var menuConfirming = false;
+    var menuReturnsToResult = false;
+
+    function isNonNegativeInteger(value) {
+      return typeof value === "number" && Number.isInteger(value) && value >= 0;
+    }
+    function isPositiveInteger(value) {
+      return typeof value === "number" && Number.isInteger(value) && value > 0;
+    }
+    function isKnownStatusCode(value) {
+      return value === "Playing" || value === "Cleared" || value === "InitializationFailed";
+    }
+    function isKnownSaveStatus(value) {
+      return value === "idle" || value === "changed" || value === "pending" || value === "saved" || value === "failed";
+    }
+    function isValidObservation(state) {
+      if (!state || typeof state !== "object" || Array.isArray(state)) return false;
+      if (typeof state.initialized !== "boolean" || typeof state.inputEnabled !== "boolean" ||
+          typeof state.restartEnabled !== "boolean" || typeof state.nextEnabled !== "boolean" ||
+          typeof state.manualSaveEnabled !== "boolean" || typeof state.startOverEnabled !== "boolean" ||
+          typeof state.savePending !== "boolean" || typeof state.saveStatus !== "string" || typeof state.saveError !== "string" ||
+          typeof state.room !== "string" || typeof state.status !== "string" ||
+          typeof state.statusCode !== "string" || typeof state.message !== "string" ||
+          typeof state.error !== "string" || typeof state.fingerprint !== "string" || typeof state.transitioning !== "boolean" ||
+          !isNonNegativeInteger(state.roomNumber) || !isNonNegativeInteger(state.roomCount) ||
+          !isNonNegativeInteger(state.turn) || !isNonNegativeInteger(state.parMoves) || !isNonNegativeInteger(state.saveRequestId) ||
+          !isNonNegativeInteger(state.pieceCount) || !Number.isInteger(state.selectedPieceIndex) ||
+          !isKnownStatusCode(state.statusCode) || !isKnownSaveStatus(state.saveStatus)) {
+        return false;
+      }
+      if (!state.initialized) return state.statusCode === "InitializationFailed";
+      if (state.savePending && (state.manualSaveEnabled || state.startOverEnabled || state.restartEnabled)) return false;
+      if (state.transitioning && state.manualSaveEnabled) return false;
+      return state.room.length > 0 && isPositiveInteger(state.roomNumber) &&
+        isPositiveInteger(state.roomCount) && state.roomNumber <= state.roomCount &&
+        isPositiveInteger(state.pieceCount) && state.pieceCount <= 3 && state.selectedPieceIndex >= 0 && state.selectedPieceIndex < state.pieceCount &&
+        state.fingerprint.length > 0 && state.statusCode !== "InitializationFailed";
+    }
+    function isInitializedState(state) {
+      return isValidObservation(state) && state.initialized === true && !state.error;
+    }
+    function isClearedState(state) {
+      return isInitializedState(state) && !state.transitioning && state.statusCode === "Cleared";
+    }
+    function canShareState(state) {
+      return isClearedState(state);
+    }
+    function isResultState(state) {
+      return isValidObservation(state) && state.initialized === true && !state.transitioning &&
+        state.statusCode === "Cleared";
+    }
+    function isActionAllowed(action) {
+      var state = currentState;
+      if (!unityInstance || !isValidObservation(state) || !state.initialized) return false;
+      if (action === "Save") return state.manualSaveEnabled === true;
+      if (action === "StartOver") return state.startOverEnabled === true;
+      if (action === "Restart") return state.restartEnabled === true && !state.savePending;
+      if (state.error) return false;
+      if (action === "Undo") return !state.savePending && state.statusCode === "Playing" && (state.transitioning || state.turn > 0);
+      if (state.transitioning) return false;
+      if (action === "Next") return state.statusCode === "Cleared" && state.nextEnabled === true;
+      return state.statusCode === "Playing" && state.inputEnabled === true &&
+        (action === "Up" || action === "Down" || action === "Left" || action === "Right");
+    }
+    function sendGameAction(action) {
+      if (!isActionAllowed(action)) return false;
+      try {
+        unityInstance.SendMessage("GameBootstrap", "HandleInput", action);
+        return true;
+      } catch (error) {
+        setFeedback("입력을 보낼 수 없습니다.");
+        return false;
+      }
+    }
+    function isSelectionAllowed(pieceIndex) {
+      var state = currentState;
+      return !!unityInstance && isInitializedState(state) && !state.savePending && state.inputEnabled === true && !state.transitioning &&
+        state.statusCode === "Playing" && Number.isInteger(pieceIndex) &&
+        pieceIndex >= 0 && pieceIndex < state.pieceCount;
+    }
+    function selectPiece(pieceIndex) {
+      if (!isSelectionAllowed(pieceIndex)) return false;
+      try {
+        unityInstance.SendMessage("GameBootstrap", "SelectPiece", String(pieceIndex));
+        return true;
+      } catch (error) {
+        setFeedback("기물을 선택할 수 없습니다.");
+        return false;
+      }
+    }
+    function setFeedback(text) {
+      feedback.textContent = text || "";
+      feedback.hidden = !text;
+    }
+    function setSharePanelFeedback(text) {
+      sharePanelFeedback.textContent = text || "";
+    }
+    function friendlyError(code) {
+      if (code.indexOf("save_") === 0 || code.indexOf("schema_") === 0 || code.indexOf("game_") === 0 || code.indexOf("content_version_") === 0 || code.indexOf("room_hash_") === 0 || code.indexOf("state_invalid") === 0) {
+        return "저장 데이터를 확인할 수 없습니다. 다시 시작해 주세요.";
+      }
+      if (code.indexOf("asset_") === 0) return "필수 게임 이미지를 확인할 수 없습니다.";
+      if (code.indexOf("content_") === 0) return "방 데이터를 확인할 수 없습니다.";
+      return "게임 상태를 확인할 수 없습니다.";
+    }
+    function usefulStateFeedback(state) {
+      if (!state) return "게임 상태를 확인할 수 없습니다.";
+      if (state.error) return friendlyError(state.error);
+      if (!state.initialized) return "게임을 시작할 수 없습니다.";
+      if (state.transitioning || state.statusCode === "Cleared") return "";
+      if (state.message === "벽에 막혔습니다" || state.message === "그쪽으로 갈 수 없습니다" ||
+          state.message === "그 방향으로는 미끄러질 수 없습니다" || state.message === "알 수 없는 입력입니다") return state.message;
+      return "";
+    }
+    function formatSaveStatus(state) {
+      if (!isValidObservation(state) || !state.initialized) return "저장 정보를 확인할 수 없습니다.";
+      if (state.error) return "저장된 진행을 확인할 수 없습니다. 이 방을 다시 시작하거나 처음부터 할 수 있습니다.";
+      if (state.savePending) return "이 브라우저에 저장하는 중…";
+      if (state.saveStatus === "saved") return "이 브라우저에 저장됨";
+      if (state.saveStatus === "failed") return "저장하지 못했습니다. 다시 저장할 수 있습니다.";
+      if (state.saveStatus === "changed") return "진행이 바뀌었습니다. 저장하기로 확인하세요.";
+      return "저장하기로 이 브라우저 저장을 확인합니다.";
+    }
+    function setMenuConfirmation(open) {
+      menuConfirming = open === true;
+      menuMain.hidden = menuConfirming;
+      menuConfirmation.hidden = !menuConfirming;
+    }
+    function renderMenu(state) {
+      menuSaveStatus.textContent = formatSaveStatus(state);
+      menuSaveButton.disabled = !isActionAllowed("Save");
+      menuStartOverButton.disabled = !isActionAllowed("StartOver");
+      menuStartOverConfirmButton.disabled = !isActionAllowed("StartOver");
+    }
+    function openLocalDialog(dialog) {
+      if (!dialog || dialog.open) return;
+      try {
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else {
+          dialog.open = true;
+          if (typeof dialog.setAttribute === "function") dialog.setAttribute("open", "");
+        }
+      } catch (error) {
+        dialog.open = true;
+        if (typeof dialog.setAttribute === "function") dialog.setAttribute("open", "");
+      }
+    }
+    function closeLocalDialog(dialog) {
+      if (!dialog || !dialog.open) return;
+      if (typeof dialog.close === "function") dialog.close();
+      else {
+        dialog.open = false;
+        if (typeof dialog.removeAttribute === "function") dialog.removeAttribute("open");
+      }
+    }
+    function openMenu(returnsToResult) {
+      menuReturnsToResult = returnsToResult === true;
+      setMenuConfirmation(false);
+      openLocalDialog(menuDialog);
+      renderMenu(currentState);
+    }
+    function closeMenu() {
+      setMenuConfirmation(false);
+      closeLocalDialog(menuDialog);
+    }
+    function openMenuFromResult() {
+      if (!isResultState(currentState)) return;
+      closeSharePanel();
+      closeLocalDialog(resultDialog);
+      openMenu(true);
+    }
+    function isOverlayOpen() {
+      return !!((menuDialog && menuDialog.open) || (resultDialog && resultDialog.open) || (shareDialog && shareDialog.open));
+    }
+    function formatShareRecord(state) {
+      return "Few Moves | 방 " + state.roomNumber + " / " + state.roomCount + " | " + state.turn + "수 클리어";
+    }
+    function createShareSnapshot(state) {
+      return Object.freeze({
+        revision: stateRevision,
+        room: state.room,
+        roomNumber: state.roomNumber,
+        roomCount: state.roomCount,
+        turn: state.turn,
+        fingerprint: state.fingerprint,
+        record: formatShareRecord(state)
+      });
+    }
+    function isSnapshotCurrent(snapshot) {
+      var state = currentState;
+      return !!snapshot && stateRevision === snapshot.revision && canShareState(state) &&
+        state.room === snapshot.room && state.roomNumber === snapshot.roomNumber &&
+        state.roomCount === snapshot.roomCount && state.turn === snapshot.turn &&
+        state.fingerprint === snapshot.fingerprint;
+    }
+    function isSharePanelCurrent(snapshot) {
+      return !!(shareDialog && shareDialog.open) && sharePanelSnapshot === snapshot && isSnapshotCurrent(snapshot);
+    }
+    function closeSharePanel() {
+      sharePanelSnapshot = null;
+      setSharePanelFeedback("");
+      closeLocalDialog(shareDialog);
+    }
+    function renderSharePanel() {
+      var snapshot = sharePanelSnapshot;
+      var isCurrent = isSharePanelCurrent(snapshot);
+      var copyBusyForCurrent = !!copyOperation && copyOperation.snapshot === snapshot;
+      shareCopyButton.disabled = !isCurrent || copyBusyForCurrent;
+      shareNativeButton.hidden = typeof navigator.share !== "function";
+      shareNativeButton.disabled = !isCurrent || !!nativeOperation;
+    }
+    function openSharePanel() {
+      if (!canShareState(currentState) || !resultDialog.open) return;
+      sharePanelSnapshot = createShareSnapshot(currentState);
+      shareText.value = sharePanelSnapshot.record;
+      setSharePanelFeedback("");
+      openLocalDialog(shareDialog);
+      renderSharePanel();
+    }
+    async function copyShareRecord() {
+      var snapshot = sharePanelSnapshot;
+      if (!isSharePanelCurrent(snapshot)) return;
+      var operation = { id: ++copyOperationId, snapshot: snapshot };
+      copyOperation = operation;
+      renderSharePanel();
+      try {
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+          if (isSharePanelCurrent(snapshot) && copyOperation === operation) {
+            setSharePanelFeedback("위 기록을 선택해 직접 복사하세요.");
+          }
+          return;
+        }
+        await navigator.clipboard.writeText(snapshot.record);
+        if (isSharePanelCurrent(snapshot) && copyOperation === operation) {
+          setSharePanelFeedback("기록을 클립보드에 복사했습니다.");
+        }
+      } catch (error) {
+        if (isSharePanelCurrent(snapshot) && copyOperation === operation) {
+          setSharePanelFeedback("위 기록을 선택해 직접 복사하세요.");
+        }
+      } finally {
+        if (copyOperation === operation) {
+          copyOperation = null;
+          if (shareDialog.open) renderSharePanel();
+        }
+      }
+    }
+    async function requestNativeShare() {
+      var snapshot = sharePanelSnapshot;
+      if (!isSharePanelCurrent(snapshot) || nativeOperation || typeof navigator.share !== "function") return;
+      var operation = { id: ++nativeOperationId, snapshot: snapshot };
+      nativeOperation = operation;
+      renderSharePanel();
+      try {
+        await navigator.share({ title: "Few Moves", text: snapshot.record });
+        if (nativeOperation === operation && isSharePanelCurrent(snapshot)) {
+          setSharePanelFeedback("공유창을 열었습니다.");
+        }
+      } catch (error) {
+        if (error && error.name === "AbortError") return;
+        if (nativeOperation === operation && isSharePanelCurrent(snapshot)) {
+          setSharePanelFeedback("공유창을 열지 못했습니다. 위 기록을 복사할 수 있습니다.");
+        }
+      } finally {
+        if (nativeOperation === operation) {
+          nativeOperation = null;
+          if (shareDialog.open) renderSharePanel();
+        }
+      }
+    }
+    function renderGameButtons() {
+      gameActionButtons.forEach(function (button) {
+        button.disabled = !isActionAllowed(button.dataset.gameAction);
+      });
+    }
+    function renderPieceButtons(state) {
+      pieceButtons.forEach(function (button) {
+        var index = Number(button.dataset.pieceIndex);
+        var visible = !!state && state.initialized && index >= 0 && index < state.pieceCount;
+        button.hidden = !visible;
+        button.disabled = !isSelectionAllowed(index);
+        button.setAttribute("aria-pressed", String(visible && state.selectedPieceIndex === index));
+      });
+    }
+    function renderResultDialog(state) {
+      if (!isResultState(state)) {
+        resultMenuButton.disabled = true;
+        closeLocalDialog(resultDialog);
+        return;
+      }
+      if (menuDialog.open) {
+        resultMenuButton.disabled = false;
+        return;
+      }
+
+      var cleared = state.statusCode === "Cleared";
+      resultTitle.textContent = "클리어";
+      resultTurn.textContent = state.turn + "수";
+      resultPar.textContent = "최단 " + state.parMoves + "수";
+      resultMenuButton.disabled = false;
+      resultNextButton.hidden = !cleared || !state.nextEnabled;
+      resultShareButton.hidden = !canShareState(state);
+      resultShareButton.disabled = !canShareState(state);
+      resultActions.classList.toggle("is-single", resultNextButton.hidden);
+      openLocalDialog(resultDialog);
+    }
+    function renderState(state) {
+      var roomLabel = state && state.initialized ? "방 " + state.roomNumber + " / " + state.roomCount : "방 —";
+      menuRoom.textContent = roomLabel;
+      menuButton.disabled = !state || !state.initialized;
+      turnRunline.textContent = state ? state.turn + "수" : "0수";
+      playControls.hidden = isResultState(state);
+      setFeedback(usefulStateFeedback(state));
+      renderGameButtons();
+      renderPieceButtons(state);
+      renderMenu(state);
+      if (!canShareState(state) && shareDialog.open) closeSharePanel();
+      if (shareDialog.open) renderSharePanel();
+      renderResultDialog(state);
+    }
+    function invalidateState(message) {
+      stateRevision += 1;
+      currentState = null;
+      window.__nectorial.state = null;
+      closeSharePanel();
+      menuReturnsToResult = false;
+      setMenuConfirmation(false);
+      closeLocalDialog(menuDialog);
+      closeLocalDialog(resultDialog);
+      menuButton.disabled = true;
+      menuRoom.textContent = "방 —";
+      turnRunline.textContent = "0수";
+      playControls.hidden = false;
+      resultNextButton.hidden = true;
+      resultMenuButton.disabled = true;
+      resultShareButton.hidden = true;
+      resultShareButton.disabled = true;
+      renderGameButtons();
+      renderPieceButtons(null);
+      setFeedback(message);
+    }
+    function receiveState(json) {
+      var state;
+      try { state = JSON.parse(json); } catch (error) { invalidateState("상태 데이터를 확인할 수 없습니다."); return; }
+      stateRevision += 1;
+      if (!isValidObservation(state)) {
+        currentState = null;
+        window.__nectorial.state = null;
+        closeSharePanel();
+        renderState(null);
+        setFeedback("상태 데이터를 확인할 수 없습니다.");
+        return;
+      }
+      currentState = Object.freeze(state);
+      window.__nectorial.state = currentState;
+      renderState(currentState);
+      window.dispatchEvent(new CustomEvent("nectorial-state", { detail: currentState }));
+    }
+    function actionForKeyboardEvent(event) {
+      if (event.code === "ArrowUp") return "Up";
+      if (event.code === "ArrowDown") return "Down";
+      if (event.code === "ArrowLeft") return "Left";
+      if (event.code === "ArrowRight") return "Right";
+      if (event.code === "Space" || event.key === " " || event.key === "Spacebar") return "Undo";
+      if (event.code === "KeyR" || String(event.key || "").toLowerCase() === "r") return "Restart";
+      return null;
+    }
+    function selectionForKeyboardEvent(event) {
+      if (event.code === "Digit1" || event.code === "Numpad1" || event.key === "1") return 0;
+      if (event.code === "Digit2" || event.code === "Numpad2" || event.key === "2") return 1;
+      if (event.code === "Digit3" || event.code === "Numpad3" || event.key === "3") return 2;
+      return -1;
+    }
+    function isEditableOrDialogTarget(target) {
+      if (!target || typeof target.closest !== "function") return false;
+      return !!target.closest("input, textarea, select, option, [contenteditable], dialog");
+    }
+    function isNativeButtonActivation(event) {
+      if (!event.target || typeof event.target.closest !== "function") return false;
+      if (!event.target.closest("button")) return false;
+      return event.code === "Space" || event.code === "Enter" || event.key === " " || event.key === "Spacebar" || event.key === "Enter";
+    }
+    document.addEventListener("keydown", function (event) {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (isOverlayOpen() || isEditableOrDialogTarget(event.target)) return;
+      if (isNativeButtonActivation(event)) {
+        if (event.repeat) event.preventDefault();
+        return;
+      }
+      var selection = selectionForKeyboardEvent(event);
+      if (selection >= 0) {
+        if (!isSelectionAllowed(selection)) return;
+        event.preventDefault();
+        if (event.repeat) return;
+        selectPiece(selection);
+        return;
+      }
+      var action = actionForKeyboardEvent(event);
+      if (!action || !isActionAllowed(action)) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      sendGameAction(action);
+    });
+    window.__nectorial = { state: null, receiveState: receiveState };
+    gameActionButtons.forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        if (event && (event.ctrlKey || event.metaKey || event.altKey)) return;
+        sendGameAction(button.dataset.gameAction);
+      });
+    });
+    pieceButtons.forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        if (event && (event.ctrlKey || event.metaKey || event.altKey)) return;
+        selectPiece(Number(button.dataset.pieceIndex));
+      });
+    });
+    menuButton.addEventListener("click", function () {
+      if (!currentState || !currentState.initialized) return;
+      openMenu(false);
+    });
+    menuSaveButton.addEventListener("click", function () { sendGameAction("Save"); });
+    menuStartOverButton.addEventListener("click", function () {
+      if (!isActionAllowed("StartOver")) return;
+      setMenuConfirmation(true);
+    });
+    menuStartOverConfirmButton.addEventListener("click", function () {
+      if (!menuConfirming || !isActionAllowed("StartOver")) return;
+      setMenuConfirmation(false);
+      sendGameAction("StartOver");
+    });
+    menuStartOverCancelButton.addEventListener("click", function () { setMenuConfirmation(false); });
+    menuContinueButton.addEventListener("click", closeMenu);
+    resultMenuButton.addEventListener("click", openMenuFromResult);
+    resultShareButton.addEventListener("click", openSharePanel);
+    shareCopyButton.addEventListener("click", function () { copyShareRecord(); });
+    shareNativeButton.addEventListener("click", function () { requestNativeShare(); });
+    shareCloseButton.addEventListener("click", closeSharePanel);
+    resultDialog.addEventListener("cancel", function (event) { event.preventDefault(); });
+    menuDialog.addEventListener("cancel", function (event) {
+      event.preventDefault();
+      if (menuConfirming) {
+        setMenuConfirmation(false);
+        return;
+      }
+      closeMenu();
+    });
+    menuDialog.addEventListener("close", function () {
+      var shouldRestoreResult = menuReturnsToResult;
+      menuReturnsToResult = false;
+      setMenuConfirmation(false);
+      if (shouldRestoreResult && isResultState(currentState)) openLocalDialog(resultDialog);
+    });
+    shareDialog.addEventListener("close", function () {
+      sharePanelSnapshot = null;
+      setSharePanelFeedback("");
+    });
+    var buildUrl = "Build";
+    var config = {
+      arguments: [],
+      dataUrl: buildUrl + "/a9c5a097d39840db1d2dafdc13da66da.data",
+      frameworkUrl: buildUrl + "/ff40936987a0d675922ddfe80881f463.framework.js",
+      codeUrl: buildUrl + "/a8160b313988cf3c242db7f577b4a269.wasm",
+      symbolsUrl: buildUrl + "/2c2182339a70a1cc8a02f9adeaf4e4f9.symbols.json",
+      streamingAssetsUrl: "StreamingAssets",
+      autoSyncPersistentDataPath: true,
+      companyName: "Independent",
+      productName: "Few Moves",
+      productVersion: "0.0.1"
+    };
+    var script = document.createElement("script");
+    script.src = buildUrl + "/af3abfbab840595d7342025035a59299.loader.js";
+    script.onload = function () {
+      createUnityInstance(canvas, config).then(function (instance) {
+        unityInstance = instance;
+        reportReducedMotionPreference();
+        if (currentState) renderState(currentState);
+      }).catch(showLoadError);
+    };
+    script.onerror = function () { showLoadError("로더 파일을 불러오지 못했습니다."); };
+    document.body.appendChild(script);
+    function showLoadError(error) {
+      console.error(error);
+      unityInstance = null;
+      invalidateState("게임을 시작할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.");
+    }
+    function reportReducedMotionPreference() {
+      if (!unityInstance) return;
+      var reduced = false;
+      try { reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (error) {}
+      unityInstance.SendMessage("GameBootstrap", "SetReducedMotion", reduced ? "true" : "false");
+    }
+  </script>
+</body>
+</html>
