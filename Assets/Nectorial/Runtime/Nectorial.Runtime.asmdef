@@ -1,19 +1,18 @@
 {
-  "name": "Nectorial.Runtime",
-  "rootNamespace": "Nectorial.SlideEscape.Unity",
-  "references": [
-    "AppsInToss.Helpers",
-    "AppsInTossSDK",
-    "Nectorial.Core",
-    "Nectorial.SlideCore"
-  ],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "overrideReferences": false,
-  "precompiledReferences": [],
-  "autoReferenced": true,
-  "defineConstraints": [],
-  "versionDefines": [],
-  "noEngineReferences": false
+    "name": "Nectorial.Runtime",
+    "rootNamespace": "Nectorial.SlideEscape.Unity",
+    "references": [
+        "AppsInToss.Helpers",
+        "AppsInTossSDK",
+        "Nectorial.SlideCore"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
