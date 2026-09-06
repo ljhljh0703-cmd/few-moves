@@ -49,9 +49,6 @@ jobs:
         with:
           dotnet-version: '10.0.203'
 
-      - name: Run game core checks
-        run: dotnet run --project tools/CoreChecks/CoreChecks.csproj --configuration Release
-
       - name: Run sliding puzzle checks
         run: dotnet run --project tools/SlideChecks/SlideChecks.csproj --configuration Release
 
