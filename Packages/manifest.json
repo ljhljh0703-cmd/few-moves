@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "im.toss.apps-in-toss-unity-sdk": "https://github.com/toss/apps-in-toss-unity-sdk.git#f344f6facc3eeae848adb56630aa36597bd91be9"
+  }
+}

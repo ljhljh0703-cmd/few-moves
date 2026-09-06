@@ -1,0 +1,1302 @@
+{
+  "schema_version": 1,
+  "kind": "public-source-snapshot",
+  "project": "few-moves",
+  "source": {
+    "commit": "77407588b215db85edb70e8cd6a95da3caefde43",
+    "history_included": false
+  },
+  "selected_files": [
+    {
+      "path": ".github/CODEOWNERS",
+      "bytes": 385,
+      "sha256": "167c1fcb4fe8a1065a491adcaad52212de1168174d8d3f35668f45ec89dffec4",
+      "provenance": "public_staging"
+    },
+    {
+      "path": ".github/workflows/verify.yml",
+      "bytes": 1735,
+      "sha256": "f57ec06d6b5ed2e31be9d4fd58337b3bb11f42a7c2285f8514d8ea949f7fc0ee",
+      "provenance": "public_staging"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 760,
+      "sha256": "75a39b7dab4d884b2430f29744f11f9b71054079f78cb045618c5bea68f91d3e",
+      "provenance": "documented_transform",
+      "source_sha256": "8ea551914b60168eace98009851e1e4e26740c13cbf111e831487a5094f9e1cf"
+    },
+    {
+      "path": "Assets/AppsInToss.meta",
+      "bytes": 169,
+      "sha256": "45ea051a26178513c045bb055ca38b569eeaaa891666f2d62ff4bd134203ce96",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "45ea051a26178513c045bb055ca38b569eeaaa891666f2d62ff4bd134203ce96"
+    },
+    {
+      "path": "Assets/AppsInToss/Editor.meta",
+      "bytes": 169,
+      "sha256": "54da53f0d88663484a5e594ab7bd508da35aeb58b12d137a6cfec37513d55d8c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "54da53f0d88663484a5e594ab7bd508da35aeb58b12d137a6cfec37513d55d8c"
+    },
+    {
+      "path": "Assets/AppsInToss/Editor/AITConfig.asset",
+      "bytes": 1737,
+      "sha256": "8dd62b630526299f79ff8ebbde1fae7662cbd22d383f4ba6ad94461bb1c69cae",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "8dd62b630526299f79ff8ebbde1fae7662cbd22d383f4ba6ad94461bb1c69cae"
+    },
+    {
+      "path": "Assets/AppsInToss/Editor/AITConfig.asset.meta",
+      "bytes": 186,
+      "sha256": "cbfb1e21fa56e545914e54066185690a4bf71e3c5dcf0d9bafcd311811bf4037",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "cbfb1e21fa56e545914e54066185690a4bf71e3c5dcf0d9bafcd311811bf4037"
+    },
+    {
+      "path": "Assets/Editor.meta",
+      "bytes": 169,
+      "sha256": "207ee8f78176271bb339a18c92f967b758cd241ec1a58feae45edb4a2a4da9f6",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "207ee8f78176271bb339a18c92f967b758cd241ec1a58feae45edb4a2a4da9f6"
+    },
+    {
+      "path": "Assets/Editor/WebGLBootstrap.cs",
+      "bytes": 5376,
+      "sha256": "9677eebdd9add4201238f6e04dc3808ff0ee97fa2fb8a01f65a1c23a14592bb4",
+      "provenance": "documented_transform",
+      "source_sha256": "91e7e6ee6c35878313b3648c90be7026c23eeb347a016d7aca0b21cf8925dce5"
+    },
+    {
+      "path": "Assets/Editor/WebGLBootstrap.cs.meta",
+      "bytes": 59,
+      "sha256": "10b19ab12c6a34fa279e9f66502a6a7760e04d5bbb68b6f9029da9ac1a9b87b8",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "10b19ab12c6a34fa279e9f66502a6a7760e04d5bbb68b6f9029da9ac1a9b87b8"
+    },
+    {
+      "path": "Assets/Nectorial.meta",
+      "bytes": 172,
+      "sha256": "92d73827ab7fe08b4bb3132041da64c55c6a2dbf336aa87267fd3119e2c39328",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "92d73827ab7fe08b4bb3132041da64c55c6a2dbf336aa87267fd3119e2c39328"
+    },
+    {
+      "path": "Assets/Nectorial/Core.meta",
+      "bytes": 60,
+      "sha256": "efe91e1401a079a66fd8e34a1452922d3a158f573801cff49b5ec0d27f12272a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "efe91e1401a079a66fd8e34a1452922d3a158f573801cff49b5ec0d27f12272a"
+    },
+    {
+      "path": "Assets/Nectorial/Core/GameEngine.cs",
+      "bytes": 32823,
+      "sha256": "679de592c1b8d80e3d01bef8aa274f16636d3373023cbd3c160b2f2dbc21f017",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "679de592c1b8d80e3d01bef8aa274f16636d3373023cbd3c160b2f2dbc21f017"
+    },
+    {
+      "path": "Assets/Nectorial/Core/GameEngine.cs.meta",
+      "bytes": 60,
+      "sha256": "ad5ba7073d9407e13b1f20b6c8fa0af1cf45f49f2fb9fcb8b9277fe22ec3f511",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ad5ba7073d9407e13b1f20b6c8fa0af1cf45f49f2fb9fcb8b9277fe22ec3f511"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Nectorial.Core.asmdef",
+      "bytes": 343,
+      "sha256": "29161d6c9289e9e8a0e4a69c4a60115651a1faf87856dab02d7bf44f0939d9e9",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "29161d6c9289e9e8a0e4a69c4a60115651a1faf87856dab02d7bf44f0939d9e9"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Nectorial.Core.asmdef.meta",
+      "bytes": 60,
+      "sha256": "98fd884a48642090d8ed33eb851dd6e4d553693d822af67739e3fbfa11459dd2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "98fd884a48642090d8ed33eb851dd6e4d553693d822af67739e3fbfa11459dd2"
+    },
+    {
+      "path": "Assets/Nectorial/Core/SaveCodec.cs",
+      "bytes": 3372,
+      "sha256": "e340cc146a609b46588516b075a00d3f64279cc2897f1c76db4efeacdf6ba094",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e340cc146a609b46588516b075a00d3f64279cc2897f1c76db4efeacdf6ba094"
+    },
+    {
+      "path": "Assets/Nectorial/Core/SaveCodec.cs.meta",
+      "bytes": 60,
+      "sha256": "27f5e65f6b428b458ed22dce4730aca57e5d3ba630f758c2f5a7dd982db44125",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "27f5e65f6b428b458ed22dce4730aca57e5d3ba630f758c2f5a7dd982db44125"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Solver.cs",
+      "bytes": 4393,
+      "sha256": "61a02f3e15a9c3e3730346f4b6bbc3cc9a1c23dc09ec65698d2701b64d80b9a4",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "61a02f3e15a9c3e3730346f4b6bbc3cc9a1c23dc09ec65698d2701b64d80b9a4"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Solver.cs.meta",
+      "bytes": 60,
+      "sha256": "1d7419c0025168804724f8635702372c122f2bee66355f57205a4bf5e66908b0",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1d7419c0025168804724f8635702372c122f2bee66355f57205a4bf5e66908b0"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Types.cs",
+      "bytes": 2203,
+      "sha256": "42ea32c338c36f4f3ba31f64a4607535247b29102e14085c51da7d72a88db5df",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "42ea32c338c36f4f3ba31f64a4607535247b29102e14085c51da7d72a88db5df"
+    },
+    {
+      "path": "Assets/Nectorial/Core/Types.cs.meta",
+      "bytes": 60,
+      "sha256": "0aea7ee45bfd835ac43c0225d78d2e5a7a56cfb54e54cc6bf4257f1aeccdcc40",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "0aea7ee45bfd835ac43c0225d78d2e5a7a56cfb54e54cc6bf4257f1aeccdcc40"
+    },
+    {
+      "path": "Assets/Nectorial/Resources.meta",
+      "bytes": 60,
+      "sha256": "4325c69b276c569adc52328c5291380e405b642276f24c3a985a56789c57ba4a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "4325c69b276c569adc52328c5291380e405b642276f24c3a985a56789c57ba4a"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms.meta",
+      "bytes": 60,
+      "sha256": "244dbb59c89d9d76e91927e4236f7ef15cb2f5fc984c1acddb8823ff44a8a0b8",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "244dbb59c89d9d76e91927e4236f7ef15cb2f5fc984c1acddb8823ff44a8a0b8"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-01.json",
+      "bytes": 305,
+      "sha256": "95cbaf624aabd03e950469433b1e4c751a50908b1a685e3f79c57d2d3a821791",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "95cbaf624aabd03e950469433b1e4c751a50908b1a685e3f79c57d2d3a821791"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-01.json.meta",
+      "bytes": 164,
+      "sha256": "2696c424b12cde83d33ce32d1ffba7f2d3dec56c1f4b0f5b12cb1c810f565a25",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2696c424b12cde83d33ce32d1ffba7f2d3dec56c1f4b0f5b12cb1c810f565a25"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-02.json",
+      "bytes": 305,
+      "sha256": "b2b97b6c50f201a58bbeb06a7473194912513255b6d5dead4318397d36be94e2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "b2b97b6c50f201a58bbeb06a7473194912513255b6d5dead4318397d36be94e2"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-02.json.meta",
+      "bytes": 164,
+      "sha256": "599baa1da63af441f6644f0471307d45d2d58028ed83d1e53095ef8912cc0155",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "599baa1da63af441f6644f0471307d45d2d58028ed83d1e53095ef8912cc0155"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-03.json",
+      "bytes": 305,
+      "sha256": "c249d43eb9537b8a7165ecc379380c4ae7abaeba2b4a2cf617a19c33b9640e9f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "c249d43eb9537b8a7165ecc379380c4ae7abaeba2b4a2cf617a19c33b9640e9f"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-03.json.meta",
+      "bytes": 164,
+      "sha256": "4067d1c4db0baf8bb45d68a075c98b0ed584f63760249cdfaa0414033038ed9a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "4067d1c4db0baf8bb45d68a075c98b0ed584f63760249cdfaa0414033038ed9a"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-04.json",
+      "bytes": 449,
+      "sha256": "e352b59a09fde2a958f612762b0cfd5a7f4166f391125b4ccad578a2305ee18b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e352b59a09fde2a958f612762b0cfd5a7f4166f391125b4ccad578a2305ee18b"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-04.json.meta",
+      "bytes": 164,
+      "sha256": "72cfc886e31398d431e5b1b055a81c5496b507cf51212dc722ee7d0f4caac06d",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "72cfc886e31398d431e5b1b055a81c5496b507cf51212dc722ee7d0f4caac06d"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-05.json",
+      "bytes": 449,
+      "sha256": "42d51ccc173fec25798078c11ee02db42618dc7a0f046cb1eca7b21583b4b5b3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "42d51ccc173fec25798078c11ee02db42618dc7a0f046cb1eca7b21583b4b5b3"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-05.json.meta",
+      "bytes": 164,
+      "sha256": "9ed03cb81d184e3e610d48c8cbcd5d8bef9b69aa7a86a84d59eab00acd6731e1",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "9ed03cb81d184e3e610d48c8cbcd5d8bef9b69aa7a86a84d59eab00acd6731e1"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-06.json",
+      "bytes": 504,
+      "sha256": "b5c70e2b1974bcb8e898bf5b39a6c23946cd8cbb9d76ec5bb5c36c88f7c3460f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "b5c70e2b1974bcb8e898bf5b39a6c23946cd8cbb9d76ec5bb5c36c88f7c3460f"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-06.json.meta",
+      "bytes": 164,
+      "sha256": "f7ec4435480241893c5bd1c6e34e8c323afa40fbe75df97932a5826292fad9ad",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "f7ec4435480241893c5bd1c6e34e8c323afa40fbe75df97932a5826292fad9ad"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-07.json",
+      "bytes": 448,
+      "sha256": "91c83ffb3e5e68caf66014f46c16ced09249af835c0f86e4037bdcb908376d60",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "91c83ffb3e5e68caf66014f46c16ced09249af835c0f86e4037bdcb908376d60"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-07.json.meta",
+      "bytes": 164,
+      "sha256": "6b079c004649b27b049dbb3c20695758e593a78fc0484a7d6536e49f271141c6",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "6b079c004649b27b049dbb3c20695758e593a78fc0484a7d6536e49f271141c6"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-08.json",
+      "bytes": 592,
+      "sha256": "a3147dcb5bcc58f7443f44c093812cf2589979b5673a9c571840532846c4bf45",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a3147dcb5bcc58f7443f44c093812cf2589979b5673a9c571840532846c4bf45"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-08.json.meta",
+      "bytes": 164,
+      "sha256": "7631bb58c1edaf2219d853e1ab2b26066dfb596c5635f8d6e6c242c87bf86a7f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7631bb58c1edaf2219d853e1ab2b26066dfb596c5635f8d6e6c242c87bf86a7f"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-09.json",
+      "bytes": 704,
+      "sha256": "7eff3ad77de0295d499a1842969b8860e4044724b1725a8a0cc8f2c11ef932dd",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7eff3ad77de0295d499a1842969b8860e4044724b1725a8a0cc8f2c11ef932dd"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-09.json.meta",
+      "bytes": 164,
+      "sha256": "ba33d447d3bb0b0e2579b9924869b2c5169321f2d568238281748ba873c9016a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ba33d447d3bb0b0e2579b9924869b2c5169321f2d568238281748ba873c9016a"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-10.json",
+      "bytes": 744,
+      "sha256": "9a230261a614930da2d7538a2bb74130f6f06862f282a13954b6e4156df400b3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "9a230261a614930da2d7538a2bb74130f6f06862f282a13954b6e4156df400b3"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-10.json.meta",
+      "bytes": 164,
+      "sha256": "c3a4ece787d1576834dfe8b8c0ef9bfd39a1f5160ac723c96cc4305b951b5af2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "c3a4ece787d1576834dfe8b8c0ef9bfd39a1f5160ac723c96cc4305b951b5af2"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-11.json",
+      "bytes": 737,
+      "sha256": "e643c1e9302ce5768a1bba3373afbde8789de38e8b8508dd54268dfb00b0d2b0",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e643c1e9302ce5768a1bba3373afbde8789de38e8b8508dd54268dfb00b0d2b0"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-11.json.meta",
+      "bytes": 164,
+      "sha256": "2e0cf4c739b5d8d4e97b2c19501558a18af79e584b0ff62ac8fe04db9bbe5f44",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2e0cf4c739b5d8d4e97b2c19501558a18af79e584b0ff62ac8fe04db9bbe5f44"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-12.json",
+      "bytes": 889,
+      "sha256": "4376b5746712c4824f351ac489852cd123116909766a53b63a501f57a2efc8dd",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "4376b5746712c4824f351ac489852cd123116909766a53b63a501f57a2efc8dd"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Rooms/room-12.json.meta",
+      "bytes": 164,
+      "sha256": "c03ced93540aa7ba644cfab678d819fda6d761bda7ba840c63188b09f334db16",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "c03ced93540aa7ba644cfab678d819fda6d761bda7ba840c63188b09f334db16"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms.meta",
+      "bytes": 60,
+      "sha256": "7836a4e03d8c8916a74470385645e4a3bbcfd250bf755c8a22ae5c84fcffed1c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7836a4e03d8c8916a74470385645e4a3bbcfd250bf755c8a22ae5c84fcffed1c"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-01.json",
+      "bytes": 339,
+      "sha256": "a18477f7198a937d7460205709abf334a0f0f3c6ccd20f4a262003338b00e49e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a18477f7198a937d7460205709abf334a0f0f3c6ccd20f4a262003338b00e49e"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-01.json.meta",
+      "bytes": 60,
+      "sha256": "ed075a2c0bd2d72cb30bba4ba665b32fbf4ac3ec6dee9b022a553072d0772f6f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ed075a2c0bd2d72cb30bba4ba665b32fbf4ac3ec6dee9b022a553072d0772f6f"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-02.json",
+      "bytes": 339,
+      "sha256": "6b40951db16a3701dce6328a2257b74d4c22330a05c22a25c3c1dbf0dd68914c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "6b40951db16a3701dce6328a2257b74d4c22330a05c22a25c3c1dbf0dd68914c"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-02.json.meta",
+      "bytes": 60,
+      "sha256": "6b4d0a8361e9e642ccf4c4b65ab2b48de4dccabfa29bfa7f92283c22a21e7e78",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "6b4d0a8361e9e642ccf4c4b65ab2b48de4dccabfa29bfa7f92283c22a21e7e78"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-03.json",
+      "bytes": 394,
+      "sha256": "ad5ca001ab72c60a284d37b6fa5f0f86171936e92e7fb9b726222d89b89ceade",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ad5ca001ab72c60a284d37b6fa5f0f86171936e92e7fb9b726222d89b89ceade"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-03.json.meta",
+      "bytes": 60,
+      "sha256": "fa091add4f16e197ea9aa8dd1dc6df13984b76860c97a2c2fe3eff14195dfeb3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "fa091add4f16e197ea9aa8dd1dc6df13984b76860c97a2c2fe3eff14195dfeb3"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-04.json",
+      "bytes": 394,
+      "sha256": "695388ea637dc5841b86692e3c7dbc8a46373cdf57c0848192ba2082953ef175",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "695388ea637dc5841b86692e3c7dbc8a46373cdf57c0848192ba2082953ef175"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-04.json.meta",
+      "bytes": 60,
+      "sha256": "534f65be2523645cdbbbce8e639b84d238c221a44c10c5c54583f38632ecabec",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "534f65be2523645cdbbbce8e639b84d238c221a44c10c5c54583f38632ecabec"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-05.json",
+      "bytes": 394,
+      "sha256": "a598e433564e2bff624ab6ff75c54e29af957ca427f23c6684a095c1129395bd",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a598e433564e2bff624ab6ff75c54e29af957ca427f23c6684a095c1129395bd"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-05.json.meta",
+      "bytes": 60,
+      "sha256": "7ce0c688b70de7534d9e123f5cec0d6042e47a99c023f2b2e292ccbd0ab626a9",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7ce0c688b70de7534d9e123f5cec0d6042e47a99c023f2b2e292ccbd0ab626a9"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-06.json",
+      "bytes": 394,
+      "sha256": "76b2c1c308af98a8ee9601ba875dc5d7866ce5b4eb3da67d08e9503454dabaa9",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "76b2c1c308af98a8ee9601ba875dc5d7866ce5b4eb3da67d08e9503454dabaa9"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-06.json.meta",
+      "bytes": 60,
+      "sha256": "051c4ffd8ea0d500d5f7036a64a147385e7843a2a83ac8ce92fa3be5c45d8791",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "051c4ffd8ea0d500d5f7036a64a147385e7843a2a83ac8ce92fa3be5c45d8791"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-07.json",
+      "bytes": 394,
+      "sha256": "41cb4602685e335e93e7395cdb61f5a8f5b592348c73a0dee57db8d52ff03403",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "41cb4602685e335e93e7395cdb61f5a8f5b592348c73a0dee57db8d52ff03403"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-07.json.meta",
+      "bytes": 60,
+      "sha256": "64a4de64c64e092923b7bfae7dcc2ef937e90ff3985def2fb88b33d50c748c2f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "64a4de64c64e092923b7bfae7dcc2ef937e90ff3985def2fb88b33d50c748c2f"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-08.json",
+      "bytes": 394,
+      "sha256": "539da3e554f0dac47ad68e23436b2ac853f44c19827b7967448175108b6b6fec",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "539da3e554f0dac47ad68e23436b2ac853f44c19827b7967448175108b6b6fec"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-08.json.meta",
+      "bytes": 60,
+      "sha256": "50d44edf3d44da45f7eee67206ffce2de1f364e1a635ee7915853a357f1794e3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "50d44edf3d44da45f7eee67206ffce2de1f364e1a635ee7915853a357f1794e3"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-09.json",
+      "bytes": 449,
+      "sha256": "a5f180676569ccb478049174596ee0fa226d5ef5a840c5dafde07f9d37828f75",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a5f180676569ccb478049174596ee0fa226d5ef5a840c5dafde07f9d37828f75"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-09.json.meta",
+      "bytes": 60,
+      "sha256": "d1da812b77faf2f5a2218c0e3541e71a9d8a456cf57ec72fdd5369882a63de1b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "d1da812b77faf2f5a2218c0e3541e71a9d8a456cf57ec72fdd5369882a63de1b"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-10.json",
+      "bytes": 449,
+      "sha256": "2166a5261e10ccda3d61a32acac0ec92d98a703ecfe3a388d725d343033e34b8",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2166a5261e10ccda3d61a32acac0ec92d98a703ecfe3a388d725d343033e34b8"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-10.json.meta",
+      "bytes": 60,
+      "sha256": "89dae2e19a0bac8fcbc5e92bed69b82cd361b1992a542fda069269bd369f5395",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "89dae2e19a0bac8fcbc5e92bed69b82cd361b1992a542fda069269bd369f5395"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-11.json",
+      "bytes": 450,
+      "sha256": "fcf62438770ded5e07692528ae21b19eca36e47be2993ca8eaf84faf544a63d5",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "fcf62438770ded5e07692528ae21b19eca36e47be2993ca8eaf84faf544a63d5"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-11.json.meta",
+      "bytes": 60,
+      "sha256": "39fd24df646f2856303bd48f6e928f543fd28ca98206e1937c923bf3bca88b4e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "39fd24df646f2856303bd48f6e928f543fd28ca98206e1937c923bf3bca88b4e"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-12.json",
+      "bytes": 450,
+      "sha256": "9d24d2d8c3a62c6c412964fe98f1e88c8badc299e088becd02f0047e5c422734",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "9d24d2d8c3a62c6c412964fe98f1e88c8badc299e088becd02f0047e5c422734"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/SlideRooms/room-12.json.meta",
+      "bytes": 60,
+      "sha256": "e058e8650dcbbe0e90943ba916a87259d20d92d22eae294b93f392587c81a264",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e058e8650dcbbe0e90943ba916a87259d20d92d22eae294b93f392587c81a264"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Visuals.meta",
+      "bytes": 169,
+      "sha256": "febff9469c7c4e57145f755cded5c3714b58a689a4302b6ab73c4e713a59c070",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "febff9469c7c4e57145f755cded5c3714b58a689a4302b6ab73c4e713a59c070"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Visuals/MatteSprite.shader",
+      "bytes": 1470,
+      "sha256": "1dc7324f468ee2699c8ccfcbbd1593f5343d14bb713659373ba8e52a0f102207",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1dc7324f468ee2699c8ccfcbbd1593f5343d14bb713659373ba8e52a0f102207"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Visuals/MatteSprite.shader.meta",
+      "bytes": 210,
+      "sha256": "23d8257850c18e03a53bd81c91f02f1c7c9ad2f500b4001abefd58abca8e41b3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "23d8257850c18e03a53bd81c91f02f1c7c9ad2f500b4001abefd58abca8e41b3"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Visuals/turn-escape-tiles.png",
+      "bytes": 305,
+      "sha256": "3135818fc44dee271ba645ea4486eb552e6372c32b729a03ce60fa4e19731dcc",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "3135818fc44dee271ba645ea4486eb552e6372c32b729a03ce60fa4e19731dcc"
+    },
+    {
+      "path": "Assets/Nectorial/Resources/Visuals/turn-escape-tiles.png.meta",
+      "bytes": 3364,
+      "sha256": "8343a0d5a0c5fd5897b285addc4f3af1b8a11ba86c866f288563b2b355a0baad",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "8343a0d5a0c5fd5897b285addc4f3af1b8a11ba86c866f288563b2b355a0baad"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime.meta",
+      "bytes": 169,
+      "sha256": "8414755b3bce2a7ca6dae2213ec1238484dc446fbad49d9f56f19d00ea8140b1",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "8414755b3bce2a7ca6dae2213ec1238484dc446fbad49d9f56f19d00ea8140b1"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/Editor.meta",
+      "bytes": 169,
+      "sha256": "4a3d940b2b311c5ad8eb357fd7acb97c682e2c3f54bebc9f37a956fd67d0f27e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "4a3d940b2b311c5ad8eb357fd7acb97c682e2c3f54bebc9f37a956fd67d0f27e"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/Editor/generate_tile_atlas.py",
+      "bytes": 2727,
+      "sha256": "1adcffe9adf12df4be1288afae27e4820df8979301f6cd9a475686b1ba6b3980",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1adcffe9adf12df4be1288afae27e4820df8979301f6cd9a475686b1ba6b3980"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/Editor/generate_tile_atlas.py.meta",
+      "bytes": 155,
+      "sha256": "a3a473d238e3b8af0a5ff2d75a24ea85c32b7b60f06d15e36e3466364e03f0d2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a3a473d238e3b8af0a5ff2d75a24ea85c32b7b60f06d15e36e3466364e03f0d2"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/GameBoardView.cs",
+      "bytes": 12760,
+      "sha256": "f54c834912024915611e4d74719ef8498d3e7838df89de4e0c0948b88dfcdf13",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "f54c834912024915611e4d74719ef8498d3e7838df89de4e0c0948b88dfcdf13"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/GameBoardView.cs.meta",
+      "bytes": 240,
+      "sha256": "7645468d5bae7231de9f448492589a0bda2977a4e125423fe7f320c2f4ec80c6",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7645468d5bae7231de9f448492589a0bda2977a4e125423fe7f320c2f4ec80c6"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/GameBootstrap.cs",
+      "bytes": 43062,
+      "sha256": "a47cc46e0499f56f391cbe6dcbf0b81ce3e028d7b4796bace10073e517be2e20",
+      "provenance": "documented_transform",
+      "source_sha256": "52c1716af4f52e741f54a566b2891e38caeed5bddcd15b775fdc3ca167999d38"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/GameBootstrap.cs.meta",
+      "bytes": 240,
+      "sha256": "61531ae21a28e69e242698624fd30507f5c7e85ceacd24de97b07a5d4ff7348d",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "61531ae21a28e69e242698624fd30507f5c7e85ceacd24de97b07a5d4ff7348d"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/Nectorial.Runtime.asmdef",
+      "bytes": 452,
+      "sha256": "936a0d203c30cc90f2da189ef2dadcdaef7376d44e6eccc904f33bc6579df81c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "936a0d203c30cc90f2da189ef2dadcdaef7376d44e6eccc904f33bc6579df81c"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/Nectorial.Runtime.asmdef.meta",
+      "bytes": 163,
+      "sha256": "92d3f52010f7a4ddd40bd156e87501495866ddf3d6f882b0e8b9cb122b1fce71",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "92d3f52010f7a4ddd40bd156e87501495866ddf3d6f882b0e8b9cb122b1fce71"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossNativeSaveCoordinator.cs",
+      "bytes": 2865,
+      "sha256": "1700e85e371e824e294622e3b7a9dd945fce2f111c637190814866294c9b23ed",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1700e85e371e824e294622e3b7a9dd945fce2f111c637190814866294c9b23ed"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossNativeSaveCoordinator.cs.meta",
+      "bytes": 60,
+      "sha256": "f9a4c548b197835cf80894d20905a788902a0dc95c54a1e34ff2949f6c90abe2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "f9a4c548b197835cf80894d20905a788902a0dc95c54a1e34ff2949f6c90abe2"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossPlatformAdapter.cs",
+      "bytes": 10185,
+      "sha256": "53cfeda7c652bd58297d49140fb588634c485e687a8abe0b8ed77b00dfc45a8b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "53cfeda7c652bd58297d49140fb588634c485e687a8abe0b8ed77b00dfc45a8b"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossPlatformAdapter.cs.meta",
+      "bytes": 59,
+      "sha256": "d7918e254ee0769f26315a6caf353d0d5f9ef6af84d1032e0fc1caa1c7601d9e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "d7918e254ee0769f26315a6caf353d0d5f9ef6af84d1032e0fc1caa1c7601d9e"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossPlatformPolicy.cs",
+      "bytes": 966,
+      "sha256": "a5c3d5b8094c3e39b8005218e9e0871dc70b925f0adb1fe20d80b9b806e44f36",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a5c3d5b8094c3e39b8005218e9e0871dc70b925f0adb1fe20d80b9b806e44f36"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossPlatformPolicy.cs.meta",
+      "bytes": 59,
+      "sha256": "0208b11b86047acbaa540f0bcbaa28a96585823bfa7b2ded1cb755468d6a749a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "0208b11b86047acbaa540f0bcbaa28a96585823bfa7b2ded1cb755468d6a749a"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossSerialWritePolicy.cs",
+      "bytes": 2092,
+      "sha256": "56284fbd51e73a78bf6fdac063c6343f8d2e69854c5c2730929e77c6da2450ad",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "56284fbd51e73a78bf6fdac063c6343f8d2e69854c5c2730929e77c6da2450ad"
+    },
+    {
+      "path": "Assets/Nectorial/Runtime/TossSerialWritePolicy.cs.meta",
+      "bytes": 60,
+      "sha256": "2d28d4b18d5ee2d8cc90be1e9fdd617352eacb04b0545f82238224fda90cebb1",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2d28d4b18d5ee2d8cc90be1e9fdd617352eacb04b0545f82238224fda90cebb1"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore.meta",
+      "bytes": 60,
+      "sha256": "e3ef475a86a8f577a6a75b4044e9e458053d8f7d8284d70f0eb7275ce1592ff4",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e3ef475a86a8f577a6a75b4044e9e458053d8f7d8284d70f0eb7275ce1592ff4"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/GameEngine.cs",
+      "bytes": 19871,
+      "sha256": "2f5247748d3ae50adda66a85b71ddc88f8ac92654ed3f12a513101e6f09fc534",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2f5247748d3ae50adda66a85b71ddc88f8ac92654ed3f12a513101e6f09fc534"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/GameEngine.cs.meta",
+      "bytes": 60,
+      "sha256": "94ff931a535aae3f9342b0a6dca19cef34e88b754d9bb8fa71f84e25ebb69c5f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "94ff931a535aae3f9342b0a6dca19cef34e88b754d9bb8fa71f84e25ebb69c5f"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Nectorial.SlideCore.asmdef",
+      "bytes": 349,
+      "sha256": "983be08c659e642024b6ca24e7ba3dffcb4a2fd693e5d3dbdd4b0d57c7e0cc94",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "983be08c659e642024b6ca24e7ba3dffcb4a2fd693e5d3dbdd4b0d57c7e0cc94"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Nectorial.SlideCore.asmdef.meta",
+      "bytes": 60,
+      "sha256": "0b3b8ec0d63b049f33544bab02009f5b88d1f50c0a50bfa9a9908cb2040ace65",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "0b3b8ec0d63b049f33544bab02009f5b88d1f50c0a50bfa9a9908cb2040ace65"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/SaveCodec.cs",
+      "bytes": 5182,
+      "sha256": "a3c91d05569f5a4f3f53ea859844bfca1b4709c85841af82ae2f22f02c014689",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "a3c91d05569f5a4f3f53ea859844bfca1b4709c85841af82ae2f22f02c014689"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/SaveCodec.cs.meta",
+      "bytes": 60,
+      "sha256": "39b7c0b98bbe333b4c957e5ba94b63e4fa17373280db10c33e0231cd24f2edc0",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "39b7c0b98bbe333b4c957e5ba94b63e4fa17373280db10c33e0231cd24f2edc0"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Solver.cs",
+      "bytes": 5995,
+      "sha256": "be4ef796f852c248053d04db373a59ae662cd88f78dff352b893e066c0d5f38e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "be4ef796f852c248053d04db373a59ae662cd88f78dff352b893e066c0d5f38e"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Solver.cs.meta",
+      "bytes": 60,
+      "sha256": "7eab89e9bdd7f9f8709cc37ce051d33a72f611f3f7c4b32017a7a17f03a9240b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7eab89e9bdd7f9f8709cc37ce051d33a72f611f3f7c4b32017a7a17f03a9240b"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Types.cs",
+      "bytes": 2349,
+      "sha256": "3fd9860ecbd8ae5063ad43107c4567907825df4921a4d449a64f64ad65320f0f",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "3fd9860ecbd8ae5063ad43107c4567907825df4921a4d449a64f64ad65320f0f"
+    },
+    {
+      "path": "Assets/Nectorial/SlideCore/Types.cs.meta",
+      "bytes": 60,
+      "sha256": "9aed2a1bf28a411f4898325fac0ef2ea5639bcc1378d3880863e960fa351b579",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "9aed2a1bf28a411f4898325fac0ef2ea5639bcc1378d3880863e960fa351b579"
+    },
+    {
+      "path": "Assets/Plugins.meta",
+      "bytes": 169,
+      "sha256": "9048487f2dd7febccae1f1b61686249dd3fa26c6f12c69d4e82dee826c7b5f8a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "9048487f2dd7febccae1f1b61686249dd3fa26c6f12c69d4e82dee826c7b5f8a"
+    },
+    {
+      "path": "Assets/Plugins/WebGL.meta",
+      "bytes": 169,
+      "sha256": "d40de9fadbe3cc2d212d5f706a16bd73b0696d199c0f4646f42a6a67ddb92aaf",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "d40de9fadbe3cc2d212d5f706a16bd73b0696d199c0f4646f42a6a67ddb92aaf"
+    },
+    {
+      "path": "Assets/Plugins/WebGL/NectorialState.jslib",
+      "bytes": 3017,
+      "sha256": "95248f22e04c2f4df42cdfb48bf0f9111a0178e16b21541837a20cb9aa4a1fc1",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "95248f22e04c2f4df42cdfb48bf0f9111a0178e16b21541837a20cb9aa4a1fc1"
+    },
+    {
+      "path": "Assets/Plugins/WebGL/NectorialState.jslib.meta",
+      "bytes": 485,
+      "sha256": "48fd1db2652f1e6a720c5bee4ea11187de6ca987ee15f296a3f6408ec84557f0",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "48fd1db2652f1e6a720c5bee4ea11187de6ca987ee15f296a3f6408ec84557f0"
+    },
+    {
+      "path": "Assets/Scenes.meta",
+      "bytes": 169,
+      "sha256": "38dbdcd2c607284ea8ee0516a5c5eb6ebea6828243a907169e928704eb2d080e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "38dbdcd2c607284ea8ee0516a5c5eb6ebea6828243a907169e928704eb2d080e"
+    },
+    {
+      "path": "Assets/Scenes/Bootstrap.unity",
+      "bytes": 5573,
+      "sha256": "14c9cb2402a7f1e585cf2b93473c5666881388ac360ed7f8a672db43e53b748a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "14c9cb2402a7f1e585cf2b93473c5666881388ac360ed7f8a672db43e53b748a"
+    },
+    {
+      "path": "Assets/Scenes/Bootstrap.unity.meta",
+      "bytes": 152,
+      "sha256": "2cf3306e4d93924c4c739fcbf5c5134f89e081b73573aab72e7d368afeee9c5c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "2cf3306e4d93924c4c739fcbf5c5134f89e081b73573aab72e7d368afeee9c5c"
+    },
+    {
+      "path": "Assets/WebGLKeyboardCapture.cs",
+      "bytes": 1574,
+      "sha256": "f3df6c80f01b03a9e2dc49286ec0c618c21d05758444b671e86b16939123469c",
+      "provenance": "public_staging"
+    },
+    {
+      "path": "Assets/WebGLKeyboardCapture.cs.meta",
+      "bytes": 240,
+      "sha256": "4bcb4792d9df9dc24c2070fe518ffd194bf9391d4521f2c2a7b3ee89aac8b701",
+      "provenance": "public_staging"
+    },
+    {
+      "path": "Assets/WebGLTemplates.meta",
+      "bytes": 169,
+      "sha256": "ad3313d6b8822b3f5e6520ab20f0df1894c35ca8c1238fb3f7077e1f356f07e2",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ad3313d6b8822b3f5e6520ab20f0df1894c35ca8c1238fb3f7077e1f356f07e2"
+    },
+    {
+      "path": "Assets/WebGLTemplates/TurnEscape.meta",
+      "bytes": 169,
+      "sha256": "c453c43bbceba53f0d522fce28cbcd03ef259c1f2e2a6e4a494c18ba2902ad59",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "c453c43bbceba53f0d522fce28cbcd03ef259c1f2e2a6e4a494c18ba2902ad59"
+    },
+    {
+      "path": "Assets/WebGLTemplates/TurnEscape/index.html",
+      "bytes": 44469,
+      "sha256": "df1cf6dca7d4665d1c22686bbf138d3a168f9bcb55f8352280bdf4d34c151b3d",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "df1cf6dca7d4665d1c22686bbf138d3a168f9bcb55f8352280bdf4d34c151b3d"
+    },
+    {
+      "path": "Assets/WebGLTemplates/TurnEscape/index.html.meta",
+      "bytes": 155,
+      "sha256": "752ad1a3c868e228d7b939b7ce08c3f13aa95d473b25074583ce3df7bde299d5",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "752ad1a3c868e228d7b939b7ce08c3f13aa95d473b25074583ce3df7bde299d5"
+    },
+    {
+      "path": "Assets/link.xml",
+      "bytes": 143,
+      "sha256": "9fcd215e113660d7fa9f5c75c05e538fa01b04a5b85495fc184d2d6f9d87c317",
+      "provenance": "public_staging"
+    },
+    {
+      "path": "Assets/link.xml.meta",
+      "bytes": 155,
+      "sha256": "181d02926f8e53f92495198d6ef13a91a62c4b7623af6360c3f746ff05829186",
+      "provenance": "public_staging"
+    },
+    {
+      "path": "Packages/manifest.json",
+      "bytes": 245,
+      "sha256": "72de3d9864adb81c79126bc0e02c44ef3e73afa4246c770916e8b7f974b1ed94",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "72de3d9864adb81c79126bc0e02c44ef3e73afa4246c770916e8b7f974b1ed94"
+    },
+    {
+      "path": "Packages/packages-lock.json",
+      "bytes": 833,
+      "sha256": "7f60b56b2e7cc17e18947d6c579d739637a94e8603c6e38e3b2a5f040b5f2bff",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "7f60b56b2e7cc17e18947d6c579d739637a94e8603c6e38e3b2a5f040b5f2bff"
+    },
+    {
+      "path": "ProjectSettings/AudioManager.asset",
+      "bytes": 521,
+      "sha256": "18f06b605aa312b62ee54ba915c716831a7b05b155312013b43729540078f7db",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "18f06b605aa312b62ee54ba915c716831a7b05b155312013b43729540078f7db"
+    },
+    {
+      "path": "ProjectSettings/ClusterInputManager.asset",
+      "bytes": 114,
+      "sha256": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623"
+    },
+    {
+      "path": "ProjectSettings/DynamicsManager.asset",
+      "bytes": 1553,
+      "sha256": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488"
+    },
+    {
+      "path": "ProjectSettings/EditorBuildSettings.asset",
+      "bytes": 255,
+      "sha256": "b5f8363e44c226c72e3104107bbed43e2da9c9b055deabe005cb0103003debbe",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "b5f8363e44c226c72e3104107bbed43e2da9c9b055deabe005cb0103003debbe"
+    },
+    {
+      "path": "ProjectSettings/EditorSettings.asset",
+      "bytes": 1658,
+      "sha256": "439c4692c61945044ec10ad0af604f98526d466e764455e778530ddd893224dd",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "439c4692c61945044ec10ad0af604f98526d466e764455e778530ddd893224dd"
+    },
+    {
+      "path": "ProjectSettings/GraphicsSettings.asset",
+      "bytes": 2433,
+      "sha256": "40de98f4d46d02fb08e268ad3a722a00eed7289f4ef6d2e759984b1b4a85d2af",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "40de98f4d46d02fb08e268ad3a722a00eed7289f4ef6d2e759984b1b4a85d2af"
+    },
+    {
+      "path": "ProjectSettings/InputManager.asset",
+      "bytes": 5733,
+      "sha256": "94b92bd15daf7453e4692ecd69bc2c6cefb7545822eb6466af78f4ab3fb34faa",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "94b92bd15daf7453e4692ecd69bc2c6cefb7545822eb6466af78f4ab3fb34faa"
+    },
+    {
+      "path": "ProjectSettings/MemorySettings.asset",
+      "bytes": 1192,
+      "sha256": "cb2e41edd7f5a64298d68dd4ab768e8908e33a00f26e5ee53638e4d4251c358e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "cb2e41edd7f5a64298d68dd4ab768e8908e33a00f26e5ee53638e4d4251c358e"
+    },
+    {
+      "path": "ProjectSettings/MultiplayerManager.asset",
+      "bytes": 232,
+      "sha256": "ce4075d7a7dd8ac7ffe55de2427692c63f90dae398208bd80cec0f27cbe09f4b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "ce4075d7a7dd8ac7ffe55de2427692c63f90dae398208bd80cec0f27cbe09f4b"
+    },
+    {
+      "path": "ProjectSettings/NavMeshAreas.asset",
+      "bytes": 1332,
+      "sha256": "d3eb7e72cf17be039780311b8a361cd5ee8408da828ece4551f8a0de446985da",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "d3eb7e72cf17be039780311b8a361cd5ee8408da828ece4551f8a0de446985da"
+    },
+    {
+      "path": "ProjectSettings/Physics2DSettings.asset",
+      "bytes": 1862,
+      "sha256": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490"
+    },
+    {
+      "path": "ProjectSettings/PresetManager.asset",
+      "bytes": 146,
+      "sha256": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c"
+    },
+    {
+      "path": "ProjectSettings/ProjectSettings.asset",
+      "bytes": 22199,
+      "sha256": "5e8f33cf7fa54a8003a565357c934cf98ba28d4c87fe5e8d60b4d3132abafa3b",
+      "provenance": "documented_transform",
+      "source_sha256": "241820127d5612db3103b996b323b699c330fd2a718f7b8dd376dbb32dc45eab"
+    },
+    {
+      "path": "ProjectSettings/ProjectVersion.txt",
+      "bytes": 83,
+      "sha256": "5bf15e27a92ae67c610832a31aae5b5eaeb8057931b75a1b9e1ee7724cee7536",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "5bf15e27a92ae67c610832a31aae5b5eaeb8057931b75a1b9e1ee7724cee7536"
+    },
+    {
+      "path": "ProjectSettings/QualitySettings.asset",
+      "bytes": 9802,
+      "sha256": "f1f893b1be47ad2442f58338dd7c860dc1986bb317e2f5bb31084454ffabbf4c",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "f1f893b1be47ad2442f58338dd7c860dc1986bb317e2f5bb31084454ffabbf4c"
+    },
+    {
+      "path": "ProjectSettings/SceneTemplateSettings.json",
+      "bytes": 3535,
+      "sha256": "bb9098b3bfcde78d93e264b96f7b77b5430e64e8c57a7aad7f5a5d9c3945e16a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "bb9098b3bfcde78d93e264b96f7b77b5430e64e8c57a7aad7f5a5d9c3945e16a"
+    },
+    {
+      "path": "ProjectSettings/TagManager.asset",
+      "bytes": 416,
+      "sha256": "917a02bf41d75f3d50bfd64be4ea9b6646df227026a1b29b64664f36122aa133",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "917a02bf41d75f3d50bfd64be4ea9b6646df227026a1b29b64664f36122aa133"
+    },
+    {
+      "path": "ProjectSettings/TimeManager.asset",
+      "bytes": 305,
+      "sha256": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287"
+    },
+    {
+      "path": "ProjectSettings/VFXManager.asset",
+      "bytes": 524,
+      "sha256": "93d301bf8a59b5e07eff03c1c110e8c7ec278891ee9c879765fd010fc425e694",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "93d301bf8a59b5e07eff03c1c110e8c7ec278891ee9c879765fd010fc425e694"
+    },
+    {
+      "path": "ProjectSettings/VersionControlSettings.asset",
+      "bytes": 172,
+      "sha256": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b"
+    },
+    {
+      "path": "THIRD-PARTY-NOTICES.md",
+      "bytes": 1440,
+      "sha256": "336b5812f36ad9d3ce9c1d8c6a4c04997a38f9371ecdab4fef9bd034b3e8d27e",
+      "provenance": "public_staging"
+    },
+    {
+      "path": "global.json",
+      "bytes": 105,
+      "sha256": "1644be051012ba18ad00f8142a16fe7dc11243129a087d6788e910578e766e69",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1644be051012ba18ad00f8142a16fe7dc11243129a087d6788e910578e766e69"
+    },
+    {
+      "path": "integrations/toss/user-body-end.html",
+      "bytes": 33558,
+      "sha256": "e05dbfc2a6164994406dc028ab9cfc9775773b2721c43228c578963c0b8d657e",
+      "provenance": "extracted_user_hook",
+      "source_path": "Assets/WebGLTemplates/AITTemplate/index.html",
+      "source_region_sha256": "e05dbfc2a6164994406dc028ab9cfc9775773b2721c43228c578963c0b8d657e"
+    },
+    {
+      "path": "integrations/toss/user-head.html",
+      "bytes": 11994,
+      "sha256": "9d82ab5c7210ecf74d2412e462d20dd59e563d62e900b46fc5f7882e0bac89c6",
+      "provenance": "extracted_user_hook",
+      "source_path": "Assets/WebGLTemplates/AITTemplate/index.html",
+      "source_region_sha256": "9d82ab5c7210ecf74d2412e462d20dd59e563d62e900b46fc5f7882e0bac89c6"
+    },
+    {
+      "path": "tests/mobile_ui_contract.test.cjs",
+      "bytes": 27777,
+      "sha256": "27a09d4df22fe55d1e1cc376c8bb72815d795a828f404d58c459aa064abbe8e0",
+      "provenance": "documented_transform",
+      "source_sha256": "2e1fc4f699a584de45aed0466532838e82f4331be9b309df125c4e291a253731"
+    },
+    {
+      "path": "tests/webgl_persistence_contract.test.cjs",
+      "bytes": 5485,
+      "sha256": "e37b187c4c0479d2de1230bef6b8641d3f84fdb394ffdfc58c41fa2b022bd44e",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "e37b187c4c0479d2de1230bef6b8641d3f84fdb394ffdfc58c41fa2b022bd44e"
+    },
+    {
+      "path": "tools/CoreChecks/CoreChecks.csproj",
+      "bytes": 664,
+      "sha256": "1a2fef90e5086be4db111b977ee55c6fa554eeb41f3c9eff5e3c3f9993cf9a47",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "1a2fef90e5086be4db111b977ee55c6fa554eeb41f3c9eff5e3c3f9993cf9a47"
+    },
+    {
+      "path": "tools/CoreChecks/Program.cs",
+      "bytes": 57350,
+      "sha256": "cb3761c966010a69f3a158848479e315965b8ee409a59b9c8b265e81932071e6",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "cb3761c966010a69f3a158848479e315965b8ee409a59b9c8b265e81932071e6"
+    },
+    {
+      "path": "tools/SlideAuthoring/Program.cs",
+      "bytes": 28389,
+      "sha256": "77bb0ea18ead60aece0332b7c728381a49c720a0cf3fd80a9d7178516dc2a8ca",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "77bb0ea18ead60aece0332b7c728381a49c720a0cf3fd80a9d7178516dc2a8ca"
+    },
+    {
+      "path": "tools/SlideAuthoring/SlideAuthoring.csproj",
+      "bytes": 529,
+      "sha256": "db797cb955fa78a0495771c6041279696efbd3d6fb888a0bfb7d56ba499186dd",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "db797cb955fa78a0495771c6041279696efbd3d6fb888a0bfb7d56ba499186dd"
+    },
+    {
+      "path": "tools/SlideChecks/Program.cs",
+      "bytes": 44591,
+      "sha256": "077ea88c8608414ad9b53c82c2b4eb289d5a7908573633eaf819c7e2b661ddc8",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "077ea88c8608414ad9b53c82c2b4eb289d5a7908573633eaf819c7e2b661ddc8"
+    },
+    {
+      "path": "tools/SlideChecks/SlideChecks.csproj",
+      "bytes": 684,
+      "sha256": "08b302578b41f6798444da6de14118bfbf1fe0d11ff6a37f321a6a2f8898fa1a",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "08b302578b41f6798444da6de14118bfbf1fe0d11ff6a37f321a6a2f8898fa1a"
+    },
+    {
+      "path": "tools/TossPlatformChecks/Program.cs",
+      "bytes": 8464,
+      "sha256": "bf3df8928d416e7fef28c59aee079f429595da0abc6f38a33874036f7fdec119",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "bf3df8928d416e7fef28c59aee079f429595da0abc6f38a33874036f7fdec119"
+    },
+    {
+      "path": "tools/TossPlatformChecks/TossPlatformChecks.csproj",
+      "bytes": 750,
+      "sha256": "71d430ad75d11fb8e57ae16080a3f8fc6930616e254a5b59f437936c2563dbf3",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "71d430ad75d11fb8e57ae16080a3f8fc6930616e254a5b59f437936c2563dbf3"
+    },
+    {
+      "path": "tools/artifact_manifest.py",
+      "bytes": 15531,
+      "sha256": "279018da319fa3347ec9009232971620551f4ed93736a652f330f81896dd8550",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "279018da319fa3347ec9009232971620551f4ed93736a652f330f81896dd8550"
+    },
+    {
+      "path": "tools/tests/test_artifact_manifest.py",
+      "bytes": 8116,
+      "sha256": "c4f79f5ba117930dec364173b78260e233c6d536b315824e2b241c6b130df3f5",
+      "provenance": "exact_source_snapshot",
+      "source_sha256": "c4f79f5ba117930dec364173b78260e233c6d536b315824e2b241c6b130df3f5"
+    }
+  ],
+  "transforms": [
+    {
+      "path": "ProjectSettings/ProjectSettings.asset",
+      "operation": "align_normal_webgl_build_settings",
+      "fields": [
+        {
+          "name": "runInBackground",
+          "from": 0,
+          "to": 1
+        },
+        {
+          "name": "stripEngineCode",
+          "from": 1,
+          "to": 0
+        },
+        {
+          "name": "webGLTemplate",
+          "from": "PROJECT:AITTemplate",
+          "to": "PROJECT:TurnEscape"
+        },
+        {
+          "name": "webGLCompressionFormat",
+          "from": 0,
+          "to": 2
+        },
+        {
+          "name": "webGLDecompressionFallback",
+          "from": 1,
+          "to": 0
+        }
+      ],
+      "reason": "Match the normal WebGL build method while using the project-owned template and excluding the copied SDK template.",
+      "source_sha256": "241820127d5612db3103b996b323b699c330fd2a718f7b8dd376dbb32dc45eab",
+      "output_sha256": "5e8f33cf7fa54a8003a565357c934cf98ba28d4c87fe5e8d60b4d3132abafa3b"
+    },
+    {
+      "source_path": "Assets/Editor/WebGLBootstrap.cs",
+      "destination_path": "Assets/Editor/WebGLBootstrap.cs",
+      "operation": "replace_legacy_webgl_product_name",
+      "from": "턴제 탈출",
+      "to": "Few Moves",
+      "source_sha256": "91e7e6ee6c35878313b3648c90be7026c23eeb347a016d7aca0b21cf8925dce5",
+      "output_sha256": "9677eebdd9add4201238f6e04dc3808ff0ee97fa2fb8a01f65a1c23a14592bb4"
+    },
+    {
+      "path": ".gitignore",
+      "operation": "append_public_source_boundaries",
+      "reason": "Keep generated SDK material, private operations, evidence, credentials, and packaged output untracked.",
+      "source_sha256": "8ea551914b60168eace98009851e1e4e26740c13cbf111e831487a5094f9e1cf",
+      "output_sha256": "75a39b7dab4d884b2430f29744f11f9b71054079f78cb045618c5bea68f91d3e"
+    },
+    {
+      "source_path": "Assets/Nectorial/Runtime/GameBootstrap.cs",
+      "destination_path": "Assets/Nectorial/Runtime/GameBootstrap.cs",
+      "added_paths": [
+        "Assets/WebGLKeyboardCapture.cs",
+        "Assets/WebGLKeyboardCapture.cs.meta",
+        "Assets/link.xml",
+        "Assets/link.xml.meta"
+      ],
+      "operation": "move_webgl_keyboard_setup_to_default_assembly",
+      "reason": "Unity 6.4 did not expose UnityEngine.WebGLModule to either script compilation assembly during the command-line WebGL build. The setup now uses a preserved, reflection-resolved WebGLInput type without copying Unity code.",
+      "source_sha256": "52c1716af4f52e741f54a566b2891e38caeed5bddcd15b775fdc3ca167999d38",
+      "output_sha256": "a47cc46e0499f56f391cbe6dcbf0b81ce3e028d7b4796bace10073e517be2e20"
+    },
+    {
+      "source_path": "tests/mobile_ui_contract.test.cjs",
+      "destination_path": "tests/mobile_ui_contract.test.cjs",
+      "operation": "align_contract_with_webgl_assembly_transform",
+      "source_sha256": "2e1fc4f699a584de45aed0466532838e82f4331be9b309df125c4e291a253731",
+      "output_sha256": "27a09d4df22fe55d1e1cc376c8bb72815d795a828f404d58c459aa064abbe8e0"
+    },
+    {
+      "source_path": "Assets/WebGLTemplates/AITTemplate/index.html",
+      "source_regions": [
+        "USER_HEAD",
+        "USER_BODY_END"
+      ],
+      "destinations": [
+        "integrations/toss/user-head.html",
+        "integrations/toss/user-body-end.html"
+      ],
+      "operation": "extract_game_authored_hook_contents",
+      "upstream_template_included": false,
+      "source_template_sha256": "d90186bbd795c7ceb4e299ab00ec454cb62878905f69435863f34afc4009b9bb",
+      "source_region_sha256": {
+        "user_head": "9d82ab5c7210ecf74d2412e462d20dd59e563d62e900b46fc5f7882e0bac89c6",
+        "user_body_end": "e05dbfc2a6164994406dc028ab9cfc9775773b2721c43228c578963c0b8d657e"
+      },
+      "pinned_upstream": {
+        "package": "im.toss.apps-in-toss-unity-sdk",
+        "commit": "f344f6facc3eeae848adb56630aa36597bd91be9",
+        "template_sha256": "2ce4790ce8969e102acf272c63c78819007aa28a4654bc19b36cd437f00e3fac",
+        "user_head_sha256": "5fccd210ee1e430e67fa8bfe55208c74336dfedddf7c7f10c975d6f72802de1f",
+        "user_body_end_sha256": "4de2e45d1c9da2bd92e6c49c0aeff709de223bb414f66d1c5e2ab3f338fb2d6d",
+        "hook_state": "placeholder_comments_only"
+      }
+    }
+  ],
+  "exclusions": [
+    "source Git history",
+    "Assets/WebGLTemplates/AITTemplate/**",
+    "Assets/Editor/TossSpikeBuild.cs and meta",
+    "ProjectSettings/UnityConnectSettings.asset",
+    "docs/**",
+    "evidence/**",
+    "ops/**",
+    "tools/model_router.py and test",
+    "tools/toss_build_receipt.py and test",
+    "tools/toss_release_harness.py and test",
+    "build outputs and local caches"
+  ],
+  "claim_boundaries": {
+    "toss_release_ready": false,
+    "registered_toss_app_verified": false,
+    "toss_upload_performed": false,
+    "native_runtime_verified": false,
+    "public_repository_published": false
+  },
+  "verification": {
+    "prior_webgl_attempt": {
+      "compilation": "passed",
+      "browser_interaction": "passed",
+      "browser_checks": [
+        "right_button",
+        "focused_arrow_down",
+        "local_save",
+        "reload_restore",
+        "room_clear",
+        "share_text_selection"
+      ],
+      "browser_console_errors": 0,
+      "snapshot_parity": "failed",
+      "reason": "The build method wrote a legacy product name and normal-WebGL settings that did not match the staged ProjectSettings file."
+    },
+    "python_source_manifest_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "node_contract_files": {
+      "passed": 2,
+      "failed": 0
+    },
+    "core_checks": {
+      "passed": 18,
+      "failed": 0
+    },
+    "sliding_checks": {
+      "passed": 10,
+      "failed": 0
+    },
+    "toss_policy_checks": {
+      "passed": 7,
+      "failed": 0
+    },
+    "unity_webgl_build": {
+      "editor": "6000.4.3f1",
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0,
+      "output_included": false,
+      "runtime_keyboard_capture_verified": true,
+      "browser_checks": [
+        "few_moves_title_and_labels",
+        "right_button",
+        "focused_arrow_down"
+      ],
+      "browser_console_errors": 0
+    },
+    "secret_signature_scan": {
+      "matching_files": 0
+    },
+    "local_path_scan": {
+      "matching_files": 0
+    }
+  }
+}

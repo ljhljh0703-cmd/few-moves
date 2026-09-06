@@ -1,0 +1,43 @@
+{
+  "Id": "room-12",
+  "Width": 8,
+  "Height": 8,
+  "Rows": [
+    "########",
+    "#......#",
+    "#.######",
+    "#......#",
+    "#......#",
+    "#......#",
+    "#.######",
+    "########"
+  ],
+  "Start": { "X": 1, "Y": 1 },
+  "Exit": { "X": 1, "Y": 6 },
+  "Doors": [
+    { "Id": "door-12-a", "Position": { "X": 1, "Y": 2 } },
+    { "Id": "door-12-b", "Position": { "X": 1, "Y": 5 } }
+  ],
+  "Switches": [
+    { "Id": "switch-12-a", "Position": { "X": 6, "Y": 1 }, "DoorIds": ["door-12-a"] },
+    { "Id": "switch-12-b", "Position": { "X": 6, "Y": 4 }, "DoorIds": ["door-12-b"] }
+  ],
+  "Guards": [
+    {
+      "Id": "guard-12-a",
+      "Patrol": [
+        { "X": 3, "Y": 3 },
+        { "X": 4, "Y": 3 }
+      ],
+      "StartIndex": 0
+    },
+    {
+      "Id": "guard-12-b",
+      "Patrol": [
+        { "X": 3, "Y": 5 },
+        { "X": 4, "Y": 5 }
+      ],
+      "StartIndex": 0
+    }
+  ]
+}

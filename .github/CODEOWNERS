@@ -1,0 +1,10 @@
+# Review routing metadata. Repository rules determine enforcement.
+* @ljhljh0703-cmd
+/.github/workflows/** @ljhljh0703-cmd
+/Assets/Editor/** @ljhljh0703-cmd
+/Assets/Nectorial/Core/** @ljhljh0703-cmd
+/Assets/Nectorial/SlideCore/** @ljhljh0703-cmd
+/Assets/Nectorial/Runtime/Toss* @ljhljh0703-cmd
+/Packages/** @ljhljh0703-cmd
+/ProjectSettings/** @ljhljh0703-cmd
+/tools/** @ljhljh0703-cmd

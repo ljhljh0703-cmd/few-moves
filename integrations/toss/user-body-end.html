@@ -1,0 +1,416 @@
+    <main id="nectorial-app" hidden>
+        <header class="nectorial-utility-bar">
+            <button id="nectorial-menu-toggle" class="nectorial-utility-button" type="button" disabled aria-label="게임 메뉴">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </button>
+        </header>
+        <section class="nectorial-play-layout" aria-label="Few Moves">
+            <section class="nectorial-board-stage" aria-label="게임 보드">
+                <section id="nectorial-game" class="nectorial-game"></section>
+                <p id="nectorial-feedback" class="nectorial-feedback" role="status" aria-live="polite" hidden></p>
+                <button id="nectorial-startup-retry" class="nectorial-startup-retry" type="button" hidden>다시 확인</button>
+            </section>
+            <section class="nectorial-control-slot">
+                <section id="nectorial-play-controls" class="nectorial-play-controls" aria-label="조작">
+                    <div class="nectorial-runline">
+                        <span id="nectorial-turn-runline">0수</span>
+                        <div class="nectorial-piece-chips" role="group" aria-label="기물 선택">
+                            <button class="nectorial-piece-chip" type="button" data-piece-index="0" aria-pressed="true" aria-label="목표 기물 선택"><span class="nectorial-piece-mark" aria-hidden="true"></span></button>
+                            <button class="nectorial-piece-chip" type="button" data-piece-index="1" aria-pressed="false" aria-label="호박색 도움 기물 선택" hidden><span class="nectorial-piece-mark" aria-hidden="true"></span></button>
+                            <button class="nectorial-piece-chip" type="button" data-piece-index="2" aria-pressed="false" aria-label="청록 도움 기물 선택" hidden><span class="nectorial-piece-mark" aria-hidden="true"></span></button>
+                        </div>
+                        <button class="nectorial-quiet-reset" type="button" data-game-action="Restart" disabled>
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l4 4a7 7 0 1 1-1.4 8.8"/></svg><span>다시</span>
+                        </button>
+                    </div>
+                    <div class="nectorial-direction-console" aria-label="방향 조작">
+                        <button class="nectorial-direction-button nectorial-direction-up" type="button" data-game-action="Up" disabled aria-label="위로 이동"></button>
+                        <button class="nectorial-direction-button nectorial-direction-left" type="button" data-game-action="Left" disabled aria-label="왼쪽으로 이동"></button>
+                        <button class="nectorial-undo-button" type="button" data-game-action="Undo" disabled aria-label="한 수 되돌리기"><span>되돌림</span></button>
+                        <button class="nectorial-direction-button nectorial-direction-right" type="button" data-game-action="Right" disabled aria-label="오른쪽으로 이동"></button>
+                        <button class="nectorial-direction-button nectorial-direction-down" type="button" data-game-action="Down" disabled aria-label="아래로 이동"></button>
+                    </div>
+                </section>
+            </section>
+        </section>
+        <dialog id="nectorial-result-dialog" aria-labelledby="nectorial-result-title">
+            <section class="nectorial-result-card">
+                <button id="nectorial-result-menu" class="nectorial-result-menu" type="button">메뉴</button>
+                <button id="nectorial-result-share" class="nectorial-result-share" type="button" hidden aria-label="기록 공유"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V3m0 0 4 4m-4-4L8 7M5 13v6h14v-6"/></svg></button>
+                <p id="nectorial-result-title" class="nectorial-result-title">클리어</p>
+                <p id="nectorial-result-turn" class="nectorial-result-turn">0수</p>
+                <p id="nectorial-result-par" class="nectorial-result-par">최단 0수</p>
+                <div id="nectorial-result-actions" class="nectorial-result-actions">
+                    <button id="nectorial-result-retry" class="nectorial-result-retry" type="button" data-game-action="Restart" disabled>재도전</button>
+                    <button id="nectorial-result-next" class="nectorial-result-next" type="button" data-game-action="Next" disabled>다음 스테이지</button>
+                </div>
+            </section>
+        </dialog>
+        <dialog id="nectorial-menu-dialog" aria-labelledby="nectorial-menu-title">
+            <div class="nectorial-dialog-body">
+                <section id="nectorial-menu-main" class="nectorial-menu-panel">
+                    <p id="nectorial-menu-title" class="nectorial-dialog-title">Few Moves</p>
+                    <p id="nectorial-menu-room" class="nectorial-dialog-room">방 —</p>
+                    <p id="nectorial-menu-save-status" class="nectorial-save-status" role="status" aria-live="polite"></p>
+                    <div class="nectorial-menu-actions">
+                        <button id="nectorial-menu-save" type="button">저장하기</button>
+                        <button id="nectorial-menu-start-over" class="nectorial-secondary" type="button">처음부터 하기</button>
+                        <button id="nectorial-menu-continue" class="nectorial-secondary" type="button">계속</button>
+                    </div>
+                </section>
+                <section id="nectorial-menu-confirmation" class="nectorial-menu-panel" hidden aria-live="polite">
+                    <p class="nectorial-dialog-title">처음부터 할까요?</p>
+                    <p>현재 진행은 첫 번째 방의 새 진행으로 바뀝니다.</p>
+                    <div class="nectorial-menu-actions">
+                        <button id="nectorial-menu-start-over-confirm" type="button">처음부터 하기</button>
+                        <button id="nectorial-menu-start-over-cancel" class="nectorial-secondary" type="button">취소</button>
+                    </div>
+                </section>
+            </div>
+        </dialog>
+        <dialog id="nectorial-share-dialog" aria-labelledby="nectorial-share-title">
+            <div class="nectorial-dialog-body">
+                <p id="nectorial-share-title" class="nectorial-dialog-title">기록 공유</p>
+                <textarea id="nectorial-share-text" class="nectorial-share-record" readonly aria-label="현재 클리어 기록" spellcheck="false"></textarea>
+                <p id="nectorial-share-feedback" class="nectorial-share-feedback" aria-live="polite"></p>
+                <div class="nectorial-share-actions">
+                    <button id="nectorial-share-copy" type="button">복사</button>
+                    <button id="nectorial-share-native" class="nectorial-share-native" type="button" hidden>공유</button>
+                    <button id="nectorial-share-close" class="nectorial-share-close" type="button">닫기</button>
+                </div>
+            </div>
+        </dialog>
+    </main>
+    <script>
+        (function () {
+            "use strict";
+
+            var app = document.querySelector("#nectorial-app");
+            var game = document.querySelector("#nectorial-game");
+            var canvas = document.querySelector("#unity-canvas");
+            if (!app || !game || !canvas) return;
+            game.appendChild(canvas);
+
+            var actionButtons = Array.prototype.slice.call(app.querySelectorAll("button[data-game-action]"));
+            var pieceButtons = Array.prototype.slice.call(app.querySelectorAll("button[data-piece-index]"));
+            var menuButton = document.querySelector("#nectorial-menu-toggle");
+            var menuDialog = document.querySelector("#nectorial-menu-dialog");
+            var menuMain = document.querySelector("#nectorial-menu-main");
+            var menuConfirmation = document.querySelector("#nectorial-menu-confirmation");
+            var menuContinueButton = document.querySelector("#nectorial-menu-continue");
+            var menuSaveButton = document.querySelector("#nectorial-menu-save");
+            var menuStartOverButton = document.querySelector("#nectorial-menu-start-over");
+            var menuStartOverConfirmButton = document.querySelector("#nectorial-menu-start-over-confirm");
+            var menuStartOverCancelButton = document.querySelector("#nectorial-menu-start-over-cancel");
+            var menuRoom = document.querySelector("#nectorial-menu-room");
+            var menuSaveStatus = document.querySelector("#nectorial-menu-save-status");
+            var resultDialog = document.querySelector("#nectorial-result-dialog");
+            var resultMenuButton = document.querySelector("#nectorial-result-menu");
+            var resultTurn = document.querySelector("#nectorial-result-turn");
+            var resultPar = document.querySelector("#nectorial-result-par");
+            var resultActions = document.querySelector("#nectorial-result-actions");
+            var resultNextButton = document.querySelector("#nectorial-result-next");
+            var resultShareButton = document.querySelector("#nectorial-result-share");
+            var shareDialog = document.querySelector("#nectorial-share-dialog");
+            var shareText = document.querySelector("#nectorial-share-text");
+            var shareCopyButton = document.querySelector("#nectorial-share-copy");
+            var shareNativeButton = document.querySelector("#nectorial-share-native");
+            var shareCloseButton = document.querySelector("#nectorial-share-close");
+            var shareFeedback = document.querySelector("#nectorial-share-feedback");
+            var feedback = document.querySelector("#nectorial-feedback");
+            var startupRetryButton = document.querySelector("#nectorial-startup-retry");
+            var playControls = document.querySelector("#nectorial-play-controls");
+            var turnRunline = document.querySelector("#nectorial-turn-runline");
+            var currentState = null;
+            var stateRevision = 0;
+            var menuConfirming = false;
+            var menuReturnsToResult = false;
+            var shareSnapshot = null;
+            var copyOperation = null;
+            var nativeOperation = null;
+            var nextNativeOperationId = 0;
+
+            function isNonNegativeInteger(value) { return typeof value === "number" && Number.isInteger(value) && value >= 0; }
+            function isPositiveInteger(value) { return typeof value === "number" && Number.isInteger(value) && value > 0; }
+            function isKnownSaveStatus(value) { return value === "idle" || value === "changed" || value === "pending" || value === "saved" || value === "failed"; }
+            function isKnownShareStatus(value) { return value === "idle" || value === "pending" || value === "shared" || value === "failed"; }
+            function isValidObservation(state) {
+                if (!state || typeof state !== "object" || Array.isArray(state)) return false;
+                if (typeof state.initialized !== "boolean" || typeof state.inputEnabled !== "boolean" ||
+                    typeof state.restartEnabled !== "boolean" || typeof state.nextEnabled !== "boolean" ||
+                    typeof state.manualSaveEnabled !== "boolean" || typeof state.startOverEnabled !== "boolean" ||
+                    typeof state.savePending !== "boolean" || typeof state.saveStatus !== "string" || typeof state.saveError !== "string" ||
+                    typeof state.tossCandidate !== "boolean" || typeof state.tossStorageReady !== "boolean" ||
+                    typeof state.startupRetryEnabled !== "boolean" || typeof state.platformShareEnabled !== "boolean" ||
+                    typeof state.platformShareStatus !== "string" || typeof state.platformShareError !== "string" ||
+                    typeof state.room !== "string" || typeof state.status !== "string" || typeof state.statusCode !== "string" ||
+                    typeof state.message !== "string" || typeof state.error !== "string" || typeof state.fingerprint !== "string" ||
+                    typeof state.transitioning !== "boolean" || !isNonNegativeInteger(state.roomNumber) ||
+                    !isNonNegativeInteger(state.roomCount) || !isNonNegativeInteger(state.turn) ||
+                    !isNonNegativeInteger(state.parMoves) || !isNonNegativeInteger(state.saveRequestId) ||
+                    !isNonNegativeInteger(state.platformShareRequestId) || !isNonNegativeInteger(state.platformShareResultRequestId) ||
+                    !isNonNegativeInteger(state.pieceCount) || !Number.isInteger(state.selectedPieceIndex) ||
+                    !isKnownSaveStatus(state.saveStatus) || !isKnownShareStatus(state.platformShareStatus)) return false;
+                if (!state.initialized) return state.statusCode === "InitializationFailed";
+                if (state.statusCode !== "Playing" && state.statusCode !== "Cleared") return false;
+                if (state.savePending && (state.manualSaveEnabled || state.startOverEnabled || state.restartEnabled)) return false;
+                return state.room.length > 0 && isPositiveInteger(state.roomNumber) && state.roomNumber <= state.roomCount &&
+                    isPositiveInteger(state.roomCount) && isPositiveInteger(state.pieceCount) && state.pieceCount <= 3 &&
+                    state.selectedPieceIndex >= 0 && state.selectedPieceIndex < state.pieceCount && state.fingerprint.length > 0;
+            }
+            function isInitializedState(state) { return isValidObservation(state) && state.initialized && !state.error; }
+            function isClearedState(state) { return isInitializedState(state) && !state.transitioning && state.statusCode === "Cleared"; }
+            function canShareState(state) { return isClearedState(state); }
+            function isActionAllowed(action) {
+                var state = currentState;
+                if (!window.unityInstance || !isValidObservation(state) || !state.initialized) return false;
+                if (action === "Save") return state.manualSaveEnabled;
+                if (action === "StartOver") return state.startOverEnabled;
+                if (action === "Restart") return state.restartEnabled && !state.savePending;
+                if (state.error) return false;
+                if (action === "Undo") return !state.savePending && state.statusCode === "Playing" && (state.transitioning || state.turn > 0);
+                if (state.transitioning) return false;
+                if (action === "Next") return state.statusCode === "Cleared" && state.nextEnabled;
+                return state.statusCode === "Playing" && state.inputEnabled && (action === "Up" || action === "Down" || action === "Left" || action === "Right");
+            }
+            function sendMessage(method, value) {
+                if (!window.unityInstance) return false;
+                try { window.unityInstance.SendMessage("GameBootstrap", method, value || ""); return true; }
+                catch (error) { setFeedback("입력을 보낼 수 없습니다."); return false; }
+            }
+            function sendGameAction(action) { return isActionAllowed(action) && sendMessage("HandleInput", action); }
+            function selectPiece(index) {
+                var state = currentState;
+                if (!window.unityInstance || !isInitializedState(state) || state.savePending || !state.inputEnabled || state.transitioning || state.statusCode !== "Playing" || index < 0 || index >= state.pieceCount) return false;
+                return sendMessage("SelectPiece", String(index));
+            }
+            function setFeedback(text) { feedback.textContent = text || ""; feedback.hidden = !text; }
+            function setShareFeedback(text) { shareFeedback.textContent = text || ""; }
+            function openDialog(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.open = true; dialog.setAttribute("open", ""); } }
+            function closeDialog(dialog) { if (!dialog || !dialog.open) return; try { dialog.close(); } catch (error) { dialog.open = false; dialog.removeAttribute("open"); } }
+            function setMenuConfirmation(open) { menuConfirming = open === true; menuMain.hidden = menuConfirming; menuConfirmation.hidden = !menuConfirming; }
+            function closeSharePanel() { shareSnapshot = null; copyOperation = null; nativeOperation = null; setShareFeedback(""); closeDialog(shareDialog); }
+            function recordFor(state) { return "Few Moves | 방 " + state.roomNumber + " / " + state.roomCount + " | " + state.turn + "수 클리어"; }
+            function createShareSnapshot(state) { return { revision: stateRevision, room: state.room, roomNumber: state.roomNumber, roomCount: state.roomCount, turn: state.turn, fingerprint: state.fingerprint, record: recordFor(state) }; }
+            function snapshotMatchesState(snapshot, state) {
+                return !!snapshot && canShareState(state) && state.room === snapshot.room && state.roomNumber === snapshot.roomNumber &&
+                    state.roomCount === snapshot.roomCount && state.turn === snapshot.turn && state.fingerprint === snapshot.fingerprint;
+            }
+            function isSharePanelCurrent(snapshot) { return !!shareDialog.open && shareSnapshot === snapshot && snapshotMatchesState(snapshot, currentState); }
+            function formatSaveStatus(state) {
+                if (!isValidObservation(state)) return "저장 정보를 확인할 수 없습니다.";
+                if (!state.initialized) return state.startupRetryEnabled ? "토스 저장소를 다시 확인해 주세요." : "토스 저장소를 확인하고 있습니다.";
+                if (state.error) return "저장된 진행을 확인할 수 없습니다. 이 방을 다시 시작하거나 처음부터 할 수 있습니다.";
+                var storageName = state.tossCandidate ? "토스 저장소" : "이 브라우저";
+                if (state.savePending) return storageName + "에 저장하는 중…";
+                if (state.saveStatus === "saved") return storageName + "에 저장됨";
+                if (state.saveError === "storage_ui_timeout") return "저장이 아직 끝나지 않았습니다. 진행은 계속할 수 있습니다.";
+                if (state.saveStatus === "failed") return "저장하지 못했습니다. 다시 저장할 수 있습니다.";
+                if (state.saveStatus === "changed") return "진행이 바뀌었습니다. 저장하기로 확인하세요.";
+                return "저장하기로 " + storageName + " 저장을 확인합니다.";
+            }
+            function usefulFeedback(state) {
+                if (!state) return "게임 상태를 확인할 수 없습니다.";
+                if (state.startupRetryEnabled) return "토스 저장소를 확인하지 못했습니다.";
+                if (state.error) return "저장 데이터를 확인할 수 없습니다. 다시 시작해 주세요.";
+                if (!state.initialized) return state.message || "게임을 시작하고 있습니다.";
+                if (state.transitioning || state.statusCode === "Cleared") return "";
+                return state.message === "그 방향으로는 미끄러질 수 없습니다" || state.message === "알 수 없는 입력입니다" ? state.message : "";
+            }
+            function renderMenu(state) {
+                menuRoom.textContent = state && state.initialized ? "방 " + state.roomNumber + " / " + state.roomCount : "방 —";
+                menuSaveStatus.textContent = formatSaveStatus(state);
+                menuSaveButton.disabled = !isActionAllowed("Save");
+                menuStartOverButton.disabled = !isActionAllowed("StartOver");
+                menuStartOverConfirmButton.disabled = !isActionAllowed("StartOver");
+            }
+            function renderPieces(state) {
+                pieceButtons.forEach(function (button) {
+                    var index = Number(button.dataset.pieceIndex);
+                    var visible = !!state && state.initialized && index >= 0 && index < state.pieceCount;
+                    button.hidden = !visible;
+                    button.disabled = !visible || !selectable(index);
+                    button.setAttribute("aria-pressed", String(visible && state.selectedPieceIndex === index));
+                });
+            }
+            function selectable(index) {
+                var state = currentState;
+                return !!state && state.initialized && !state.savePending && state.inputEnabled && !state.transitioning && state.statusCode === "Playing" && index >= 0 && index < state.pieceCount;
+            }
+            function renderResult(state) {
+                if (!isClearedState(state)) { closeDialog(resultDialog); return; }
+                resultTurn.textContent = state.turn + "수";
+                resultPar.textContent = "최단 " + state.parMoves + "수";
+                resultNextButton.hidden = !state.nextEnabled;
+                resultShareButton.hidden = !canShareState(state);
+                resultShareButton.disabled = !canShareState(state);
+                resultActions.classList.toggle("is-single", resultNextButton.hidden);
+                openDialog(resultDialog);
+            }
+            function renderSharePanel() {
+                var snapshot = shareSnapshot;
+                var current = isSharePanelCurrent(snapshot);
+                shareCopyButton.disabled = !current || !!copyOperation;
+                var state = currentState;
+                var nativeAvailable = !!state && ((state.tossCandidate && state.platformShareEnabled) || (!state.tossCandidate && typeof navigator.share === "function"));
+                shareNativeButton.hidden = !nativeAvailable;
+                shareNativeButton.disabled = !current || !!nativeOperation;
+            }
+            function resolvePlatformShare(state) {
+                if (!nativeOperation || !nativeOperation.platform || state.platformShareResultRequestId !== nativeOperation.id) return;
+                if (!snapshotMatchesState(nativeOperation.snapshot, state)) { nativeOperation = null; return; }
+                if (state.platformShareStatus === "shared") setShareFeedback("공유창을 열었습니다.");
+                else if (state.platformShareStatus === "failed") setShareFeedback("공유창을 열지 못했습니다. 위 기록을 복사할 수 있습니다.");
+                else return;
+                nativeOperation = null;
+            }
+            function renderState(state) {
+                menuButton.disabled = !state || !state.initialized;
+                turnRunline.textContent = state && state.initialized ? state.turn + "수" : "0수";
+                playControls.hidden = !state || !state.initialized || state.statusCode === "Cleared";
+                startupRetryButton.hidden = !(state && state.startupRetryEnabled);
+                actionButtons.forEach(function (button) { button.disabled = !isActionAllowed(button.dataset.gameAction); });
+                renderPieces(state);
+                renderMenu(state);
+                setFeedback(usefulFeedback(state));
+                if (!canShareState(state) && shareDialog.open) closeSharePanel();
+                resolvePlatformShare(state);
+                if (shareDialog.open) renderSharePanel();
+                renderResult(state);
+            }
+            function receiveState(json) {
+                var state;
+                try { state = JSON.parse(json); } catch (error) { currentState = null; renderState(null); return; }
+                stateRevision += 1;
+                if (!isValidObservation(state)) { currentState = null; closeSharePanel(); renderState(null); setFeedback("상태 데이터를 확인할 수 없습니다."); return; }
+                var previousSnapshot = shareSnapshot;
+                currentState = Object.freeze(state);
+                if (previousSnapshot && snapshotMatchesState(previousSnapshot, currentState)) {
+                    shareSnapshot = createShareSnapshot(currentState);
+                    if (nativeOperation && nativeOperation.snapshot === previousSnapshot) nativeOperation.snapshot = shareSnapshot;
+                }
+                renderState(currentState);
+                window.dispatchEvent(new CustomEvent("nectorial-state", { detail: currentState }));
+            }
+            function openSharePanel() {
+                if (!canShareState(currentState) || !resultDialog.open) return;
+                shareSnapshot = createShareSnapshot(currentState);
+                shareText.value = shareSnapshot.record;
+                setShareFeedback("");
+                openDialog(shareDialog);
+                renderSharePanel();
+            }
+            function copyShareRecord() {
+                var snapshot = shareSnapshot;
+                if (!isSharePanelCurrent(snapshot) || copyOperation) return;
+                copyOperation = snapshot;
+                renderSharePanel();
+                var write = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(snapshot.record) : Promise.reject(new Error("clipboard_unavailable"));
+                Promise.resolve(write).then(function () {
+                    if (isSharePanelCurrent(snapshot) && copyOperation === snapshot) setShareFeedback("기록을 클립보드에 복사했습니다.");
+                }).catch(function () {
+                    if (isSharePanelCurrent(snapshot) && copyOperation === snapshot) setShareFeedback("위 기록을 선택해 직접 복사하세요.");
+                }).finally(function () {
+                    if (copyOperation === snapshot) { copyOperation = null; if (shareDialog.open) renderSharePanel(); }
+                });
+            }
+            function requestNativeShare() {
+                var snapshot = shareSnapshot;
+                if (!isSharePanelCurrent(snapshot) || nativeOperation) return;
+                var state = currentState;
+                if (state.tossCandidate && state.platformShareEnabled) {
+                    var platformOperation = { id: ++nextNativeOperationId, snapshot: snapshot, platform: true };
+                    nativeOperation = platformOperation;
+                    if (!sendMessage("RequestPlatformShare", String(platformOperation.id))) nativeOperation = null;
+                    renderSharePanel();
+                    return;
+                }
+                if (typeof navigator.share !== "function") return;
+                var webOperation = { snapshot: snapshot, platform: false };
+                nativeOperation = webOperation;
+                renderSharePanel();
+                navigator.share({ title: "Few Moves", text: snapshot.record }).then(function () {
+                    if (nativeOperation === webOperation && isSharePanelCurrent(snapshot)) setShareFeedback("공유창을 열었습니다.");
+                }).catch(function () {
+                    if (nativeOperation === webOperation && isSharePanelCurrent(snapshot)) setShareFeedback("공유창을 열지 못했습니다. 위 기록을 복사할 수 있습니다.");
+                }).finally(function () {
+                    if (nativeOperation === webOperation) { nativeOperation = null; if (shareDialog.open) renderSharePanel(); }
+                });
+            }
+            function openMenu(returnsToResult) { menuReturnsToResult = returnsToResult === true; setMenuConfirmation(false); openDialog(menuDialog); renderMenu(currentState); }
+            function closeMenu() { setMenuConfirmation(false); closeDialog(menuDialog); }
+            function isOverlayOpen() { return menuDialog.open || resultDialog.open || shareDialog.open; }
+            function actionForKey(event) {
+                if (event.code === "ArrowUp") return "Up";
+                if (event.code === "ArrowDown") return "Down";
+                if (event.code === "ArrowLeft") return "Left";
+                if (event.code === "ArrowRight") return "Right";
+                if (event.code === "Space" || event.key === " ") return "Undo";
+                if (event.code === "KeyR" || String(event.key || "").toLowerCase() === "r") return "Restart";
+                return null;
+            }
+            document.addEventListener("keydown", function (event) {
+                if (event.ctrlKey || event.metaKey || event.altKey || isOverlayOpen()) return;
+                if (event.target && event.target.closest && event.target.closest("input, textarea, select, option, [contenteditable], dialog")) return;
+                var index = event.code === "Digit1" || event.code === "Numpad1" ? 0 : event.code === "Digit2" || event.code === "Numpad2" ? 1 : event.code === "Digit3" || event.code === "Numpad3" ? 2 : -1;
+                if (index >= 0 && selectable(index)) { event.preventDefault(); if (!event.repeat) selectPiece(index); return; }
+                var action = actionForKey(event);
+                if (!action || !isActionAllowed(action)) return;
+                event.preventDefault();
+                if (!event.repeat) sendGameAction(action);
+            });
+            actionButtons.forEach(function (button) { button.addEventListener("click", function (event) { if (!event.ctrlKey && !event.metaKey && !event.altKey) sendGameAction(button.dataset.gameAction); }); });
+            pieceButtons.forEach(function (button) { button.addEventListener("click", function (event) { if (!event.ctrlKey && !event.metaKey && !event.altKey) selectPiece(Number(button.dataset.pieceIndex)); }); });
+            menuButton.addEventListener("click", function () { if (currentState && currentState.initialized) openMenu(false); });
+            menuSaveButton.addEventListener("click", function () { sendGameAction("Save"); });
+            menuStartOverButton.addEventListener("click", function () { if (isActionAllowed("StartOver")) setMenuConfirmation(true); });
+            menuStartOverConfirmButton.addEventListener("click", function () { if (menuConfirming && isActionAllowed("StartOver")) { setMenuConfirmation(false); sendGameAction("StartOver"); } });
+            menuStartOverCancelButton.addEventListener("click", function () { setMenuConfirmation(false); });
+            menuContinueButton.addEventListener("click", closeMenu);
+            resultMenuButton.addEventListener("click", function () { if (isClearedState(currentState)) { closeDialog(resultDialog); openMenu(true); } });
+            resultShareButton.addEventListener("click", openSharePanel);
+            shareCopyButton.addEventListener("click", copyShareRecord);
+            shareNativeButton.addEventListener("click", requestNativeShare);
+            shareCloseButton.addEventListener("click", closeSharePanel);
+            startupRetryButton.addEventListener("click", function () { if (currentState && currentState.startupRetryEnabled) sendMessage("RetryPlatformStartup", ""); });
+            menuDialog.addEventListener("cancel", function (event) { event.preventDefault(); if (menuConfirming) setMenuConfirmation(false); else closeMenu(); });
+            menuDialog.addEventListener("close", function () { var restore = menuReturnsToResult; menuReturnsToResult = false; setMenuConfirmation(false); if (restore && isClearedState(currentState)) openDialog(resultDialog); });
+            resultDialog.addEventListener("cancel", function (event) { event.preventDefault(); });
+            shareDialog.addEventListener("close", function () { shareSnapshot = null; copyOperation = null; nativeOperation = null; setShareFeedback(""); });
+            function reportReducedMotion() {
+                if (!window.unityInstance) return false;
+                var reduced = false;
+                try { reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (error) {}
+                return sendMessage("SetReducedMotion", reduced ? "true" : "false");
+            }
+            var unityReadyProjectionApplied = false;
+            function onUnityReady() {
+                if (!window.unityInstance) return false;
+                if (!unityReadyProjectionApplied) {
+                    unityReadyProjectionApplied = true;
+                    if (currentState) renderState(currentState);
+                    reportReducedMotion();
+                }
+                return true;
+            }
+            window.__nectorial = {
+                state: null,
+                receiveState: function (json) { receiveState(json); window.__nectorial.state = currentState; },
+                onUnityReady: onUnityReady
+            };
+            var unityReadyWatcher;
+            function stopUnityReadyWatcher() {
+                if (unityReadyWatcher === undefined) return;
+                clearInterval(unityReadyWatcher);
+                unityReadyWatcher = undefined;
+            }
+            unityReadyWatcher = setInterval(function () {
+                if (window._aitGLErrorHandled === true || onUnityReady()) stopUnityReadyWatcher();
+            }, 50);
+            if (window.AITLoading && window.AITLoading.onError) {
+                window.AITLoading.onError(stopUnityReadyWatcher);
+            }
+            if (window.AITLoading && window.AITLoading.onComplete) window.AITLoading.onComplete(function () { app.hidden = false; });
+            setTimeout(function () { app.hidden = false; }, 6000);
+        })();
+    </script>

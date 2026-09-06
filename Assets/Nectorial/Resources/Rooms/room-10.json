@@ -1,0 +1,35 @@
+{
+  "Id": "room-10",
+  "Width": 8,
+  "Height": 8,
+  "Rows": [
+    "########",
+    "#......#",
+    "#.######",
+    "#......#",
+    "#......#",
+    "#....#.#",
+    "########",
+    "########"
+  ],
+  "Start": { "X": 1, "Y": 1 },
+  "Exit": { "X": 6, "Y": 5 },
+  "Doors": [
+    { "Id": "door-10-a", "Position": { "X": 1, "Y": 2 } },
+    { "Id": "door-10-b", "Position": { "X": 6, "Y": 4 } }
+  ],
+  "Switches": [
+    { "Id": "switch-10-a", "Position": { "X": 6, "Y": 1 }, "DoorIds": ["door-10-a"] },
+    { "Id": "switch-10-b", "Position": { "X": 1, "Y": 3 }, "DoorIds": ["door-10-b"] }
+  ],
+  "Guards": [
+    {
+      "Id": "guard-10",
+      "Patrol": [
+        { "X": 3, "Y": 3 },
+        { "X": 4, "Y": 3 }
+      ],
+      "StartIndex": 0
+    }
+  ]
+}

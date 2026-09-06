@@ -1,0 +1,14 @@
+{
+  "name": "Nectorial.SlideCore",
+  "rootNamespace": "Nectorial.SlideEscape",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

@@ -1,0 +1,52 @@
+[Ll]ibrary/
+[Tt]emp/
+/[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Bb]uilds/
+/webgl/
+/ait-build/
+[Mm]emoryCaptures/
+.vs/
+.idea/
+.DS_Store
+/*.csproj
+/*.sln
+*.user
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+sysinfo.txt
+**/__pycache__/
+tools/**/bin/
+tools/**/obj/
+
+# Public-source boundary: generated or copied SDK material
+/Assets/WebGLTemplates/AITTemplate/
+/Assets/WebGLTemplates/AITTemplate.meta
+/Assets/Resources.meta
+/Assets/Resources/AITVersionInfo.json
+/Assets/Resources/AITVersionInfo.json.meta
+/ProjectSettings/UnityConnectSettings.asset
+
+# Private operations and evidence
+/docs/
+/evidence/
+/ops/
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+**/Secrets.plist
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+*.key
+
+# Packaged output
+*.ait
+node_modules/
