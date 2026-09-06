@@ -3,7 +3,7 @@
   "kind": "public-source-snapshot",
   "project": "few-moves",
   "source": {
-    "commit": "77407588b215db85edb70e8cd6a95da3caefde43",
+    "commit": "430ac96d9bdf8ae8f514ec69f0218bf257cb043a",
     "history_included": false
   },
   "selected_files": [
@@ -15,8 +15,8 @@
     },
     {
       "path": ".github/workflows/verify.yml",
-      "bytes": 1735,
-      "sha256": "f57ec06d6b5ed2e31be9d4fd58337b3bb11f42a7c2285f8514d8ea949f7fc0ee",
+      "bytes": 1606,
+      "sha256": "c92eac537d607e05000e4bd60618f2e904a139d11947b7082acaac0cd88a9124",
       "provenance": "public_staging"
     },
     {
@@ -81,83 +81,6 @@
       "sha256": "92d73827ab7fe08b4bb3132041da64c55c6a2dbf336aa87267fd3119e2c39328",
       "provenance": "exact_source_snapshot",
       "source_sha256": "92d73827ab7fe08b4bb3132041da64c55c6a2dbf336aa87267fd3119e2c39328"
-    },
-    {
-      "path": "Assets/Nectorial/Core.meta",
-      "bytes": 60,
-      "sha256": "efe91e1401a079a66fd8e34a1452922d3a158f573801cff49b5ec0d27f12272a",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "efe91e1401a079a66fd8e34a1452922d3a158f573801cff49b5ec0d27f12272a"
-    },
-    {
-      "path": "Assets/Nectorial/Core/GameEngine.cs",
-      "bytes": 32823,
-      "sha256": "679de592c1b8d80e3d01bef8aa274f16636d3373023cbd3c160b2f2dbc21f017",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "679de592c1b8d80e3d01bef8aa274f16636d3373023cbd3c160b2f2dbc21f017"
-    },
-    {
-      "path": "Assets/Nectorial/Core/GameEngine.cs.meta",
-      "bytes": 60,
-      "sha256": "ad5ba7073d9407e13b1f20b6c8fa0af1cf45f49f2fb9fcb8b9277fe22ec3f511",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "ad5ba7073d9407e13b1f20b6c8fa0af1cf45f49f2fb9fcb8b9277fe22ec3f511"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Nectorial.Core.asmdef",
-      "bytes": 343,
-      "sha256": "29161d6c9289e9e8a0e4a69c4a60115651a1faf87856dab02d7bf44f0939d9e9",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "29161d6c9289e9e8a0e4a69c4a60115651a1faf87856dab02d7bf44f0939d9e9"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Nectorial.Core.asmdef.meta",
-      "bytes": 60,
-      "sha256": "98fd884a48642090d8ed33eb851dd6e4d553693d822af67739e3fbfa11459dd2",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "98fd884a48642090d8ed33eb851dd6e4d553693d822af67739e3fbfa11459dd2"
-    },
-    {
-      "path": "Assets/Nectorial/Core/SaveCodec.cs",
-      "bytes": 3372,
-      "sha256": "e340cc146a609b46588516b075a00d3f64279cc2897f1c76db4efeacdf6ba094",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "e340cc146a609b46588516b075a00d3f64279cc2897f1c76db4efeacdf6ba094"
-    },
-    {
-      "path": "Assets/Nectorial/Core/SaveCodec.cs.meta",
-      "bytes": 60,
-      "sha256": "27f5e65f6b428b458ed22dce4730aca57e5d3ba630f758c2f5a7dd982db44125",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "27f5e65f6b428b458ed22dce4730aca57e5d3ba630f758c2f5a7dd982db44125"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Solver.cs",
-      "bytes": 4393,
-      "sha256": "61a02f3e15a9c3e3730346f4b6bbc3cc9a1c23dc09ec65698d2701b64d80b9a4",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "61a02f3e15a9c3e3730346f4b6bbc3cc9a1c23dc09ec65698d2701b64d80b9a4"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Solver.cs.meta",
-      "bytes": 60,
-      "sha256": "1d7419c0025168804724f8635702372c122f2bee66355f57205a4bf5e66908b0",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "1d7419c0025168804724f8635702372c122f2bee66355f57205a4bf5e66908b0"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Types.cs",
-      "bytes": 2203,
-      "sha256": "42ea32c338c36f4f3ba31f64a4607535247b29102e14085c51da7d72a88db5df",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "42ea32c338c36f4f3ba31f64a4607535247b29102e14085c51da7d72a88db5df"
-    },
-    {
-      "path": "Assets/Nectorial/Core/Types.cs.meta",
-      "bytes": 60,
-      "sha256": "0aea7ee45bfd835ac43c0225d78d2e5a7a56cfb54e54cc6bf4257f1aeccdcc40",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "0aea7ee45bfd835ac43c0225d78d2e5a7a56cfb54e54cc6bf4257f1aeccdcc40"
     },
     {
       "path": "Assets/Nectorial/Resources.meta",
@@ -1051,20 +974,6 @@
       "sha256": "e37b187c4c0479d2de1230bef6b8641d3f84fdb394ffdfc58c41fa2b022bd44e",
       "provenance": "exact_source_snapshot",
       "source_sha256": "e37b187c4c0479d2de1230bef6b8641d3f84fdb394ffdfc58c41fa2b022bd44e"
-    },
-    {
-      "path": "tools/CoreChecks/CoreChecks.csproj",
-      "bytes": 664,
-      "sha256": "1a2fef90e5086be4db111b977ee55c6fa554eeb41f3c9eff5e3c3f9993cf9a47",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "1a2fef90e5086be4db111b977ee55c6fa554eeb41f3c9eff5e3c3f9993cf9a47"
-    },
-    {
-      "path": "tools/CoreChecks/Program.cs",
-      "bytes": 57350,
-      "sha256": "cb3761c966010a69f3a158848479e315965b8ee409a59b9c8b265e81932071e6",
-      "provenance": "exact_source_snapshot",
-      "source_sha256": "cb3761c966010a69f3a158848479e315965b8ee409a59b9c8b265e81932071e6"
     },
     {
       "path": "tools/SlideAuthoring/Program.cs",
