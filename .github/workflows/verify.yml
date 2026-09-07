@@ -42,6 +42,7 @@ jobs:
         run: |
           node tests/mobile_ui_contract.test.cjs
           node tests/webgl_persistence_contract.test.cjs
+          node tests/coop_ui_contract.test.cjs
 
       # actions/setup-dotnet v5.2.0
       - name: Set up .NET SDK
