@@ -52,5 +52,8 @@ jobs:
       - name: Run sliding puzzle checks
         run: dotnet run --project tools/SlideChecks/SlideChecks.csproj --configuration Release
 
+      - name: Run co-op core checks
+        run: dotnet run --project tools/CoopChecks/CoopChecks.csproj --configuration Release
+
       - name: Run Toss policy checks
         run: dotnet run --project tools/TossPlatformChecks/TossPlatformChecks.csproj --configuration Release
