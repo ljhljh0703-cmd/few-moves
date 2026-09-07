@@ -22,6 +22,7 @@ internal static class Program
         Run("idempotency_stale_and_revision_monotonic_undo", CheckIdempotencyAndUndo);
         Run("consent_invalidation_and_restart", CheckConsentAndRestart);
         Run("cleared_c1_restart_and_room_alias_isolation", CheckClearedRestartAndAliasIsolation);
+        Run("rejected_attempt_ledger_and_initial_goal_room", CheckRejectedAttemptLedgerAndInitialGoals);
         Run("coop_save_replay_round_trip_and_tamper", CheckSaveReplay);
 
         int passed = 0;
@@ -212,6 +213,38 @@ internal static class Program
         AssertEqual(0, approval.State.LogicalActionCount, "terminal restart resets logical action count");
     }
 
+    private static void CheckRejectedAttemptLedgerAndInitialGoals()
+    {
+        CoopRoomDefinition initiallyCleared = GeometryRoom();
+        initiallyCleared.CircleGoal = initiallyCleared.CircleStart;
+        initiallyCleared.DiamondGoal = initiallyCleared.DiamondStart;
+        Assert(Contains(CoopRules.ValidateRoom(initiallyCleared), "room_already_cleared_at_start"), "already-cleared start room must be authoring error");
+        bool createRejected = false;
+        try { CoopSession.Create(initiallyCleared); }
+        catch (ArgumentException) { createRejected = true; }
+        Assert(createRejected, "invalid already-cleared room must not create a contradictory Playing session");
+
+        CoopRoomDefinition room = GeometryRoom();
+        CoopSession session = CoopSession.Create(room);
+        CoopCommand stale = CoopCommandFactory.Pass(CoopActor.Circle, "rejected-id", 99);
+        CoopDispatchResult first = session.Dispatch(stale);
+        Assert(!first.Accepted && first.Reason == "stale_revision", "first stale attempt rejected");
+        CoopDispatchResult retry = session.Dispatch(stale);
+        Assert(!retry.Accepted && retry.Idempotent && retry.Reason == "stale_revision", "same rejected payload must return cached rejection");
+        CoopDispatchResult changed = session.Dispatch(CoopCommandFactory.Pass(CoopActor.Circle, "rejected-id", 0));
+        Assert(!changed.Accepted && changed.Reason == "command_id_payload_conflict", "changed rejected ID payload must conflict before mutation");
+        AssertEqual(0L, session.State.AuthorityRevision, "rejected ledger must not mutate authority state");
+
+        CoopSaveEnvelope envelope = CoopSaveCodec.Capture(session, "rejected-ledger");
+        CoopSession restored;
+        string error;
+        Assert(CoopSaveCodec.TryRestore(room, envelope, out restored, out error), "rejected ledger save must restore: " + error);
+        CoopDispatchResult restoredRetry = restored.Dispatch(stale);
+        Assert(!restoredRetry.Accepted && restoredRetry.Idempotent && restoredRetry.Reason == "stale_revision", "restored ledger must preserve rejected retry result");
+        CoopDispatchResult restoredChanged = restored.Dispatch(CoopCommandFactory.Pass(CoopActor.Circle, "rejected-id", 0));
+        Assert(!restoredChanged.Accepted && restoredChanged.Reason == "command_id_payload_conflict", "restored ledger must preserve changed-payload conflict");
+    }
+
     private static void CheckSaveReplay()
     {
         if (C1 == null || C1Solution == null) CheckC1();
@@ -251,6 +284,11 @@ internal static class Program
     private static void AssertEqual<T>(T expected, T actual, string detail)
     {
         if (!EqualityComparer<T>.Default.Equals(expected, actual)) throw new InvalidOperationException(detail + " expected=" + expected + " actual=" + actual);
+    }
+
+    private static bool Contains(string[] source, string expected)
+    {
+        return Array.IndexOf(source, expected) >= 0;
     }
 
     [Serializable]

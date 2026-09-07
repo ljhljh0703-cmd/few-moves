@@ -30,6 +30,7 @@ namespace Nectorial.SlideEscape.Coop
             ValidatePoint(room, room.DiamondGoal, "diamond_goal", errors);
             if (Same(room.CircleStart, room.DiamondStart)) errors.Add("starts_overlap");
             if (Same(room.CircleGoal, room.DiamondGoal)) errors.Add("goals_overlap");
+            if (Same(room.CircleStart, room.CircleGoal) && Same(room.DiamondStart, room.DiamondGoal)) errors.Add("room_already_cleared_at_start");
             return errors.ToArray();
         }
 
@@ -204,6 +205,19 @@ namespace Nectorial.SlideEscape.Coop
                 RequestId = source.RequestId,
                 Approve = source.Approve,
                 Expression = source.Expression
+            };
+        }
+
+        public static CoopAttempt CloneAttempt(CoopAttempt source)
+        {
+            if (source == null) return null;
+            return new CoopAttempt
+            {
+                Command = CloneCommand(source.Command),
+                Accepted = source.Accepted,
+                Idempotent = source.Idempotent,
+                Reason = source.Reason,
+                StateFingerprint = source.StateFingerprint
             };
         }
 

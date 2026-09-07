@@ -10,8 +10,11 @@ namespace Nectorial.SlideEscape.Coop
         private readonly CoopState _initialState;
         private readonly List<ActionFrame> _actionFrames = new List<ActionFrame>();
         private readonly List<CoopCommand> _acceptedCommands = new List<CoopCommand>();
+        private readonly List<CoopAttempt> _attempts = new List<CoopAttempt>();
         private readonly Dictionary<string, StoredCommand> _commandsById = new Dictionary<string, StoredCommand>(StringComparer.Ordinal);
         private CoopState _state;
+        private CoopCommand _inFlightCommand;
+        private string _inFlightPayload;
 
         private CoopSession(CoopRoomDefinition room)
         {
@@ -32,7 +35,9 @@ namespace Nectorial.SlideEscape.Coop
         {
             var commands = new CoopCommand[_acceptedCommands.Count];
             for (int index = 0; index < commands.Length; index++) commands[index] = CoopRules.CloneCommand(_acceptedCommands[index]);
-            return new CoopReplay { Commands = commands };
+            var attempts = new CoopAttempt[_attempts.Count];
+            for (int index = 0; index < attempts.Length; index++) attempts[index] = CoopRules.CloneAttempt(_attempts[index]);
+            return new CoopReplay { Commands = commands, Attempts = attempts };
         }
 
         public CoopDispatchResult Dispatch(CoopCommand command)
@@ -40,28 +45,38 @@ namespace Nectorial.SlideEscape.Coop
             if (command == null) return Rejected("command_missing");
             if (string.IsNullOrEmpty(command.CommandId)) return Rejected("command_id_missing");
             string payload = CommandPayload(command);
-            StoredCommand prior;
-            if (_commandsById.TryGetValue(command.CommandId, out prior))
+            _inFlightCommand = command;
+            _inFlightPayload = payload;
+            try
             {
-                if (!string.Equals(prior.Payload, payload, StringComparison.Ordinal)) return Rejected("command_id_payload_conflict");
-                CoopDispatchResult replay = CloneResult(prior.Result);
-                replay.Idempotent = true;
-                replay.State = CoopRules.CloneState(_state);
-                return replay;
-            }
-            if (command.ExpectedRevision != _state.AuthorityRevision) return Rejected("stale_revision");
-            if (!IsActor(command.Seat)) return Rejected("invalid_seat");
+                StoredCommand prior;
+                if (_commandsById.TryGetValue(command.CommandId, out prior))
+                {
+                    if (!string.Equals(prior.Payload, payload, StringComparison.Ordinal)) return Rejected("command_id_payload_conflict");
+                    CoopDispatchResult replay = CloneResult(prior.Result);
+                    replay.Idempotent = true;
+                    replay.State = CoopRules.CloneState(_state);
+                    return RecordAttempt(command, replay);
+                }
+                if (command.ExpectedRevision != _state.AuthorityRevision) return Rejected("stale_revision");
+                if (!IsActor(command.Seat)) return Rejected("invalid_seat");
 
-            switch (command.Kind)
+                switch (command.Kind)
+                {
+                    case CoopCommandKind.Slide: return DispatchSlide(command, payload);
+                    case CoopCommandKind.Pass: return DispatchPass(command, payload);
+                    case CoopCommandKind.RequestUndo: return DispatchConsentRequest(command, payload, CoopConsentKind.Undo);
+                    case CoopCommandKind.ResolveUndo: return DispatchConsentResolution(command, payload, CoopConsentKind.Undo);
+                    case CoopCommandKind.RequestRestart: return DispatchConsentRequest(command, payload, CoopConsentKind.Restart);
+                    case CoopCommandKind.ResolveRestart: return DispatchConsentResolution(command, payload, CoopConsentKind.Restart);
+                    case CoopCommandKind.Express: return DispatchExpression(command, payload);
+                    default: return Rejected("invalid_command_kind");
+                }
+            }
+            finally
             {
-                case CoopCommandKind.Slide: return DispatchSlide(command, payload);
-                case CoopCommandKind.Pass: return DispatchPass(command, payload);
-                case CoopCommandKind.RequestUndo: return DispatchConsentRequest(command, payload, CoopConsentKind.Undo);
-                case CoopCommandKind.ResolveUndo: return DispatchConsentResolution(command, payload, CoopConsentKind.Undo);
-                case CoopCommandKind.RequestRestart: return DispatchConsentRequest(command, payload, CoopConsentKind.Restart);
-                case CoopCommandKind.ResolveRestart: return DispatchConsentResolution(command, payload, CoopConsentKind.Restart);
-                case CoopCommandKind.Express: return DispatchExpression(command, payload);
-                default: return Rejected("invalid_command_kind");
+                _inFlightCommand = null;
+                _inFlightPayload = null;
             }
         }
 
@@ -184,12 +199,12 @@ namespace Nectorial.SlideEscape.Coop
             };
             _commandsById.Add(command.CommandId, new StoredCommand(payload, result));
             _acceptedCommands.Add(CoopRules.CloneCommand(command));
-            return CloneResult(result);
+            return RecordAttempt(command, CloneResult(result));
         }
 
         private CoopDispatchResult Rejected(string reason)
         {
-            return new CoopDispatchResult
+            var result = new CoopDispatchResult
             {
                 Accepted = false,
                 Idempotent = false,
@@ -197,6 +212,26 @@ namespace Nectorial.SlideEscape.Coop
                 State = CoopRules.CloneState(_state),
                 Events = new CoopEvent[0]
             };
+            if (_inFlightCommand != null)
+            {
+                if (!_commandsById.ContainsKey(_inFlightCommand.CommandId))
+                    _commandsById.Add(_inFlightCommand.CommandId, new StoredCommand(_inFlightPayload, result));
+                return RecordAttempt(_inFlightCommand, result);
+            }
+            return result;
+        }
+
+        private CoopDispatchResult RecordAttempt(CoopCommand command, CoopDispatchResult result)
+        {
+            _attempts.Add(new CoopAttempt
+            {
+                Command = CoopRules.CloneCommand(command),
+                Accepted = result.Accepted,
+                Idempotent = result.Idempotent,
+                Reason = result.Reason,
+                StateFingerprint = CoopRules.StateFingerprint(_room, result.State)
+            });
+            return CloneResult(result);
         }
 
         private static CoopDispatchResult CloneResult(CoopDispatchResult source)

@@ -4,7 +4,7 @@ namespace Nectorial.SlideEscape.Coop
 {
     public static class CoopSaveCodec
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
         public const string CurrentGameId = "few-moves";
         public const string CurrentModeId = "coop-v1";
 
@@ -42,6 +42,7 @@ namespace Nectorial.SlideEscape.Coop
             if (!string.Equals(envelope.ContentVersion, room.ContentVersion, StringComparison.Ordinal)) { error = "content_version_mismatch"; return false; }
             if (!string.Equals(envelope.RoomFingerprint, CoopRules.RoomFingerprint(room), StringComparison.Ordinal)) { error = "room_fingerprint_mismatch"; return false; }
             if (string.IsNullOrEmpty(envelope.SessionId)) { error = "session_id_missing"; return false; }
+            if (envelope.Replay == null || envelope.Replay.Attempts == null) { error = "attempt_transcript_missing"; return false; }
 
             CoopSession restored;
             string replayError;

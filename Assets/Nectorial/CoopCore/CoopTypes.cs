@@ -117,9 +117,20 @@ namespace Nectorial.SlideEscape.Coop
     }
 
     [Serializable]
+    public sealed class CoopAttempt
+    {
+        public CoopCommand Command;
+        public bool Accepted;
+        public bool Idempotent;
+        public string Reason;
+        public string StateFingerprint;
+    }
+
+    [Serializable]
     public sealed class CoopReplay
     {
         public CoopCommand[] Commands;
+        public CoopAttempt[] Attempts;
     }
 
     [Serializable]
