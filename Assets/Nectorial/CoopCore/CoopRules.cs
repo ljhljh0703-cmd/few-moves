@@ -167,6 +167,30 @@ namespace Nectorial.SlideEscape.Coop
             };
         }
 
+        public static CoopRoomDefinition CloneRoom(CoopRoomDefinition source)
+        {
+            if (source == null) return null;
+            string[] rows = null;
+            if (source.Rows != null)
+            {
+                rows = new string[source.Rows.Length];
+                Array.Copy(source.Rows, rows, source.Rows.Length);
+            }
+            return new CoopRoomDefinition
+            {
+                Id = source.Id,
+                Width = source.Width,
+                Height = source.Height,
+                Rows = rows,
+                CircleStart = source.CircleStart,
+                DiamondStart = source.DiamondStart,
+                CircleGoal = source.CircleGoal,
+                DiamondGoal = source.DiamondGoal,
+                RulesVersion = source.RulesVersion,
+                ContentVersion = source.ContentVersion
+            };
+        }
+
         public static CoopCommand CloneCommand(CoopCommand source)
         {
             if (source == null) return null;

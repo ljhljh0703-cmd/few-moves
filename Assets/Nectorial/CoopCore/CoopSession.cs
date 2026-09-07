@@ -15,8 +15,8 @@ namespace Nectorial.SlideEscape.Coop
 
         private CoopSession(CoopRoomDefinition room)
         {
-            _room = room;
-            _initialState = CoopRules.CreateInitialState(room);
+            _room = CoopRules.CloneRoom(room);
+            _initialState = CoopRules.CreateInitialState(_room);
             _state = CoopRules.CloneState(_initialState);
         }
 
@@ -25,7 +25,7 @@ namespace Nectorial.SlideEscape.Coop
             return new CoopSession(room);
         }
 
-        public CoopRoomDefinition Room { get { return _room; } }
+        public CoopRoomDefinition Room { get { return CoopRules.CloneRoom(_room); } }
         public CoopState State { get { return CoopRules.CloneState(_state); } }
 
         public CoopReplay ExportReplay()
@@ -99,7 +99,7 @@ namespace Nectorial.SlideEscape.Coop
 
         private CoopDispatchResult DispatchConsentRequest(CoopCommand command, string payload, CoopConsentKind kind)
         {
-            if (_state.Status != CoopRunStatus.Playing) return Rejected("terminal_state");
+            if (_state.Status != CoopRunStatus.Playing && !(kind == CoopConsentKind.Restart && _state.Status == CoopRunStatus.Cleared)) return Rejected("terminal_state");
             if (command.Seat != _state.ActiveActor) return Rejected("wrong_active_actor");
             if (_state.PendingConsent != null) return Rejected("consent_pending");
             if (string.IsNullOrEmpty(command.RequestId)) return Rejected("request_id_missing");

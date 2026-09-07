@@ -21,6 +21,7 @@ internal static class Program
         Run("ownership_alternation_pass_and_soft_goals", CheckOwnershipAndPass);
         Run("idempotency_stale_and_revision_monotonic_undo", CheckIdempotencyAndUndo);
         Run("consent_invalidation_and_restart", CheckConsentAndRestart);
+        Run("cleared_c1_restart_and_room_alias_isolation", CheckClearedRestartAndAliasIsolation);
         Run("coop_save_replay_round_trip_and_tamper", CheckSaveReplay);
 
         int passed = 0;
@@ -184,6 +185,31 @@ internal static class Program
         AssertEqual(4L, restart.State.AuthorityRevision, "restart revision grows");
         AssertEqual(0, restart.State.LogicalActionCount, "restart resets logical count");
         AssertEqual(CoopActor.Circle, restart.State.ActiveActor, "restart returns initial actor");
+    }
+
+    private static void CheckClearedRestartAndAliasIsolation()
+    {
+        CoopRoomDefinition external = GeometryRoom();
+        CoopSession isolated = CoopSession.Create(external);
+        external.Rows[1] = "########";
+        Assert(!string.Equals("########", isolated.Room.Rows[1], StringComparison.Ordinal), "caller room mutation must not alter active session room");
+        CoopRoomDefinition exposed = isolated.Room;
+        exposed.Rows[2] = "########";
+        Assert(!string.Equals("########", isolated.Room.Rows[2], StringComparison.Ordinal), "Room getter must not expose mutable active room alias");
+
+        if (C1 == null || C1Solution == null) CheckC1();
+        CoopSession session = CoopSession.Create(C1);
+        for (int index = 0; index < C1Solution.Commands.Length; index++) Assert(session.Dispatch(C1Solution.Commands[index]).Accepted, "C1 clear setup command accepted");
+        CoopState cleared = session.State;
+        AssertEqual(CoopRunStatus.Cleared, cleared.Status, "C1 must be cleared before terminal restart test");
+        CoopActor requester = cleared.ActiveActor;
+        CoopDispatchResult request = session.Dispatch(CoopCommandFactory.RequestRestart(requester, "clear-restart-request", cleared.AuthorityRevision, "clear-r1"));
+        Assert(request.Accepted, "active seat may request restart after cleared state");
+        CoopDispatchResult approval = session.Dispatch(CoopCommandFactory.ResolveRestart(CoopRules.Opponent(requester), "clear-restart-approve", request.State.AuthorityRevision, "clear-r1", true));
+        Assert(approval.Accepted, "other seat may approve restart after cleared state");
+        AssertEqual(CoopRunStatus.Playing, approval.State.Status, "cleared restart returns playing state");
+        AssertEqual(cleared.AuthorityRevision + 2, approval.State.AuthorityRevision, "terminal restart request and approval both advance authority revision");
+        AssertEqual(0, approval.State.LogicalActionCount, "terminal restart resets logical action count");
     }
 
     private static void CheckSaveReplay()
