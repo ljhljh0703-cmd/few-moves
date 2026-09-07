@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="icon" href="data:,">
+  <title>Few Moves 협력 파일럿</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --warm-surface: #f0ece2;
+      --warm-ink: #293238;
+      --warm-muted: #6e736f;
+      --warm-floor: #e5e0d3;
+      --warm-grid: #d2cbbb;
+      --warm-charcoal: #313a3b;
+      --warm-edge: #171e1f;
+      --warm-pressed: #151c1d;
+      --warm-focus: #5d8960;
+      --circle: #437491;
+      --diamond: #c88a40;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; background: var(--warm-surface); }
+    body { min-height: 100svh; color: var(--warm-ink); }
+    button { min-width: 48px; min-height: 48px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, canvas:focus-visible { outline: 3px solid var(--warm-focus); outline-offset: 3px; }
+    button:disabled { opacity: .36; cursor: default; }
+    main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: 8px; }
+    .topbar { min-height: 64px; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; }
+    .topbar h1 { margin: 0; font-size: 17px; line-height: 1.2; text-align: center; }
+    .topbar small { display: block; margin-top: 3px; color: var(--warm-muted); font-size: 11px; font-weight: 600; }
+    .icon-button { display: grid; place-items: center; border-radius: 12px; color: var(--warm-ink); }
+    .icon-button:enabled:hover, .icon-button:enabled:active { background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
+    .icon-button span { font-size: 21px; line-height: 1; }
+    .coop-layout { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 286px; gap: 8px; justify-items: center; }
+    .board-stage { position: relative; width: 100%; min-height: 0; display: grid; place-items: center; }
+    #unity-canvas { display: block; width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); image-rendering: pixelated; }
+    .state-line { position: absolute; left: 50%; bottom: 8px; width: min(calc(100% - 24px), 380px); transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--warm-grid); border-radius: 9px; background: color-mix(in srgb, var(--warm-surface) 93%, var(--warm-grid)); font-size: 12px; font-weight: 700; }
+    .state-line[hidden] { display: none; }
+    .seat-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--circle); }
+    .seat-dot.diamond { border-radius: 2px; background: var(--diamond); transform: rotate(45deg); }
+    .controls { width: min(100%, 360px); min-height: 0; display: grid; align-content: start; gap: 8px; }
+    .status-row { min-height: 44px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 5px; }
+    .goal-chip { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; color: var(--warm-muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .goal-chip strong { color: var(--warm-ink); font-size: 15px; }
+    .turn-label { display: grid; place-items: center; min-width: 92px; min-height: 40px; padding: 4px 8px; border: 1px solid var(--warm-grid); border-radius: 9px; background: #fffdf7; font-size: 13px; line-height: 1.15; text-align: center; }
+    .turn-label small { color: var(--warm-muted); font-size: 10px; }
+    .dpad { position: relative; width: 228px; height: 150px; margin: 0 auto; }
+    .dpad button { position: absolute; display: grid; place-items: center; width: 72px; height: 72px; padding: 0; border-radius: 14px; color: var(--warm-ink); background: transparent; }
+    .dpad button::after { position: absolute; inset: 2px; z-index: 0; content: ""; background: var(--warm-edge); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
+    .dpad button::before { position: absolute; inset: 5px; z-index: 1; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-edge))); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
+    .dpad button:enabled:active::before { background: var(--warm-pressed); }
+    .dpad button span { position: relative; z-index: 2; color: var(--warm-surface); font-size: 24px; }
+    .dpad-up { left: 78px; top: 0; }
+    .dpad-left { left: 0; top: 70px; }
+    .dpad-right { right: 0; top: 70px; }
+    .dpad-down { left: 78px; top: 70px; }
+    .pass-button { position: absolute; left: 78px; top: 70px; width: 72px; height: 72px; display: grid; place-items: center; z-index: 3; border: 1px solid var(--warm-grid); border-radius: 12px; background: #fffdf7; color: var(--warm-ink); font-size: 12px; }
+    .pass-button:enabled:active { background: var(--warm-floor); }
+    .emoji-row { display: flex; justify-content: center; gap: 7px; min-height: 48px; }
+    .emoji-button { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--warm-grid); border-radius: 10px; background: #fffdf7; font-size: 21px; }
+    .emoji-button:enabled:active { background: var(--warm-floor); }
+    .action-row { display: flex; justify-content: center; gap: 7px; min-height: 44px; }
+    .text-button { min-height: 44px; padding: 0 14px; border: 1px solid var(--warm-grid); border-radius: 10px; background: transparent; font-size: 12px; }
+    .text-button:enabled:active { background: var(--warm-floor); }
+    .feedback { min-height: 22px; margin: 0; color: var(--warm-muted); font-size: 11px; text-align: center; }
+    dialog { width: min(300px, calc(100% - 32px)); border: 1px solid var(--warm-charcoal); border-radius: 13px; color: var(--warm-ink); background: var(--warm-surface); box-shadow: 0 16px 50px color-mix(in srgb, var(--warm-charcoal) 28%, transparent); }
+    dialog::backdrop { background: color-mix(in srgb, var(--warm-charcoal) 38%, transparent); }
+    .dialog-card { display: grid; gap: 12px; padding: 18px; }
+    .dialog-title { margin: 0; font-size: 17px; font-weight: 800; }
+    .dialog-copy { margin: 0; color: var(--warm-muted); font-size: 12px; line-height: 1.5; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; }
+    .dialog-actions button { min-height: 44px; padding: 0 13px; border: 1px solid var(--warm-grid); border-radius: 9px; }
+    .dialog-actions .primary { color: #fff; background: var(--warm-charcoal); border-color: var(--warm-charcoal); }
+    #clear-dialog { width: min(286px, calc(100% - 36px)); }
+    #clear-dialog .dialog-card { text-align: center; }
+    .clear-title { margin: 0; font-size: 24px; }
+    .clear-subtitle { margin: 0; color: var(--warm-muted); font-size: 12px; }
+    [hidden] { display: none !important; }
+    @media (min-width: 700px) {
+      main#app { width: min(760px, 100%); }
+      .coop-layout { grid-template-rows: minmax(0, 1fr) 300px; }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <button id="menu-button" class="icon-button" type="button" disabled aria-label="협력 메뉴"><span aria-hidden="true">☰</span></button>
+      <h1>Few Moves<small>한 기기로 번갈아</small></h1>
+      <button id="save-button" class="icon-button" type="button" disabled aria-label="협력 진행 저장"><span aria-hidden="true">▣</span></button>
+    </header>
+    <section class="coop-layout" aria-label="Few Moves 협력 파일럿">
+      <section class="board-stage" aria-label="협력 게임 보드">
+        <canvas id="unity-canvas" tabindex="0" aria-label="원과 마름모가 함께 움직이는 협력 보드"></canvas>
+        <p id="state-line" class="state-line" role="status" aria-live="polite" hidden></p>
+      </section>
+      <section class="controls" aria-label="협력 조작">
+        <div class="status-row">
+          <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">원</strong><span id="circle-goal">목표 —</span></span>
+          <span id="turn-label" class="turn-label">준비 중<small>행동 0</small></span>
+          <span class="goal-chip"><span class="seat-dot diamond" aria-hidden="true"></span><strong id="diamond-progress">마름모</strong><span id="diamond-goal">목표 —</span></span>
+        </div>
+        <div class="dpad" aria-label="방향 조작">
+          <button class="dpad-up" type="button" data-coop-action="Slide" data-direction="Up" disabled aria-label="원 또는 마름모를 위로 이동"><span aria-hidden="true">▲</span></button>
+          <button class="dpad-left" type="button" data-coop-action="Slide" data-direction="Left" disabled aria-label="원 또는 마름모를 왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
+          <button id="pass-button" class="pass-button" type="button" data-coop-action="Pass" disabled aria-label="현재 좌석이 행동을 넘김">Pass</button>
+          <button class="dpad-right" type="button" data-coop-action="Slide" data-direction="Right" disabled aria-label="원 또는 마름모를 오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
+          <button class="dpad-down" type="button" data-coop-action="Slide" data-direction="Down" disabled aria-label="원 또는 마름모를 아래로 이동"><span aria-hidden="true">▼</span></button>
+        </div>
+        <div class="emoji-row" role="group" aria-label="고정 표현">
+          <button class="emoji-button" type="button" data-coop-action="Express" data-expression="Look" disabled aria-label="살펴보기 표현">👀</button>
+          <button class="emoji-button" type="button" data-coop-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요 표현">👍</button>
+          <button class="emoji-button" type="button" data-coop-action="Express" data-expression="Handshake" disabled aria-label="협력 표현">🤝</button>
+          <button class="emoji-button" type="button" data-coop-action="Express" data-expression="Waiting" disabled aria-label="기다리기 표현">⏳</button>
+        </div>
+        <div class="action-row">
+          <button class="text-button" type="button" data-coop-action="RequestUndo" disabled>되돌림 동의</button>
+          <button class="text-button" type="button" data-coop-action="RequestRestart" disabled>다시 시작</button>
+        </div>
+        <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="consent-dialog" aria-labelledby="consent-title">
+    <div class="dialog-card">
+      <p id="consent-title" class="dialog-title">동의가 필요합니다</p>
+      <p id="consent-copy" class="dialog-copy">다른 좌석의 확인을 기다리고 있습니다.</p>
+      <div class="dialog-actions">
+        <button id="consent-reject" type="button">거절</button>
+        <button id="consent-approve" class="primary" type="button">동의</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="menu-dialog" aria-labelledby="menu-title">
+    <div class="dialog-card">
+      <p id="menu-title" class="dialog-title">협력 메뉴</p>
+      <p id="save-status" class="dialog-copy">이 브라우저에 저장할 수 있습니다.</p>
+      <div class="dialog-actions">
+        <button id="menu-close" type="button">계속</button>
+        <button id="menu-save" class="primary" type="button">저장 확인</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="clear-dialog" aria-labelledby="clear-title">
+    <div class="dialog-card">
+      <p id="clear-title" class="clear-title">둘 다 도착</p>
+      <p id="clear-copy" class="clear-subtitle">원과 마름모가 각자의 목표에 함께 섰습니다.</p>
+      <div class="dialog-actions">
+        <button id="clear-restart" class="primary" type="button" data-coop-action="Restart">다시 시작</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (function () {
+      "use strict";
+      var canvas = document.querySelector("#unity-canvas");
+      var unityInstance = null;
+      var currentState = null;
+      var currentConsent = null;
+      var stateRevision = 0;
+      var stateLine = document.querySelector("#state-line");
+      var feedback = document.querySelector("#feedback");
+      var turnLabel = document.querySelector("#turn-label");
+      var circleGoal = document.querySelector("#circle-goal");
+      var diamondGoal = document.querySelector("#diamond-goal");
+      var circleProgress = document.querySelector("#circle-progress");
+      var diamondProgress = document.querySelector("#diamond-progress");
+      var saveStatus = document.querySelector("#save-status");
+      var saveButton = document.querySelector("#save-button");
+      var menuButton = document.querySelector("#menu-button");
+      var consentDialog = document.querySelector("#consent-dialog");
+      var consentCopy = document.querySelector("#consent-copy");
+      var clearDialog = document.querySelector("#clear-dialog");
+      var menuDialog = document.querySelector("#menu-dialog");
+
+      function asObject(value) { return value && typeof value === "object" ? value : null; }
+      function text(value, fallback) { return typeof value === "string" && value.length > 0 ? value : (fallback || ""); }
+      function positive(value) { return Number.isInteger(value) && value >= 0; }
+      function positionLabel(value) {
+        var point = asObject(value);
+        var x = point ? (Number.isInteger(point.x) ? point.x : point.X) : null;
+        var y = point ? (Number.isInteger(point.y) ? point.y : point.Y) : null;
+        if (!point || !Number.isInteger(x) || !Number.isInteger(y)) return "목표 —";
+        return "(" + x + "," + y + ")";
+      }
+      function activeLabel(state) {
+        return state.activeActorCode === "Diamond" || state.activeActor === "Diamond" ? "마름모 차례" : "원 차례";
+      }
+      function isValidState(state) {
+        if (!state || typeof state.initialized !== "boolean" || !positive(state.authorityRevision) || !positive(state.logicalActionCount) ||
+            typeof state.inputEnabled !== "boolean" || typeof state.passEnabled !== "boolean" || typeof state.restartEnabled !== "boolean" ||
+            typeof state.undoEnabled !== "boolean" || typeof state.statusCode !== "string") return false;
+        return true;
+      }
+      function openDialog(dialog) {
+        if (!dialog || dialog.open) return;
+        try { if (typeof dialog.showModal === "function") dialog.showModal(); else dialog.setAttribute("open", ""); }
+        catch (error) { dialog.setAttribute("open", ""); }
+      }
+      function closeDialog(dialog) {
+        if (!dialog || !dialog.open) return;
+        if (typeof dialog.close === "function") dialog.close(); else dialog.removeAttribute("open");
+      }
+      function send(command) {
+        if (!unityInstance || !currentState || !isValidState(currentState)) return false;
+        try {
+          unityInstance.SendMessage("CoopBootstrap", "HandleCommand", JSON.stringify(command));
+          return true;
+        } catch (error) {
+          feedback.textContent = "협력 입력을 보낼 수 없습니다.";
+          return false;
+        }
+      }
+      function actionAllowed(button) {
+        if (!currentState || !isValidState(currentState) || !currentState.initialized || currentState.transitioning || currentState.savePending) return false;
+        var action = button.dataset.coopAction;
+        if (action === "Slide" || action === "Pass") return currentState.inputEnabled === true && currentState.statusCode === "Playing";
+        if (action === "Express") return currentState.initialized === true;
+        if (action === "RequestUndo") return currentState.undoEnabled === true;
+        if (action === "RequestRestart") return currentState.restartEnabled === true;
+        if (action === "Restart") return currentState.restartEnabled === true;
+        return false;
+      }
+      function renderButtons() {
+        Array.from(document.querySelectorAll("button[data-coop-action]")).forEach(function (button) {
+          button.disabled = !actionAllowed(button);
+        });
+        saveButton.disabled = !currentState || currentState.manualSaveEnabled !== true || currentState.savePending === true;
+        menuButton.disabled = !currentState || currentState.initialized !== true;
+      }
+      function renderConsent(state) {
+        var consent = asObject(state.pendingConsent);
+        currentConsent = consent;
+        if (!consent || consent.statusCode === "None" || consent.status === "None") {
+          closeDialog(consentDialog);
+          return;
+        }
+        consentCopy.textContent = consent.kind === "Restart" ? "다시 시작하려면 다른 좌석의 동의가 필요합니다." : "한 수 되돌리려면 다른 좌석의 동의가 필요합니다.";
+        openDialog(consentDialog);
+      }
+      function renderState(state) {
+        if (!isValidState(state)) {
+          currentState = null;
+          window.__nectorialCoop.state = null;
+          feedback.textContent = "협력 상태를 확인할 수 없습니다.";
+          renderButtons();
+          return;
+        }
+        currentState = Object.freeze(state);
+        window.__nectorialCoop.state = currentState;
+        stateLine.hidden = false;
+        stateLine.innerHTML = "<span class=\"seat-dot " + (state.activeActorCode === "Diamond" ? "diamond" : "") + "\"></span>" + activeLabel(state) + " · 행동 " + state.logicalActionCount;
+        turnLabel.innerHTML = activeLabel(state) + "<small>revision " + state.authorityRevision + "</small>";
+        circleGoal.textContent = "목표 " + positionLabel(state.circleGoal);
+        diamondGoal.textContent = "목표 " + positionLabel(state.diamondGoal);
+        circleProgress.textContent = positionLabel(state.circlePosition);
+        diamondProgress.textContent = positionLabel(state.diamondPosition);
+        feedback.textContent = text(state.message, text(state.error, ""));
+        saveStatus.textContent = state.savePending ? "저장하는 중…" : (state.saveStatus === "saved" ? "이 브라우저에 저장됨" : "저장 확인을 누르면 진행을 보관합니다.");
+        renderConsent(state);
+        renderButtons();
+        if (state.statusCode === "Cleared") openDialog(clearDialog); else closeDialog(clearDialog);
+      }
+      function isCurrentOrNewer(state) {
+        if (!currentState) return true;
+        if (state.authorityRevision < currentState.authorityRevision) return false;
+        if (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount) return false;
+        return true;
+      }
+      function receiveState(json) {
+        var parsed;
+        try { parsed = JSON.parse(json); } catch (error) { currentState = null; feedback.textContent = "협력 상태 데이터를 확인할 수 없습니다."; renderButtons(); return; }
+        stateRevision += 1;
+        if (!isValidState(parsed) || !isCurrentOrNewer(parsed)) return;
+        renderState(parsed);
+        window.dispatchEvent(new CustomEvent("nectorial-coop-state", { detail: parsed }));
+      }
+      function sendFromButton(button) {
+        if (!actionAllowed(button)) return;
+        var action = button.dataset.coopAction;
+        var command = { kind: action, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || currentState.activeActor || "Circle" };
+        if (action === "Slide") command.direction = button.dataset.direction;
+        if (action === "Express") command.expression = button.dataset.expression;
+        if (action === "RequestUndo" || action === "RequestRestart") command.requestId = String(stateRevision) + "-" + action;
+        send(command);
+      }
+      Array.from(document.querySelectorAll("button[data-coop-action]")).forEach(function (button) { button.addEventListener("click", function () { sendFromButton(button); }); });
+      saveButton.addEventListener("click", function () { if (currentState && currentState.manualSaveEnabled) send({ kind: "Save", expectedRevision: currentState.authorityRevision }); });
+      menuButton.addEventListener("click", function () { openDialog(menuDialog); });
+      document.querySelector("#menu-close").addEventListener("click", function () { closeDialog(menuDialog); });
+      document.querySelector("#menu-save").addEventListener("click", function () { if (currentState && currentState.manualSaveEnabled) send({ kind: "Save", expectedRevision: currentState.authorityRevision }); });
+      document.querySelector("#consent-approve").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: true, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); closeDialog(consentDialog); } });
+      document.querySelector("#consent-reject").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: false, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); closeDialog(consentDialog); } });
+      document.querySelector("#clear-restart").addEventListener("click", function () { if (!currentState || currentState.restartEnabled !== true) return; closeDialog(clearDialog); send({ kind: "RequestRestart", requestId: String(stateRevision) + "-clear-restart", expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); });
+      document.addEventListener("keydown", function (event) {
+        if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || (event.target && event.target.closest && event.target.closest("dialog"))) return;
+        var direction = { ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right" }[event.key];
+        if (direction) {
+          event.preventDefault();
+          send({ kind: "Slide", direction: direction, expectedRevision: currentState ? currentState.authorityRevision : 0, seat: currentState ? currentState.activeActorCode : "Circle" });
+        } else if (String(event.key || "").toLowerCase() === "p") {
+          event.preventDefault();
+          send({ kind: "Pass", expectedRevision: currentState ? currentState.authorityRevision : 0, seat: currentState ? currentState.activeActorCode : "Circle" });
+        }
+      });
+      window.__nectorialCoop = { state: null, receiveState: receiveState };
+
+      var buildUrl = "Build";
+      var config = {
+        dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+        frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+        workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+        codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "Independent",
+        productName: "Few Moves Coop Pilot",
+        productVersion: "0.0.1",
+        matchWebGLToCanvasSize: true,
+        devicePixelRatio: 1
+      };
+      var loader = document.createElement("script");
+      loader.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+      loader.onload = function () {
+        createUnityInstance(canvas, config, function (progress) {
+          feedback.textContent = "협력 보드 불러오는 중 " + Math.round(progress * 100) + "%";
+        }).then(function (instance) {
+          unityInstance = instance;
+          feedback.textContent = "원부터 움직여 보세요.";
+        }).catch(function () {
+          feedback.textContent = "협력 보드를 시작할 수 없습니다.";
+        });
+      };
+      loader.onerror = function () { feedback.textContent = "협력 빌드 파일을 불러올 수 없습니다."; };
+      document.body.appendChild(loader);
+    }());
+  </script>
+</body>
+</html>

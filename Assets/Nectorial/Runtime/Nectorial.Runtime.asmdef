@@ -4,7 +4,8 @@
     "references": [
         "AppsInToss.Helpers",
         "AppsInTossSDK",
-        "Nectorial.SlideCore"
+        "Nectorial.SlideCore",
+        "Nectorial.CoopCore"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
