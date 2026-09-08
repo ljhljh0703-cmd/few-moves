@@ -33,6 +33,7 @@ assert.doesNotMatch(template, /"revision /i);
 assert.doesNotMatch(template, /positionLabel\(state\.circle/);
 assert.doesNotMatch(template, /circlePosition|diamondPosition|circleGoal\.X|diamondGoal\.X/);
 assert.match(template, /consent\.active !== true/);
+assert.match(template, /state\.statusCode === "Cleared" && !currentConsent/);
 assert.match(template, /\.dpad \{ position: relative; width: 180px; height: 168px/);
 assert.match(template, /\.dpad-up \{ left: 62px; top: 0; \}/);
 assert.match(template, /\.dpad-down \{ left: 62px; top: 112px; \}/);
@@ -123,6 +124,12 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
   }
   assert.equal(consentVisible(emptyConsentFromCSharp), false, "JsonUtility empty consent object does not open the approval modal");
   assert.equal(consentVisible({ active: true, requestId: "", kind: "Undo", statusCode: "Undo" }), false, "malformed consent cannot enable approval");
+  function clearVisible(statusCode, consent) {
+    return statusCode === "Cleared" && !consentVisible(consent);
+  }
+  assert.equal(clearVisible("Cleared", emptyConsentFromCSharp), true, "normalized empty consent still allows the clear overlay");
+  const activeRestartConsent = { active: true, requestId: "restart-1", kind: "Restart", statusCode: "Restart" };
+  assert.equal(clearVisible("Cleared", activeRestartConsent), false, "active restart consent keeps the clear overlay closed");
 
   let now = 0;
   let cooldownUntil = 0;
