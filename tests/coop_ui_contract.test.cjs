@@ -41,7 +41,11 @@ assert.match(template, /\.pass-button \{ position: absolute; left: 62px; top: 56
 assert.match(template, /\.dpad button:not\(\.pass-button\)::after/);
 assert.doesNotMatch(template, /\.pass-button::(before|after)/);
 assert.match(template, /grid-template-rows: minmax\(0, 1fr\) 342px/);
-assert.match(template, /html, body \{ width: 100%; min-height: 100%; margin: 0; overflow: hidden/);
+assert.match(template, /html, body \{ width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; overflow-y: auto/);
+assert.doesNotMatch(template, /overflow: hidden/);
+assert.match(template, /function resizeCanvasToStage\(\)/);
+assert.match(template, /Math\.min\(rect\.width, rect\.height\)/);
+assert.match(template, /new ResizeObserver\(resizeCanvasToStage\)/);
 assert.doesNotMatch(template, /left-right|좌우 전환|oversized|tutorial-image/i);
 assert.doesNotMatch(template, /board-grid|fakeBoard|staticBoard/i);
 assert.match(template, /createUnityInstance\(canvas, config/);
@@ -159,6 +163,14 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
     assert.ok(dpad.button >= 48, "every D-pad target remains generous");
   }
   assert.equal(boxes.pass.x === boxes.down.x && boxes.pass.y === boxes.down.y, false, "Pass does not overlap Down");
+
+  const viewport = { width: 360, height: 640, padY: 8, topbar: 64, gap: 8, controls: 342 };
+  const coopHeight = viewport.height - viewport.padY * 2 - viewport.topbar - viewport.gap;
+  const boardHeight = coopHeight - viewport.gap - viewport.controls;
+  const boardTop = viewport.padY + viewport.topbar + viewport.gap;
+  const controlsTop = boardTop + boardHeight + viewport.gap;
+  const canvasSide = Math.min(viewport.width - 20, boardHeight);
+  assert.ok(boardTop + canvasSide <= controlsTop, "canvas square fits before controls at 360x640");
 }
 
 {

@@ -22,12 +22,12 @@
       --diamond: #c88a40;
     }
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; overflow: hidden; background: var(--warm-surface); }
+    html, body { width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; overflow-y: auto; background: var(--warm-surface); }
     body { min-height: 100svh; color: var(--warm-ink); }
     button { min-width: 48px; min-height: 48px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     button:focus-visible, canvas:focus-visible { outline: 3px solid var(--warm-focus); outline-offset: 3px; }
     button:disabled { opacity: .36; cursor: default; }
-    main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: 8px; }
+    main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; margin: 0 auto; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: 8px; }
     .topbar { min-height: 64px; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; }
     .topbar h1 { margin: 0; font-size: 17px; line-height: 1.2; text-align: center; }
     .topbar small { display: block; margin-top: 3px; color: var(--warm-muted); font-size: 11px; font-weight: 600; }
@@ -37,8 +37,6 @@
     .coop-layout { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 342px; gap: 8px; justify-items: center; }
     .board-stage { position: relative; width: 100%; min-height: 0; display: grid; place-items: center; }
     #unity-canvas { display: block; width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); image-rendering: pixelated; }
-    .state-line { position: absolute; left: 50%; bottom: 8px; width: min(calc(100% - 24px), 380px); transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; padding: 6px 10px; border: 1px solid var(--warm-grid); border-radius: 9px; background: color-mix(in srgb, var(--warm-surface) 93%, var(--warm-grid)); font-size: 12px; font-weight: 700; }
-    .state-line[hidden] { display: none; }
     .seat-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--circle); }
     .seat-dot.diamond { border-radius: 2px; background: var(--diamond); transform: rotate(45deg); }
     .controls { width: min(100%, 360px); min-height: 0; display: grid; align-content: start; gap: 4px; }
@@ -95,12 +93,11 @@
     <section class="coop-layout" aria-label="Few Moves 협력 파일럿">
       <section class="board-stage" aria-label="협력 게임 보드">
         <canvas id="unity-canvas" tabindex="0" aria-label="원과 마름모가 함께 움직이는 협력 보드"></canvas>
-        <p id="state-line" class="state-line" role="status" aria-live="polite" hidden></p>
       </section>
       <section class="controls" aria-label="협력 조작">
         <div class="status-row">
           <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">원</strong><span id="circle-goal">진행 중</span></span>
-          <span id="turn-label" class="turn-label">준비 중<small>행동 0</small></span>
+          <span id="turn-label" class="turn-label">행동 0<small>준비 중</small></span>
           <span class="goal-chip"><span class="seat-dot diamond" aria-hidden="true"></span><strong id="diamond-progress">마름모</strong><span id="diamond-goal">진행 중</span></span>
         </div>
         <div class="dpad" aria-label="방향 조작">
@@ -163,7 +160,7 @@
       var currentState = null;
       var currentConsent = null;
       var stateRevision = 0;
-      var stateLine = document.querySelector("#state-line");
+      var boardStage = document.querySelector(".board-stage");
       var feedback = document.querySelector("#feedback");
       var turnLabel = document.querySelector("#turn-label");
       var circleGoal = document.querySelector("#circle-goal");
@@ -254,7 +251,6 @@
         currentState = Object.freeze(state);
         window.__nectorialCoop.state = currentState;
         if (!state.initialized) {
-          stateLine.hidden = true;
           turnLabel.innerHTML = "시작 실패<small>다시 확인해 주세요</small>";
           feedback.textContent = text(state.message, "협력 보드를 시작할 수 없습니다.");
           closeDialog(consentDialog);
@@ -262,8 +258,6 @@
           renderButtons();
           return;
         }
-        stateLine.hidden = false;
-        stateLine.innerHTML = "<span class=\"seat-dot " + (state.activeActorCode === "Diamond" ? "diamond" : "") + "\"></span>" + activeLabel(state);
         turnLabel.innerHTML = "행동 " + state.logicalActionCount + "<small>현재 차례</small>";
         circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
         diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
@@ -320,6 +314,20 @@
         }
       });
       window.__nectorialCoop = { state: null, receiveState: receiveState };
+
+      function resizeCanvasToStage() {
+        if (!boardStage || !canvas) return;
+        var rect = boardStage.getBoundingClientRect();
+        var side = Math.floor(Math.min(rect.width, rect.height));
+        if (side <= 0) return;
+        canvas.style.width = side + "px";
+        canvas.style.height = side + "px";
+      }
+      if (typeof ResizeObserver === "function") {
+        new ResizeObserver(resizeCanvasToStage).observe(boardStage);
+      }
+      window.addEventListener("resize", resizeCanvasToStage);
+      resizeCanvasToStage();
 
       var buildUrl = "Build";
       var config = {
