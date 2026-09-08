@@ -32,11 +32,13 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private Coroutine _saveTimeoutRoutine;
         private Coroutine _transitionRoutine;
         private float _expressionCooldownUntil;
+        private long _expressionSequence;
+        private string _expressionSender = string.Empty;
+        private string _expressionValue = string.Empty;
         private string _message = "초기화 중";
         private string _loadError = string.Empty;
         private string _saveStatus = "idle";
         private string _saveError = string.Empty;
-        private string _lastExpression = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -63,7 +65,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
             else if (Input.GetKeyDown(KeyCode.DownArrow)) SendSlide(GameCommand.Down);
             else if (Input.GetKeyDown(KeyCode.LeftArrow)) SendSlide(GameCommand.Left);
             else if (Input.GetKeyDown(KeyCode.RightArrow)) SendSlide(GameCommand.Right);
-            else if (Input.GetKeyDown(KeyCode.P)) SendPass();
             else if (Input.GetKeyDown(KeyCode.U)) RequestUndo();
             else if (Input.GetKeyDown(KeyCode.R)) RequestRestart();
 #endif
@@ -115,7 +116,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
                     GameCommand direction;
                     if (!TryParseDirection(payload.direction, out direction)) { RejectCommand("알 수 없는 이동입니다"); return; }
                     SendSlide(direction, payload); return;
-                case "Pass": SendPass(payload); return;
                 case "RequestUndo": RequestUndo(payload); return;
                 case "RequestRestart": RequestRestart(payload); return;
                 case "ResolveConsent": ResolveConsent(payload); return;
@@ -221,18 +221,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
             CoopActor seat;
             if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat)) return;
             DispatchCommand(CoopCommandFactory.Slide(seat, NextCommandId(), payload.expectedRevision, direction));
-        }
-
-        private void SendPass()
-        {
-            SendPass(CreateLocalPayload("Pass"));
-        }
-
-        private void SendPass(UiCommandPayload payload)
-        {
-            CoopActor seat;
-            if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat)) return;
-            DispatchCommand(CoopCommandFactory.Pass(seat, NextCommandId(), payload.expectedRevision));
         }
 
         private void RequestUndo()
@@ -360,14 +348,16 @@ namespace Nectorial.SlideEscape.Unity.Coop
 
         private void ApplyDispatch(CoopDispatchResult result, CoopCommand command, bool render)
         {
-            _message = TranslateResult(result);
+            _message = TranslateResult(result, command);
             if (result != null && result.Accepted && result.Events != null)
             {
                 for (int index = 0; index < result.Events.Length; index++)
                 {
                     if (result.Events[index] != null && string.Equals(result.Events[index].Type, "expression", StringComparison.Ordinal))
                     {
-                        _lastExpression = result.Events[index].Detail;
+                        _expressionSequence = checked(_expressionSequence + 1);
+                        _expressionSender = result.Events[index].Actor.ToString();
+                        _expressionValue = result.Events[index].Detail;
                         _expressionCooldownUntil = Time.unscaledTime + ExpressionCooldownSeconds;
                         _message = "표현을 보냈습니다";
                     }
@@ -512,7 +502,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 {
                     initialized = false,
                     inputEnabled = false,
-                    passEnabled = false,
                     undoEnabled = false,
                     restartEnabled = false,
                     manualSaveEnabled = false,
@@ -534,7 +523,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
             {
                 initialized = _initialized,
                 inputEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing,
-                passEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing,
                 undoEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing && state.LogicalActionCount > 0,
                 restartEnabled = _initialized && !_restoreBlocked && !_manualSavePending && (state.Status == CoopRunStatus.Playing || state.Status == CoopRunStatus.Cleared),
                 manualSaveEnabled = _initialized && !_restoreBlocked && !_manualSavePending,
@@ -562,7 +550,9 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 circleAtGoal = CoopRules.Same(state.CirclePosition, _room.CircleGoal),
                 diamondAtGoal = CoopRules.Same(state.DiamondPosition, _room.DiamondGoal),
                 pendingConsent = ToObservation(state.PendingConsent),
-                lastExpression = _lastExpression,
+                expressionSequence = _expressionSequence,
+                expressionSender = _expressionSender,
+                expression = _expressionValue,
                 localHotseat = true,
                 seatAuthority = "session_state_only",
                 fingerprint = CoopRules.StateFingerprint(_room, state)
@@ -657,10 +647,24 @@ namespace Nectorial.SlideEscape.Unity.Coop
             return false;
         }
 
-        private static string TranslateResult(CoopDispatchResult result)
+        private static string TranslateResult(CoopDispatchResult result, CoopCommand command)
         {
             if (result == null) return "협력 결과를 확인할 수 없습니다";
-            if (result.Accepted) return result.Idempotent ? "현재 협력 상태를 확인했습니다" : "협력 상태가 바뀌었습니다";
+            if (result.Accepted)
+            {
+                if (result.Idempotent) return "현재 상태를 확인했습니다";
+                if (command == null) return string.Empty;
+                switch (command.Kind)
+                {
+                    case CoopCommandKind.Slide: return "이동했습니다";
+                    case CoopCommandKind.RequestUndo: return "되돌림 동의를 요청했습니다";
+                    case CoopCommandKind.ResolveUndo: return "되돌림 동의를 처리했습니다";
+                    case CoopCommandKind.RequestRestart: return "다시 시작 동의를 요청했습니다";
+                    case CoopCommandKind.ResolveRestart: return "다시 시작 동의를 처리했습니다";
+                    case CoopCommandKind.Express: return "표현을 보냈습니다";
+                    default: return string.Empty;
+                }
+            }
             switch (result.Reason)
             {
                 case "blocked_zero": return "그 방향으로는 미끄러질 수 없습니다";
@@ -735,7 +739,6 @@ namespace Nectorial.SlideEscape.Unity.Coop
         {
             public bool initialized;
             public bool inputEnabled;
-            public bool passEnabled;
             public bool undoEnabled;
             public bool restartEnabled;
             public bool manualSaveEnabled;
@@ -763,7 +766,9 @@ namespace Nectorial.SlideEscape.Unity.Coop
             public bool circleAtGoal;
             public bool diamondAtGoal;
             public PendingConsentObservation pendingConsent;
-            public string lastExpression;
+            public long expressionSequence;
+            public string expressionSender;
+            public string expression;
             public bool localHotseat;
             public string seatAuthority;
             public string fingerprint;

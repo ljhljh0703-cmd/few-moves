@@ -16,7 +16,7 @@ const asmdef = readFileSync(path.join(root, "Assets/Nectorial/Runtime/Nectorial.
 
 assert.match(template, /id="unity-canvas"[^>]*aria-label="원과 마름모가 함께 움직이는 협력 보드"/);
 assert.match(template, /data-coop-action="Slide" data-direction="Up"/);
-assert.match(template, /data-coop-action="Pass"/);
+assert.doesNotMatch(template, /data-coop-action="Pass"|pass-button|Pass<\/button>/);
 assert.match(template, /data-coop-action="Express" data-expression="Look"/);
 assert.match(template, /data-coop-action="Express" data-expression="ThumbsUp"/);
 assert.match(template, /data-coop-action="Express" data-expression="Handshake"/);
@@ -31,6 +31,9 @@ assert.match(template, /state\.logicalActionCount < currentState\.logicalActionC
 assert.match(template, /hasExpectedRevision: true/);
 assert.match(template, /currentState\.expressionEnabled === true/);
 assert.match(template, /currentConsent\.requester === "Circle" \? "Diamond" : "Circle"/);
+assert.match(template, /expression-bubble/);
+assert.match(template, /lastExpressionSequence/);
+assert.match(template, /expressionSender/);
 assert.doesNotMatch(template, /"revision /i);
 assert.doesNotMatch(template, /positionLabel\(state\.circle/);
 assert.doesNotMatch(template, /circlePosition|diamondPosition|circleGoal\.X|diamondGoal\.X/);
@@ -39,9 +42,8 @@ assert.match(template, /state\.statusCode === "Cleared" && !currentConsent/);
 assert.match(template, /\.dpad \{ position: relative; width: 180px; height: 168px/);
 assert.match(template, /\.dpad-up \{ left: 62px; top: 0; \}/);
 assert.match(template, /\.dpad-down \{ left: 62px; top: 112px; \}/);
-assert.match(template, /\.pass-button \{ position: absolute; left: 62px; top: 56px; width: 56px; height: 56px/);
-assert.match(template, /\.dpad button:not\(\.pass-button\)::after/);
-assert.doesNotMatch(template, /\.pass-button::(before|after)/);
+assert.match(template, /\.dpad button::after/);
+assert.doesNotMatch(template, /clip-path: polygon/);
 assert.match(template, /grid-template-rows: minmax\(0, 1fr\) 342px/);
 assert.match(template, /html, body \{ width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; overflow-y: auto/);
 assert.doesNotMatch(template, /overflow: hidden/);
@@ -69,6 +71,9 @@ assert.match(bootstrap, /private const string SaveKey = "nectorial-coop\.save\.v
 assert.match(bootstrap, /hasExpectedRevision/);
 assert.match(bootstrap, /TryParseDirection/);
 assert.match(bootstrap, /TryParseExpression/);
+assert.doesNotMatch(bootstrap, /KeyCode\.P|SendPass|case "Pass"/);
+assert.match(bootstrap, /expressionSequence/);
+assert.match(bootstrap, /expressionSender/);
 assert.match(bootstrap, /_commandPrefix/);
 assert.match(bootstrap, /PendingConsent\.RequestId, payload\.requestId/);
 assert.match(bootstrap, /CanDispatchNow\(\)[\s\S]*_restoreBlocked[\s\S]*_manualSavePending/);
@@ -164,7 +169,6 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
   const boxes = {
     up: { x: 62, y: 0 },
     left: { x: 0, y: 56 },
-    pass: { x: 62, y: 56 },
     right: { x: 124, y: 56 },
     down: { x: 62, y: 112 }
   };
@@ -172,7 +176,7 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
     assert.ok(box.x >= 0 && box.y >= 0 && box.x + dpad.button <= dpad.width && box.y + dpad.button <= dpad.height, "every control fits in the three-row D-pad");
     assert.ok(dpad.button >= 48, "every D-pad target remains generous");
   }
-  assert.equal(boxes.pass.x === boxes.down.x && boxes.pass.y === boxes.down.y, false, "Pass does not overlap Down");
+  assert.equal(Object.keys(boxes).length, 4, "the D-pad has four direction controls and an inert center");
 
   const viewport = { width: 360, height: 640, padY: 8, topbar: 64, gap: 8, controls: 342 };
   const coopHeight = viewport.height - viewport.padY * 2 - viewport.topbar - viewport.gap;
@@ -181,6 +185,17 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
   const controlsTop = boardTop + boardHeight + viewport.gap;
   const canvasSide = Math.min(viewport.width - 20, boardHeight);
   assert.ok(boardTop + canvasSide <= controlsTop, "canvas square fits before controls at 360x640");
+
+  const expressionMap = { Look: "👀", ThumbsUp: "👍", Handshake: "🤝", Waiting: "⏳" };
+  function expressionBubble(previousSequence, state) {
+    if (state.expressionSequence <= previousSequence || !expressionMap[state.expression]) return null;
+    return { sequence: state.expressionSequence, icon: expressionMap[state.expression], sender: state.expressionSender };
+  }
+  const firstExpression = expressionBubble(0, { expressionSequence: 1, expression: "Look", expressionSender: "Circle" });
+  assert.deepEqual(firstExpression, { sequence: 1, icon: "👀", sender: "Circle" }, "accepted expression renders sender and icon");
+  assert.equal(expressionBubble(1, { expressionSequence: 1, expression: "Look", expressionSender: "Circle" }), null, "ordinary state republish does not replay old expression");
+  assert.deepEqual(expressionBubble(1, { expressionSequence: 2, expression: "Look", expressionSender: "Diamond" }), { sequence: 2, icon: "👀", sender: "Diamond" }, "repeated emoji gets a new visible event");
+  assert.equal(expressionBubble(2, { expressionSequence: 0, expression: "Look", expressionSender: "Circle" }), null, "reload without an expression does not replay history");
 }
 
 {

@@ -37,6 +37,11 @@
     .coop-layout { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 342px; gap: 8px; justify-items: center; }
     .board-stage { position: relative; width: 100%; min-height: 0; display: grid; place-items: center; }
     #unity-canvas { display: block; width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); image-rendering: pixelated; }
+    .expression-bubble { position: absolute; top: 8px; left: 50%; z-index: 3; display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 6px 11px; transform: translateX(-50%); border: 1px solid var(--warm-grid); border-radius: 999px; background: color-mix(in srgb, var(--warm-surface) 95%, var(--warm-grid)); box-shadow: 0 4px 12px color-mix(in srgb, var(--warm-charcoal) 14%, transparent); font-size: 20px; pointer-events: none; }
+    .expression-bubble[hidden] { display: none; }
+    .expression-sender { width: 12px; height: 12px; border-radius: 50%; background: var(--circle); }
+    .expression-sender.diamond { border-radius: 2px; background: var(--diamond); transform: rotate(45deg); }
+    .expression-name { color: var(--warm-muted); font-size: 11px; font-weight: 800; }
     .seat-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--circle); }
     .seat-dot.diamond { border-radius: 2px; background: var(--diamond); transform: rotate(45deg); }
     .controls { width: min(100%, 360px); min-height: 0; display: grid; align-content: start; gap: 4px; }
@@ -46,17 +51,15 @@
     .turn-label { display: grid; place-items: center; min-width: 92px; min-height: 40px; padding: 4px 8px; border: 1px solid var(--warm-grid); border-radius: 9px; background: #fffdf7; font-size: 13px; line-height: 1.15; text-align: center; }
     .turn-label small { color: var(--warm-muted); font-size: 10px; }
     .dpad { position: relative; width: 180px; height: 168px; margin: 0 auto; }
-    .dpad button:not(.pass-button) { position: absolute; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border-radius: 12px; color: var(--warm-ink); background: transparent; }
-    .dpad button:not(.pass-button)::after { position: absolute; inset: 2px; z-index: 0; content: ""; background: var(--warm-edge); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
-    .dpad button:not(.pass-button)::before { position: absolute; inset: 5px; z-index: 1; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-edge))); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
-    .dpad button:not(.pass-button):enabled:active::before { background: var(--warm-pressed); }
+    .dpad button { position: absolute; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border-radius: 12px; color: var(--warm-ink); background: transparent; }
+    .dpad button::after { position: absolute; inset: 0; z-index: 0; content: ""; border-radius: 12px; background: var(--warm-edge); }
+    .dpad button::before { position: absolute; inset: 3px; z-index: 1; content: ""; border-radius: 10px; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-edge))); }
+    .dpad button:enabled:active::before { background: var(--warm-pressed); }
     .dpad button span { position: relative; z-index: 2; color: var(--warm-surface); font-size: 24px; }
     .dpad-up { left: 62px; top: 0; }
     .dpad-left { left: 0; top: 56px; }
     .dpad-right { left: 124px; top: 56px; }
     .dpad-down { left: 62px; top: 112px; }
-    .pass-button { position: absolute; left: 62px; top: 56px; width: 56px; height: 56px; display: grid; place-items: center; z-index: 3; border: 1px solid var(--warm-grid); border-radius: 10px; background: #fffdf7; color: var(--warm-ink); font-size: 11px; }
-    .pass-button:enabled:active { background: var(--warm-floor); }
     .emoji-row { display: flex; justify-content: center; gap: 7px; min-height: 48px; }
     .emoji-button { width: 48px; height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--warm-grid); border-radius: 10px; background: #fffdf7; font-size: 21px; }
     .emoji-button:enabled:active { background: var(--warm-floor); }
@@ -93,6 +96,11 @@
     <section class="coop-layout" aria-label="Few Moves 협력 파일럿">
       <section class="board-stage" aria-label="협력 게임 보드">
         <canvas id="unity-canvas" tabindex="0" aria-label="원과 마름모가 함께 움직이는 협력 보드"></canvas>
+        <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden>
+          <span id="expression-sender" class="expression-sender" aria-hidden="true"></span>
+          <span id="expression-icon" aria-hidden="true"></span>
+          <span id="expression-name" class="expression-name"></span>
+        </p>
       </section>
       <section class="controls" aria-label="협력 조작">
         <div class="status-row">
@@ -103,7 +111,6 @@
         <div class="dpad" aria-label="방향 조작">
           <button class="dpad-up" type="button" data-coop-action="Slide" data-direction="Up" disabled aria-label="원 또는 마름모를 위로 이동"><span aria-hidden="true">▲</span></button>
           <button class="dpad-left" type="button" data-coop-action="Slide" data-direction="Left" disabled aria-label="원 또는 마름모를 왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
-          <button id="pass-button" class="pass-button" type="button" data-coop-action="Pass" disabled aria-label="현재 좌석이 행동을 넘김">Pass</button>
           <button class="dpad-right" type="button" data-coop-action="Slide" data-direction="Right" disabled aria-label="원 또는 마름모를 오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
           <button class="dpad-down" type="button" data-coop-action="Slide" data-direction="Down" disabled aria-label="원 또는 마름모를 아래로 이동"><span aria-hidden="true">▼</span></button>
         </div>
@@ -162,6 +169,10 @@
       var stateRevision = 0;
       var boardStage = document.querySelector(".board-stage");
       var feedback = document.querySelector("#feedback");
+      var expressionBubble = document.querySelector("#expression-bubble");
+      var expressionSender = document.querySelector("#expression-sender");
+      var expressionIcon = document.querySelector("#expression-icon");
+      var expressionName = document.querySelector("#expression-name");
       var turnLabel = document.querySelector("#turn-label");
       var circleGoal = document.querySelector("#circle-goal");
       var diamondGoal = document.querySelector("#diamond-goal");
@@ -176,6 +187,9 @@
       var menuDialog = document.querySelector("#menu-dialog");
       var emojiCooldownUntil = 0;
       var ExpressionCooldownMilliseconds = 2000;
+      var lastExpressionSequence = 0;
+      var expressionBubbleTimer = null;
+      var expressionIcons = { Look: "👀", ThumbsUp: "👍", Handshake: "🤝", Waiting: "⏳" };
 
       function asObject(value) { return value && typeof value === "object" ? value : null; }
       function text(value, fallback) { return typeof value === "string" && value.length > 0 ? value : (fallback || ""); }
@@ -185,7 +199,7 @@
       }
       function isValidState(state) {
         if (!state || typeof state.initialized !== "boolean" || !positive(state.authorityRevision) || !positive(state.logicalActionCount) ||
-            typeof state.inputEnabled !== "boolean" || typeof state.passEnabled !== "boolean" || typeof state.restartEnabled !== "boolean" ||
+            typeof state.inputEnabled !== "boolean" || typeof state.restartEnabled !== "boolean" ||
             typeof state.undoEnabled !== "boolean" || typeof state.expressionEnabled !== "boolean" || typeof state.statusCode !== "string") return false;
         return true;
       }
@@ -213,7 +227,7 @@
       function actionAllowed(button) {
         if (!currentState || !isValidState(currentState) || !currentState.initialized || currentState.transitioning || currentState.savePending) return false;
         var action = button.dataset.coopAction;
-        if (action === "Slide" || action === "Pass") return currentState.inputEnabled === true && currentState.statusCode === "Playing";
+        if (action === "Slide") return currentState.inputEnabled === true && currentState.statusCode === "Playing";
         if (action === "Express") return currentState.expressionEnabled === true && Date.now() >= emojiCooldownUntil;
         if (action === "RequestUndo") return currentState.undoEnabled === true;
         if (action === "RequestRestart") return currentState.restartEnabled === true;
@@ -226,6 +240,29 @@
         });
         saveButton.disabled = !currentState || currentState.manualSaveEnabled !== true || currentState.savePending === true;
         menuButton.disabled = !currentState || currentState.initialized !== true;
+      }
+      function hideExpressionBubble() {
+        if (expressionBubbleTimer !== null) {
+          clearTimeout(expressionBubbleTimer);
+          expressionBubbleTimer = null;
+        }
+        expressionBubble.hidden = true;
+      }
+      function renderExpression(state) {
+        var sequence = Number(state.expressionSequence) || 0;
+        if (sequence <= lastExpressionSequence) return;
+        var icon = expressionIcons[state.expression];
+        if (!icon) {
+          lastExpressionSequence = sequence;
+          return;
+        }
+        lastExpressionSequence = sequence;
+        expressionSender.className = "expression-sender" + (state.expressionSender === "Diamond" ? " diamond" : "");
+        expressionIcon.textContent = icon;
+        expressionName.textContent = state.expressionSender === "Diamond" ? "마름모" : "원";
+        expressionBubble.hidden = false;
+        if (expressionBubbleTimer !== null) clearTimeout(expressionBubbleTimer);
+        expressionBubbleTimer = setTimeout(hideExpressionBubble, 2500);
       }
       function renderConsent(state) {
         var consent = asObject(state.pendingConsent);
@@ -244,6 +281,7 @@
         if (!isValidState(state)) {
           currentState = null;
           window.__nectorialCoop.state = null;
+          hideExpressionBubble();
           feedback.textContent = "협력 상태를 확인할 수 없습니다.";
           renderButtons();
           return;
@@ -255,6 +293,7 @@
           feedback.textContent = text(state.message, "협력 보드를 시작할 수 없습니다.");
           closeDialog(consentDialog);
           closeDialog(clearDialog);
+          hideExpressionBubble();
           renderButtons();
           return;
         }
@@ -264,6 +303,7 @@
         circleProgress.textContent = "원";
         diamondProgress.textContent = "마름모";
         feedback.textContent = text(state.message, "");
+        renderExpression(state);
         saveStatus.textContent = state.savePending ? "저장하는 중…" : (state.saveStatus === "saved" ? "이 브라우저에 저장됨" : "저장 확인을 누르면 진행을 보관합니다.");
         renderConsent(state);
         renderButtons();
@@ -308,9 +348,6 @@
         if (direction) {
           event.preventDefault();
           send({ kind: "Slide", direction: direction, expectedRevision: currentState ? currentState.authorityRevision : 0, hasExpectedRevision: true, seat: currentState ? currentState.activeActorCode : "Circle" });
-        } else if (String(event.key || "").toLowerCase() === "p") {
-          event.preventDefault();
-          send({ kind: "Pass", expectedRevision: currentState ? currentState.authorityRevision : 0, hasExpectedRevision: true, seat: currentState ? currentState.activeActorCode : "Circle" });
         }
       });
       window.__nectorialCoop = { state: null, receiveState: receiveState };
