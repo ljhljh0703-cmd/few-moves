@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, "..");
 const template = readFileSync(path.join(root, "Assets/WebGLTemplates/CoopOnline/index.html"), "utf8");
 const bridge = readFileSync(path.join(root, "Assets/Plugins/WebGL/CoopOnlineNetwork.jslib"), "utf8");
 const bootstrap = readFileSync(path.join(root, "Assets/Nectorial/Runtime/CoopOnline/CoopOnlineBootstrap.cs"), "utf8");
+const onlineSerialization = readFileSync(path.join(root, "Assets/Editor/CoopOnlineSerializationChecks.cs"), "utf8");
 const build = readFileSync(path.join(root, "Assets/Editor/CoopOnlineBuild.cs"), "utf8");
 const solo = readFileSync(path.join(root, "Assets/Nectorial/Runtime/GameBootstrap.cs"), "utf8");
 
@@ -73,9 +74,13 @@ assert.match(bootstrap, /bearer_derived/);
 assert.match(bootstrap, /private static void ConfigureCamera\(\)/);
 assert.match(bootstrap, /using Nectorial\.SlideEscape\.Unity\.Coop;/);
 assert.match(bootstrap, /MatchesBundledRoom/);
-assert.match(bootstrap, /wire\.roomId, _room\.Id/);
+assert.match(bootstrap, /wire\.roomId, room\.Id/);
 assert.doesNotMatch(bootstrap, /wire\.roomId, _roomId/);
 assert.match(bootstrap, /RoomId = wire\.roomId/);
+assert.match(bootstrap, /TryNormalizeWirePending/);
+assert.match(bootstrap, /CoopSaveSerializationAdapter\.TryNormalizePendingConsent/);
+assert.match(bootstrap, /CoopRules\.ValidateState/);
+assert.match(bootstrap, /TryDeserializeServerStateForCheck/);
 assert.match(bootstrap, /expressionHighWater/);
 assert.match(bootstrap, /_expressionHydrated/);
 assert.match(bootstrap, /result\.op == "resume"/);
@@ -102,6 +107,10 @@ assert.match(build, /previousCompanyName/);
 assert.match(build, /previousRunInBackground/);
 assert.match(build, /previousCompression/);
 assert.match(solo, /Few Moves Online Pilot/);
+assert.match(onlineSerialization, /pending-null/);
+assert.match(onlineSerialization, /active-pending/);
+assert.match(onlineSerialization, /malformed-pending/);
+assert.match(onlineSerialization, /COOP_ONLINE_JSON_PROBE_RESULT pass=true/);
 
 const serverStateFixture = {
   ok: true,

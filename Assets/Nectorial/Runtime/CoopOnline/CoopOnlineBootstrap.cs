@@ -189,6 +189,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
             ApplyAvailability(result.availability);
             bool authenticatedState = ApplyAuthenticatedResult(result);
+            if (result.state != null && !authenticatedState)
+            {
+                PublishState();
+                return;
+            }
             bool sessionPresent = result.seat == 0 || result.seat == 1;
             if (result.op == "created" || result.op == "joined" || result.op == "resumed" || (result.op == "resume" && sessionPresent))
             {
@@ -213,7 +218,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             if (!_roomReady) return false;
             _seatCode = result.seat;
             ApplyAvailability(result.availability);
-            ApplyWireState(result.state, result.expressions, result.room);
+            if (!ApplyWireState(result.state, result.expressions, result.room)) return false;
             _joined = true;
             return true;
         }
@@ -278,17 +283,30 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             return true;
         }
 
-        private void ApplyWireState(OnlineWireState wire, OnlineExpressions expressions, OnlineRoomView room)
+        private bool ApplyWireState(OnlineWireState wire, OnlineExpressions expressions, OnlineRoomView room)
         {
-            // Core state carries the bundled puzzle ID (for C1: coop-c1); _roomId is the server session UUID.
-            if (wire == null || !_roomReady || _room == null || !string.Equals(wire.roomId, _room.Id, StringComparison.Ordinal)) return;
+            CoopState converted;
+            string conversionError;
+            if (!_roomReady || !TryToCoreState(_room, wire, out converted, out conversionError))
+            {
+                RejectWireState();
+                return false;
+            }
             if (_authorityRevision >= 0 && (wire.authorityRevision < _authorityRevision ||
-                (wire.authorityRevision == _authorityRevision && wire.logicalActionCount < _logicalActionCount))) return;
+                (wire.authorityRevision == _authorityRevision && wire.logicalActionCount < _logicalActionCount))) return true;
             _authorityRevision = wire.authorityRevision;
             _logicalActionCount = wire.logicalActionCount;
-            _serverState = ToCoreState(wire);
+            _serverState = converted;
             if (_board != null && _roomReady) _board.Render(_room, _serverState);
             ApplyExpressions(expressions);
+            return true;
+        }
+
+        private void RejectWireState()
+        {
+            LockForTransportFailure("online_state_invalid");
+            _error = "online_state_invalid";
+            _message = "온라인 상태를 안전하게 적용하지 못했습니다";
         }
 
         private void ApplyExpressions(OnlineExpressions expressions)
@@ -337,9 +355,19 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 string.Equals(room.roomFingerprint, CoopRules.RoomFingerprint(_room), StringComparison.Ordinal);
         }
 
-        private CoopState ToCoreState(OnlineWireState wire)
+        private static bool TryToCoreState(CoopRoomDefinition room, OnlineWireState wire, out CoopState state, out string error)
         {
-            return new CoopState
+            state = null;
+            error = null;
+            if (room == null || wire == null) { error = "online_state_missing"; return false; }
+            if (!string.Equals(wire.roomId, room.Id, StringComparison.Ordinal)) { error = "online_state_room_id_mismatch"; return false; }
+            if (wire.circlePosition == null || wire.diamondPosition == null) { error = "online_state_position_missing"; return false; }
+            if (wire.activeActor != 0 && wire.activeActor != 1) { error = "online_state_actor_invalid"; return false; }
+            if (wire.status != 0 && wire.status != 1 && wire.status != 2) { error = "online_state_status_invalid"; return false; }
+
+            CoopPendingConsent pending;
+            if (!TryNormalizeWirePending(wire.pendingConsent, out pending, out error)) return false;
+            var converted = new CoopState
             {
                 RoomId = wire.roomId,
                 CirclePosition = new GridPoint(wire.circlePosition.x, wire.circlePosition.y),
@@ -348,15 +376,52 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 AuthorityRevision = wire.authorityRevision,
                 LogicalActionCount = wire.logicalActionCount,
                 Status = wire.status == 1 ? CoopRunStatus.Cleared : (wire.status == 2 ? CoopRunStatus.Paused : CoopRunStatus.Playing),
-                PendingConsent = wire.pendingConsent == null ? null : new CoopPendingConsent
+                PendingConsent = pending
+            };
+            string[] errors = CoopRules.ValidateState(room, converted);
+            if (errors.Length > 0) { error = "online_state_" + errors[0]; return false; }
+            state = converted;
+            return true;
+        }
+
+        private static bool TryNormalizeWirePending(OnlinePendingConsent wire, out CoopPendingConsent pending, out string error)
+        {
+            pending = null;
+            error = null;
+            var envelope = new CoopSaveEnvelope
+            {
+                State = new CoopState
                 {
-                    RequestId = wire.pendingConsent.requestId,
-                    Kind = wire.pendingConsent.kind == 1 ? CoopConsentKind.Restart : CoopConsentKind.Undo,
-                    Requester = wire.pendingConsent.requester == 1 ? CoopActor.Diamond : CoopActor.Circle,
-                    RequestedAtRevision = wire.pendingConsent.requestedAtRevision
+                    PendingConsent = wire == null ? null : new CoopPendingConsent
+                    {
+                        RequestId = wire.requestId,
+                        Kind = (CoopConsentKind)wire.kind,
+                        Requester = (CoopActor)wire.requester,
+                        RequestedAtRevision = wire.requestedAtRevision
+                    }
                 }
             };
+            string normalizationError;
+            if (!CoopSaveSerializationAdapter.TryNormalizePendingConsent(envelope, out normalizationError))
+            {
+                error = "online_pending_consent_invalid";
+                return false;
+            }
+            pending = envelope.State.PendingConsent;
+            return true;
         }
+
+#if UNITY_EDITOR
+        public static bool TryDeserializeServerStateForCheck(CoopRoomDefinition room, string json, out CoopState state, out string error)
+        {
+            state = null;
+            error = null;
+            OnlineWireState wire;
+            try { wire = JsonUtility.FromJson<OnlineWireState>(json); }
+            catch (Exception exception) { error = "online_state_json_" + exception.GetType().Name; return false; }
+            return TryToCoreState(room, wire, out state, out error);
+        }
+#endif
 
         private void ResetRoomView()
         {
