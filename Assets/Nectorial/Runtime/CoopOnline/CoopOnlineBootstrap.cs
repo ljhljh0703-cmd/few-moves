@@ -34,6 +34,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private int _logicalActionCount;
         private CoopState _serverState;
         private long _expressionHighWater;
+        private bool _expressionHydrated;
         private long _visibleExpressionSequence;
         private string _visibleExpressionSender = string.Empty;
         private string _visibleExpression = string.Empty;
@@ -173,7 +174,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 }
             }
             if (result.state != null) ApplyWireState(result.state, result.expressions, result.room);
-            if (result.op == "created" || result.op == "joined" || result.op == "resumed")
+            if (result.op == "created" || result.op == "joined" || result.op == "resumed" || result.op == "resume")
             {
                 _joined = true;
                 _message = result.op == "created" ? "초대 코드를 공유하세요" : "온라인 방에 들어왔습니다";
@@ -222,9 +223,10 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         {
             if (expressions == null) return;
             long incoming = expressions.expressionSequence;
-            if (!_joined && _expressionHighWater == 0)
+            if (!_expressionHydrated)
             {
                 _expressionHighWater = incoming;
+                _expressionHydrated = true;
                 return;
             }
             if (incoming <= _expressionHighWater) return;
@@ -278,6 +280,8 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _serverState = null;
             _authorityRevision = -1;
             _logicalActionCount = 0;
+            _expressionHighWater = 0;
+            _expressionHydrated = false;
             _message = "온라인 방을 준비하세요";
             _error = string.Empty;
             PublishState();

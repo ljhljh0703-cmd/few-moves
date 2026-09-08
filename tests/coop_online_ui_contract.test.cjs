@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const template = readFileSync(path.join(root, "Assets/WebGLTemplates/CoopOnline/index.html"), "utf8");
@@ -38,6 +39,8 @@ assert.match(bridge, /NectorialOnlineCreate/);
 assert.match(bridge, /NectorialOnlineJoin/);
 assert.match(bridge, /NectorialOnlineCommand/);
 assert.match(bridge, /NectorialOnlineReportState/);
+assert.match(bridge, /sanitizedCopy/);
+assert.match(bridge, /delete copy\.seatToken/);
 assert.doesNotMatch(bridge, /console\.log\(.*seatToken|console\.log\(.*bearer/);
 
 assert.match(bootstrap, /NectorialOnlineCreate/);
@@ -47,6 +50,8 @@ assert.match(bootstrap, /bearer_derived/);
 assert.match(bootstrap, /using Nectorial\.SlideEscape\.Unity\.Coop;/);
 assert.match(bootstrap, /MatchesBundledRoom/);
 assert.match(bootstrap, /expressionHighWater/);
+assert.match(bootstrap, /_expressionHydrated/);
+assert.match(bootstrap, /result\.op == "resume"/);
 assert.match(bootstrap, /COOP_ONLINE_STATE_OBSERVATION/);
 assert.match(bootstrap, /OnlineSafeLog/);
 assert.match(bootstrap, /bearer_derived/);
@@ -57,5 +62,30 @@ assert.match(build, /previousCompanyName/);
 assert.match(build, /previousRunInBackground/);
 assert.match(build, /previousCompression/);
 assert.match(solo, /Few Moves Online Pilot/);
+
+{
+  const library = {};
+  const local = new Map();
+  const session = new Map();
+  const sandbox = {
+    LibraryManager: { library },
+    localStorage: { getItem: key => local.get(key) || null, setItem: (key, value) => local.set(key, value), removeItem: key => local.delete(key) },
+    sessionStorage: { getItem: key => session.get(key) || null, setItem: (key, value) => session.set(key, value), removeItem: key => session.delete(key) },
+    mergeInto(target, additions) {
+      Object.assign(target, additions);
+      Object.entries(additions).forEach(([name, value]) => { if (name.startsWith("$")) sandbox[name.slice(1)] = value; });
+    },
+    console: { warn() {} }
+  };
+  vm.runInNewContext(bridge, sandbox, { filename: "CoopOnlineNetwork.jslib" });
+  const rawCreate = { ok: true, room: { roomId: "room-1" }, seat: 0, inviteCode: "ABC", seatToken: "bearer-secret" };
+  sandbox.NectorialOnlineBridge.writeSession({ roomId: "room-1", seat: 0, seatToken: rawCreate.seatToken, inviteCode: rawCreate.inviteCode });
+  const stored = sandbox.NectorialOnlineBridge.readSession();
+  assert.equal(stored.seatToken, "bearer-secret", "seat credential remains in private browser storage");
+  const safeProjection = sandbox.NectorialOnlineBridge.sanitizedCopy(rawCreate);
+  assert.equal(rawCreate.seatToken, "bearer-secret", "raw create response is not mutated before private storage");
+  assert.equal(safeProjection.seatToken, undefined, "Unity projection excludes bearer token");
+  assert.equal(safeProjection.inviteCode, "ABC", "safe Unity projection may retain invite code");
+}
 
 console.log("Coop online UI contract checks passed");
