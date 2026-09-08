@@ -243,6 +243,12 @@ internal static class Program
         Assert(!restoredRetry.Accepted && restoredRetry.Idempotent && restoredRetry.Reason == "stale_revision", "restored ledger must preserve rejected retry result");
         CoopDispatchResult restoredChanged = restored.Dispatch(CoopCommandFactory.Pass(CoopActor.Circle, "rejected-id", 0));
         Assert(!restoredChanged.Accepted && restoredChanged.Reason == "command_id_payload_conflict", "restored ledger must preserve changed-payload conflict");
+
+        CoopSession acceptedSession = CoopSession.Create(room);
+        Assert(acceptedSession.Dispatch(CoopCommandFactory.Pass(CoopActor.Circle, "accepted-command", 0)).Accepted, "accepted command setup must pass");
+        CoopSaveEnvelope commandTamper = CoopSaveCodec.Capture(acceptedSession, "command-tamper");
+        commandTamper.Replay.Commands[0] = CoopCommandFactory.Slide(CoopActor.Diamond, "tampered-command", 0, GameCommand.Left);
+        Assert(!CoopSaveCodec.TryRestore(room, commandTamper, out restored, out error) && error.StartsWith("accepted_commands_projection_mismatch", StringComparison.Ordinal), "tampered accepted command projection must reject restore");
     }
 
     private static void CheckSaveReplay()

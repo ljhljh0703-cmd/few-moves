@@ -42,7 +42,7 @@ namespace Nectorial.SlideEscape.Coop
             if (!string.Equals(envelope.ContentVersion, room.ContentVersion, StringComparison.Ordinal)) { error = "content_version_mismatch"; return false; }
             if (!string.Equals(envelope.RoomFingerprint, CoopRules.RoomFingerprint(room), StringComparison.Ordinal)) { error = "room_fingerprint_mismatch"; return false; }
             if (string.IsNullOrEmpty(envelope.SessionId)) { error = "session_id_missing"; return false; }
-            if (envelope.Replay == null || envelope.Replay.Attempts == null) { error = "attempt_transcript_missing"; return false; }
+            if (envelope.Replay == null || envelope.Replay.Attempts == null || envelope.Replay.Commands == null) { error = "attempt_transcript_missing"; return false; }
 
             CoopSession restored;
             string replayError;
