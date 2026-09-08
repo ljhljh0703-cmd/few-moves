@@ -349,7 +349,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private void ApplyDispatch(CoopDispatchResult result, CoopCommand command, bool render)
         {
             _message = TranslateResult(result, command);
-            if (result != null && result.Accepted && result.Events != null)
+            if (result != null && result.Accepted && !result.Idempotent && result.Events != null)
             {
                 for (int index = 0; index < result.Events.Length; index++)
                 {

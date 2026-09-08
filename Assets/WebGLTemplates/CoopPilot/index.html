@@ -28,7 +28,7 @@
     button:focus-visible, canvas:focus-visible { outline: 3px solid var(--warm-focus); outline-offset: 3px; }
     button:disabled { opacity: .36; cursor: default; }
     main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; margin: 0 auto; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 64px minmax(0, 1fr); gap: 8px; }
-    .topbar { min-height: 64px; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; }
+    .topbar { position: relative; min-height: 64px; display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 8px; }
     .topbar h1 { margin: 0; font-size: 17px; line-height: 1.2; text-align: center; }
     .topbar small { display: block; margin-top: 3px; color: var(--warm-muted); font-size: 11px; font-weight: 600; }
     .icon-button { display: grid; place-items: center; border-radius: 12px; color: var(--warm-ink); }
@@ -37,7 +37,7 @@
     .coop-layout { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 342px; gap: 8px; justify-items: center; }
     .board-stage { position: relative; width: 100%; min-height: 0; display: grid; place-items: center; }
     #unity-canvas { display: block; width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); image-rendering: pixelated; }
-    .expression-bubble { position: absolute; top: 8px; left: 50%; z-index: 3; display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 6px 11px; transform: translateX(-50%); border: 1px solid var(--warm-grid); border-radius: 999px; background: color-mix(in srgb, var(--warm-surface) 95%, var(--warm-grid)); box-shadow: 0 4px 12px color-mix(in srgb, var(--warm-charcoal) 14%, transparent); font-size: 20px; pointer-events: none; }
+    .expression-bubble { position: absolute; top: 12px; left: 56px; right: 56px; z-index: 3; display: flex; align-items: center; justify-content: center; gap: 7px; width: auto; max-width: calc(100% - 112px); height: 40px; min-height: 40px; padding: 6px 11px; border: 1px solid var(--warm-grid); border-radius: 999px; background: color-mix(in srgb, var(--warm-surface) 95%, var(--warm-grid)); box-shadow: 0 4px 12px color-mix(in srgb, var(--warm-charcoal) 14%, transparent); font-size: 20px; pointer-events: none; overflow: hidden; white-space: nowrap; }
     .expression-bubble[hidden] { display: none; }
     .expression-sender { width: 12px; height: 12px; border-radius: 50%; background: var(--circle); }
     .expression-sender.diamond { border-radius: 2px; background: var(--diamond); transform: rotate(45deg); }
@@ -91,16 +91,16 @@
     <header class="topbar">
       <button id="menu-button" class="icon-button" type="button" disabled aria-label="협력 메뉴"><span aria-hidden="true">☰</span></button>
       <h1>Few Moves<small>한 기기로 번갈아</small></h1>
+      <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden>
+        <span id="expression-sender" class="expression-sender" aria-hidden="true"></span>
+        <span id="expression-icon" aria-hidden="true"></span>
+        <span id="expression-name" class="expression-name"></span>
+      </p>
       <button id="save-button" class="icon-button" type="button" disabled aria-label="협력 진행 저장"><span aria-hidden="true">▣</span></button>
     </header>
     <section class="coop-layout" aria-label="Few Moves 협력 파일럿">
       <section class="board-stage" aria-label="협력 게임 보드">
         <canvas id="unity-canvas" tabindex="0" aria-label="원과 마름모가 함께 움직이는 협력 보드"></canvas>
-        <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden>
-          <span id="expression-sender" class="expression-sender" aria-hidden="true"></span>
-          <span id="expression-icon" aria-hidden="true"></span>
-          <span id="expression-name" class="expression-name"></span>
-        </p>
       </section>
       <section class="controls" aria-label="협력 조작">
         <div class="status-row">
@@ -297,7 +297,7 @@
           renderButtons();
           return;
         }
-        turnLabel.innerHTML = "행동 " + state.logicalActionCount + "<small>현재 차례</small>";
+        turnLabel.innerHTML = activeLabel(state) + "<small>행동 " + state.logicalActionCount + "</small>";
         circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
         diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
         circleProgress.textContent = "원";
