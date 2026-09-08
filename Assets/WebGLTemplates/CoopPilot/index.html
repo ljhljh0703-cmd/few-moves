@@ -177,24 +177,18 @@
       var consentCopy = document.querySelector("#consent-copy");
       var clearDialog = document.querySelector("#clear-dialog");
       var menuDialog = document.querySelector("#menu-dialog");
+      var emojiCooldownUntil = 0;
 
       function asObject(value) { return value && typeof value === "object" ? value : null; }
       function text(value, fallback) { return typeof value === "string" && value.length > 0 ? value : (fallback || ""); }
       function positive(value) { return Number.isInteger(value) && value >= 0; }
-      function positionLabel(value) {
-        var point = asObject(value);
-        var x = point ? (Number.isInteger(point.x) ? point.x : point.X) : null;
-        var y = point ? (Number.isInteger(point.y) ? point.y : point.Y) : null;
-        if (!point || !Number.isInteger(x) || !Number.isInteger(y)) return "목표 —";
-        return "(" + x + "," + y + ")";
-      }
       function activeLabel(state) {
         return state.activeActorCode === "Diamond" || state.activeActor === "Diamond" ? "마름모 차례" : "원 차례";
       }
       function isValidState(state) {
         if (!state || typeof state.initialized !== "boolean" || !positive(state.authorityRevision) || !positive(state.logicalActionCount) ||
             typeof state.inputEnabled !== "boolean" || typeof state.passEnabled !== "boolean" || typeof state.restartEnabled !== "boolean" ||
-            typeof state.undoEnabled !== "boolean" || typeof state.statusCode !== "string") return false;
+            typeof state.undoEnabled !== "boolean" || typeof state.expressionEnabled !== "boolean" || typeof state.statusCode !== "string") return false;
         return true;
       }
       function openDialog(dialog) {
@@ -208,6 +202,8 @@
       }
       function send(command) {
         if (!unityInstance || !currentState || !isValidState(currentState)) return false;
+        if (command.kind !== "Save" && (!command.hasExpectedRevision || !command.seat)) return false;
+        if (command.kind !== "Save" && currentState.transitioning) return false;
         try {
           unityInstance.SendMessage("CoopBootstrap", "HandleCommand", JSON.stringify(command));
           return true;
@@ -220,7 +216,7 @@
         if (!currentState || !isValidState(currentState) || !currentState.initialized || currentState.transitioning || currentState.savePending) return false;
         var action = button.dataset.coopAction;
         if (action === "Slide" || action === "Pass") return currentState.inputEnabled === true && currentState.statusCode === "Playing";
-        if (action === "Express") return currentState.initialized === true;
+        if (action === "Express") return currentState.expressionEnabled === true && Date.now() >= emojiCooldownUntil;
         if (action === "RequestUndo") return currentState.undoEnabled === true;
         if (action === "RequestRestart") return currentState.restartEnabled === true;
         if (action === "Restart") return currentState.restartEnabled === true;
@@ -240,6 +236,7 @@
           closeDialog(consentDialog);
           return;
         }
+        closeDialog(clearDialog);
         consentCopy.textContent = consent.kind === "Restart" ? "다시 시작하려면 다른 좌석의 동의가 필요합니다." : "한 수 되돌리려면 다른 좌석의 동의가 필요합니다.";
         openDialog(consentDialog);
       }
@@ -253,18 +250,27 @@
         }
         currentState = Object.freeze(state);
         window.__nectorialCoop.state = currentState;
+        if (!state.initialized) {
+          stateLine.hidden = true;
+          turnLabel.innerHTML = "시작 실패<small>다시 확인해 주세요</small>";
+          feedback.textContent = text(state.message, "협력 보드를 시작할 수 없습니다.");
+          closeDialog(consentDialog);
+          closeDialog(clearDialog);
+          renderButtons();
+          return;
+        }
         stateLine.hidden = false;
         stateLine.innerHTML = "<span class=\"seat-dot " + (state.activeActorCode === "Diamond" ? "diamond" : "") + "\"></span>" + activeLabel(state) + " · 행동 " + state.logicalActionCount;
-        turnLabel.innerHTML = activeLabel(state) + "<small>revision " + state.authorityRevision + "</small>";
-        circleGoal.textContent = "목표 " + positionLabel(state.circleGoal);
-        diamondGoal.textContent = "목표 " + positionLabel(state.diamondGoal);
-        circleProgress.textContent = positionLabel(state.circlePosition);
-        diamondProgress.textContent = positionLabel(state.diamondPosition);
-        feedback.textContent = text(state.message, text(state.error, ""));
+        turnLabel.innerHTML = activeLabel(state) + "<small>현재 좌석</small>";
+        circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
+        diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
+        circleProgress.textContent = "원";
+        diamondProgress.textContent = "마름모";
+        feedback.textContent = text(state.message, "");
         saveStatus.textContent = state.savePending ? "저장하는 중…" : (state.saveStatus === "saved" ? "이 브라우저에 저장됨" : "저장 확인을 누르면 진행을 보관합니다.");
         renderConsent(state);
         renderButtons();
-        if (state.statusCode === "Cleared") openDialog(clearDialog); else closeDialog(clearDialog);
+        if (state.statusCode === "Cleared" && !state.pendingConsent) openDialog(clearDialog); else closeDialog(clearDialog);
       }
       function isCurrentOrNewer(state) {
         if (!currentState) return true;
@@ -283,10 +289,11 @@
       function sendFromButton(button) {
         if (!actionAllowed(button)) return;
         var action = button.dataset.coopAction;
-        var command = { kind: action, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || currentState.activeActor || "Circle" };
+        var command = { kind: action, expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: currentState.activeActorCode || currentState.activeActor || "Circle" };
         if (action === "Slide") command.direction = button.dataset.direction;
         if (action === "Express") command.expression = button.dataset.expression;
         if (action === "RequestUndo" || action === "RequestRestart") command.requestId = String(stateRevision) + "-" + action;
+        if (action === "Express") { emojiCooldownUntil = Date.now() + 350; renderButtons(); setTimeout(renderButtons, 360); }
         send(command);
       }
       Array.from(document.querySelectorAll("button[data-coop-action]")).forEach(function (button) { button.addEventListener("click", function () { sendFromButton(button); }); });
@@ -294,18 +301,19 @@
       menuButton.addEventListener("click", function () { openDialog(menuDialog); });
       document.querySelector("#menu-close").addEventListener("click", function () { closeDialog(menuDialog); });
       document.querySelector("#menu-save").addEventListener("click", function () { if (currentState && currentState.manualSaveEnabled) send({ kind: "Save", expectedRevision: currentState.authorityRevision }); });
-      document.querySelector("#consent-approve").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: true, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); closeDialog(consentDialog); } });
-      document.querySelector("#consent-reject").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: false, expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); closeDialog(consentDialog); } });
-      document.querySelector("#clear-restart").addEventListener("click", function () { if (!currentState || currentState.restartEnabled !== true) return; closeDialog(clearDialog); send({ kind: "RequestRestart", requestId: String(stateRevision) + "-clear-restart", expectedRevision: currentState.authorityRevision, seat: currentState.activeActorCode || "Circle" }); });
+      function consentResolverSeat() { return currentConsent && currentConsent.requester === "Circle" ? "Diamond" : "Circle"; }
+      document.querySelector("#consent-approve").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: true, expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: consentResolverSeat() }); closeDialog(consentDialog); } });
+      document.querySelector("#consent-reject").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind: "ResolveConsent", requestId: currentConsent.requestId, approve: false, expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: consentResolverSeat() }); closeDialog(consentDialog); } });
+      document.querySelector("#clear-restart").addEventListener("click", function () { if (!currentState || currentState.restartEnabled !== true) return; closeDialog(clearDialog); send({ kind: "RequestRestart", requestId: String(stateRevision) + "-clear-restart", expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: currentState.activeActorCode || "Circle" }); });
       document.addEventListener("keydown", function (event) {
         if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || (event.target && event.target.closest && event.target.closest("dialog"))) return;
         var direction = { ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right" }[event.key];
         if (direction) {
           event.preventDefault();
-          send({ kind: "Slide", direction: direction, expectedRevision: currentState ? currentState.authorityRevision : 0, seat: currentState ? currentState.activeActorCode : "Circle" });
+          send({ kind: "Slide", direction: direction, expectedRevision: currentState ? currentState.authorityRevision : 0, hasExpectedRevision: true, seat: currentState ? currentState.activeActorCode : "Circle" });
         } else if (String(event.key || "").toLowerCase() === "p") {
           event.preventDefault();
-          send({ kind: "Pass", expectedRevision: currentState ? currentState.authorityRevision : 0, seat: currentState ? currentState.activeActorCode : "Circle" });
+          send({ kind: "Pass", expectedRevision: currentState ? currentState.authorityRevision : 0, hasExpectedRevision: true, seat: currentState ? currentState.activeActorCode : "Circle" });
         }
       });
       window.__nectorialCoop = { state: null, receiveState: receiveState };

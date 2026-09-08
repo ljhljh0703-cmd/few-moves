@@ -22,10 +22,15 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private bool _initialized;
         private bool _restoreBlocked;
         private bool _manualSavePending;
+        private bool _transitioning;
+        private bool _initializationFailed;
+        private readonly string _commandPrefix = "coop-" + Guid.NewGuid().ToString("N") + "-";
         private int _nextCommandId;
         private int _nextSaveRequestId;
         private int _pendingSaveRequestId;
         private Coroutine _saveTimeoutRoutine;
+        private Coroutine _transitionRoutine;
+        private float _expressionCooldownUntil;
         private string _message = "초기화 중";
         private string _loadError = string.Empty;
         private string _saveStatus = "idle";
@@ -52,7 +57,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private void Update()
         {
 #if !UNITY_WEBGL || UNITY_EDITOR
-            if (!_initialized || _restoreBlocked) return;
+            if (!_initialized || _restoreBlocked || _transitioning) return;
             if (Input.GetKeyDown(KeyCode.UpArrow)) SendSlide(GameCommand.Up);
             else if (Input.GetKeyDown(KeyCode.DownArrow)) SendSlide(GameCommand.Down);
             else if (Input.GetKeyDown(KeyCode.LeftArrow)) SendSlide(GameCommand.Left);
@@ -66,12 +71,13 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private void OnDestroy()
         {
             StopSaveTimeout();
+            StopTransition();
             if (_board != null) _board.Dispose();
         }
 
         public void HandleCommand(string json)
         {
-            if (!_initialized || string.IsNullOrEmpty(json)) return;
+            if (!_initialized || _restoreBlocked || _initializationFailed || string.IsNullOrEmpty(json)) return;
 
             UiCommandPayload payload;
             try
@@ -93,18 +99,28 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 return;
             }
 
+            if (!string.Equals(payload.kind, "Save", StringComparison.Ordinal) && !HasCommandContext(payload))
+            {
+                RejectCommand("협력 상태가 오래되었습니다");
+                return;
+            }
+
+            if (_transitioning && !string.Equals(payload.kind, "Save", StringComparison.Ordinal)) return;
+
             switch (payload.kind)
             {
                 case "Save": RequestManualSave(); return;
-                case "Slide": SendSlide(ParseDirection(payload.direction)); return;
-                case "Pass": SendPass(); return;
-                case "RequestUndo": RequestUndo(payload.requestId); return;
-                case "RequestRestart": RequestRestart(payload.requestId); return;
+                case "Slide":
+                    GameCommand direction;
+                    if (!TryParseDirection(payload.direction, out direction)) { RejectCommand("알 수 없는 이동입니다"); return; }
+                    SendSlide(direction, payload); return;
+                case "Pass": SendPass(payload); return;
+                case "RequestUndo": RequestUndo(payload); return;
+                case "RequestRestart": RequestRestart(payload); return;
                 case "ResolveConsent": ResolveConsent(payload); return;
-                case "Express": Express(payload.expression); return;
+                case "Express": Express(payload); return;
                 default:
-                    _message = "알 수 없는 협력 입력입니다";
-                    PublishState();
+                    RejectCommand("알 수 없는 협력 입력입니다");
                     return;
             }
         }
@@ -195,78 +211,169 @@ namespace Nectorial.SlideEscape.Unity.Coop
 
         private void SendSlide(GameCommand direction)
         {
-            if (!_initialized || _restoreBlocked || _manualSavePending) return;
-            CoopActor seat = _session.State.ActiveActor;
-            string commandId = NextCommandId();
-            ApplyDispatch(_session.Dispatch(CoopCommandFactory.Slide(seat, commandId, _session.State.AuthorityRevision, direction)));
+            SendSlide(direction, CreateLocalPayload("Slide"));
+        }
+
+        private void SendSlide(GameCommand direction, UiCommandPayload payload)
+        {
+            CoopActor seat;
+            if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat)) return;
+            DispatchCommand(CoopCommandFactory.Slide(seat, NextCommandId(), payload.expectedRevision, direction));
         }
 
         private void SendPass()
         {
-            if (!_initialized || _restoreBlocked || _manualSavePending) return;
-            CoopActor seat = _session.State.ActiveActor;
-            ApplyDispatch(_session.Dispatch(CoopCommandFactory.Pass(seat, NextCommandId(), _session.State.AuthorityRevision)));
+            SendPass(CreateLocalPayload("Pass"));
         }
 
-        private void RequestUndo(string requestId = null)
+        private void SendPass(UiCommandPayload payload)
         {
-            if (!_initialized || _restoreBlocked || _manualSavePending) return;
-            CoopState state = _session.State;
-            string id = string.IsNullOrEmpty(requestId) ? "undo-" + _nextCommandId.ToString() : requestId;
-            ApplyDispatch(_session.Dispatch(CoopCommandFactory.RequestUndo(state.ActiveActor, NextCommandId(), state.AuthorityRevision, id)));
+            CoopActor seat;
+            if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat)) return;
+            DispatchCommand(CoopCommandFactory.Pass(seat, NextCommandId(), payload.expectedRevision));
         }
 
-        private void RequestRestart(string requestId = null)
+        private void RequestUndo()
         {
-            if (!_initialized || _restoreBlocked || _manualSavePending) return;
-            CoopState state = _session.State;
-            string id = string.IsNullOrEmpty(requestId) ? "restart-" + _nextCommandId.ToString() : requestId;
-            ApplyDispatch(_session.Dispatch(CoopCommandFactory.RequestRestart(state.ActiveActor, NextCommandId(), state.AuthorityRevision, id)));
+            UiCommandPayload payload = CreateLocalPayload("RequestUndo");
+            payload.requestId = "undo-" + NextCommandId();
+            RequestUndo(payload);
+        }
+
+        private void RequestUndo(UiCommandPayload payload)
+        {
+            CoopActor seat;
+            if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat) || string.IsNullOrEmpty(payload.requestId)) return;
+            DispatchCommand(CoopCommandFactory.RequestUndo(seat, NextCommandId(), payload.expectedRevision, payload.requestId));
+        }
+
+        private void RequestRestart()
+        {
+            UiCommandPayload payload = CreateLocalPayload("RequestRestart");
+            payload.requestId = "restart-" + NextCommandId();
+            RequestRestart(payload);
+        }
+
+        private void RequestRestart(UiCommandPayload payload)
+        {
+            CoopActor seat;
+            if (!CanDispatch(payload) || !TryParseActor(payload.seat, out seat) || string.IsNullOrEmpty(payload.requestId)) return;
+            DispatchCommand(CoopCommandFactory.RequestRestart(seat, NextCommandId(), payload.expectedRevision, payload.requestId));
         }
 
         private void ResolveConsent(UiCommandPayload payload)
         {
+            if (!CanDispatch(payload) || string.IsNullOrEmpty(payload.requestId)) return;
+            CoopActor seat;
+            if (!TryParseActor(payload.seat, out seat)) return;
             CoopState state = _session.State;
-            if (state.PendingConsent == null) return;
-            CoopActor resolver = CoopRules.Opponent(state.PendingConsent.Requester);
-            string requestId = state.PendingConsent.RequestId;
-            CoopCommand command = state.PendingConsent.Kind == CoopConsentKind.Undo
-                ? CoopCommandFactory.ResolveUndo(resolver, NextCommandId(), state.AuthorityRevision, requestId, payload.approve)
-                : CoopCommandFactory.ResolveRestart(resolver, NextCommandId(), state.AuthorityRevision, requestId, payload.approve);
-            ApplyDispatch(_session.Dispatch(command));
-        }
-
-        private void Express(string expression)
-        {
-            CoopExpression parsed;
-            if (!Enum.TryParse(expression, out parsed))
+            if (state.PendingConsent == null || !string.Equals(state.PendingConsent.RequestId, payload.requestId, StringComparison.Ordinal))
             {
-                _message = "표현을 사용할 수 없습니다";
-                PublishState();
+                RejectCommand("동의 요청이 이미 바뀌었습니다");
                 return;
             }
 
-            CoopState state = _session.State;
-            _lastExpression = parsed.ToString();
-            ApplyDispatch(_session.Dispatch(CoopCommandFactory.Express(state.ActiveActor, NextCommandId(), state.AuthorityRevision, parsed)));
+            CoopCommand command = state.PendingConsent.Kind == CoopConsentKind.Undo
+                ? CoopCommandFactory.ResolveUndo(seat, NextCommandId(), payload.expectedRevision, payload.requestId, payload.approve)
+                : CoopCommandFactory.ResolveRestart(seat, NextCommandId(), payload.expectedRevision, payload.requestId, payload.approve);
+            DispatchCommand(command);
         }
 
-        private void ApplyDispatch(CoopDispatchResult result)
+        private void Express(UiCommandPayload payload)
+        {
+            if (!CanDispatch(payload) || Time.unscaledTime < _expressionCooldownUntil) return;
+            CoopActor seat;
+            CoopExpression expression;
+            if (!TryParseActor(payload.seat, out seat) || !TryParseExpression(payload.expression, out expression))
+            {
+                RejectCommand("표현을 사용할 수 없습니다");
+                return;
+            }
+
+            DispatchCommand(CoopCommandFactory.Express(seat, NextCommandId(), payload.expectedRevision, expression));
+        }
+
+        private void DispatchCommand(CoopCommand command)
+        {
+            if (!CanDispatchNow() || command == null) return;
+            CoopState before = _session.State;
+            CoopDispatchResult result = _session.Dispatch(command);
+            if (result.Accepted && !result.Idempotent && command.Kind == CoopCommandKind.Slide)
+            {
+                StartTransition(before, result.State, result, command);
+                return;
+            }
+            ApplyDispatch(result, command, true);
+        }
+
+        private void StartTransition(CoopState before, CoopState after, CoopDispatchResult result, CoopCommand command)
+        {
+            if (_board == null || !_board.BeginTransition(_room, before, after, command.Seat))
+            {
+                ApplyDispatch(result, command, true);
+                return;
+            }
+
+            _transitioning = true;
+            _message = "";
+            PublishState();
+            float duration = CalculateTransitionDuration(before, after, command.Seat);
+            _transitionRoutine = StartCoroutine(CompleteTransition(duration, after, result, command));
+        }
+
+        private IEnumerator CompleteTransition(float duration, CoopState after, CoopDispatchResult result, CoopCommand command)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                _board.AdvanceTransition(Mathf.Clamp01(elapsed / duration));
+                yield return null;
+            }
+
+            _transitionRoutine = null;
+            _transitioning = false;
+            _board.CompleteTransition(_room, after);
+            ApplyDispatch(result, command, false);
+        }
+
+        private void StopTransition()
+        {
+            if (_transitionRoutine != null)
+            {
+                StopCoroutine(_transitionRoutine);
+                _transitionRoutine = null;
+            }
+            _transitioning = false;
+            if (_board != null) _board.CancelTransition();
+        }
+
+        private static float CalculateTransitionDuration(CoopState before, CoopState after, CoopActor actor)
+        {
+            GridPoint from = actor == CoopActor.Circle ? before.CirclePosition : before.DiamondPosition;
+            GridPoint to = actor == CoopActor.Circle ? after.CirclePosition : after.DiamondPosition;
+            int distance = Math.Abs(to.X - from.X) + Math.Abs(to.Y - from.Y);
+            return Mathf.Clamp(0.12f + Math.Max(0, distance - 1) * 0.03f, 0.12f, 0.28f);
+        }
+
+        private void ApplyDispatch(CoopDispatchResult result, CoopCommand command, bool render)
         {
             _message = TranslateResult(result);
-            if (result.Accepted && result.Events != null)
+            if (result != null && result.Accepted && result.Events != null)
             {
                 for (int index = 0; index < result.Events.Length; index++)
                 {
                     if (result.Events[index] != null && string.Equals(result.Events[index].Type, "expression", StringComparison.Ordinal))
                     {
                         _lastExpression = result.Events[index].Detail;
+                        _expressionCooldownUntil = Time.unscaledTime + 0.35f;
+                        _message = "표현을 보냈습니다";
                     }
                 }
                 AutosaveCurrentState();
             }
 
-            _board.Render(_room, _session.State);
+            if (render && _board != null) _board.Render(_room, _session.State);
             PublishState();
         }
 
@@ -287,7 +394,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
 
         private void RequestManualSave()
         {
-            if (!_initialized || _restoreBlocked || _manualSavePending) return;
+            if (!_initialized || _restoreBlocked || _manualSavePending || _transitioning) return;
             string error;
             if (!TryWriteSave(out error))
             {
@@ -361,9 +468,65 @@ namespace Nectorial.SlideEscape.Unity.Coop
             _saveTimeoutRoutine = null;
         }
 
+        private bool CanDispatchNow()
+        {
+            return _initialized && !_restoreBlocked && !_initializationFailed && !_manualSavePending && !_transitioning && _session != null;
+        }
+
+        private bool CanDispatch(UiCommandPayload payload)
+        {
+            return CanDispatchNow() && payload != null && payload.hasExpectedRevision && !string.IsNullOrEmpty(payload.seat);
+        }
+
+        private static bool HasCommandContext(UiCommandPayload payload)
+        {
+            CoopActor actor;
+            return payload != null && payload.hasExpectedRevision && TryParseActor(payload.seat, out actor);
+        }
+
+        private UiCommandPayload CreateLocalPayload(string kind)
+        {
+            CoopState state = _session.State;
+            return new UiCommandPayload
+            {
+                kind = kind,
+                expectedRevision = state.AuthorityRevision,
+                hasExpectedRevision = true,
+                seat = state.ActiveActor.ToString()
+            };
+        }
+
+        private void RejectCommand(string message)
+        {
+            _message = message;
+            PublishState();
+        }
+
         private void PublishState()
         {
-            if (_session == null || _room == null) return;
+            if (_session == null || _room == null)
+            {
+                PublishObservation(new StateObservation
+                {
+                    initialized = false,
+                    inputEnabled = false,
+                    passEnabled = false,
+                    undoEnabled = false,
+                    restartEnabled = false,
+                    manualSaveEnabled = false,
+                    savePending = false,
+                    saveStatus = _saveStatus,
+                    saveError = _saveError,
+                    status = "시작 실패",
+                    statusCode = "InitializationFailed",
+                    message = _message,
+                    error = _loadError,
+                    localHotseat = true,
+                    seatAuthority = "session_state_only",
+                    fingerprint = string.Empty
+                });
+                return;
+            }
             CoopState state = _session.State;
             var observation = new StateObservation
             {
@@ -371,7 +534,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 inputEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing,
                 passEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing,
                 undoEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing && state.LogicalActionCount > 0,
-                restartEnabled = _initialized && !_restoreBlocked && !_manualSavePending && state.Status == CoopRunStatus.Playing,
+                restartEnabled = _initialized && !_restoreBlocked && !_manualSavePending && (state.Status == CoopRunStatus.Playing || state.Status == CoopRunStatus.Cleared),
                 manualSaveEnabled = _initialized && !_restoreBlocked && !_manualSavePending,
                 savePending = _manualSavePending,
                 saveStatus = _saveStatus,
@@ -384,7 +547,8 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 statusCode = state.Status.ToString(),
                 message = _message,
                 error = _loadError,
-                transitioning = false,
+                transitioning = _transitioning,
+                expressionEnabled = _initialized && !_restoreBlocked && !_manualSavePending && !_transitioning,
                 activeActor = state.ActiveActor.ToString(),
                 activeActorCode = state.ActiveActor.ToString(),
                 authorityRevision = state.AuthorityRevision,
@@ -393,6 +557,8 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 diamondPosition = state.DiamondPosition,
                 circleGoal = _room.CircleGoal,
                 diamondGoal = _room.DiamondGoal,
+                circleAtGoal = CoopRules.Same(state.CirclePosition, _room.CircleGoal),
+                diamondAtGoal = CoopRules.Same(state.DiamondPosition, _room.DiamondGoal),
                 pendingConsent = ToObservation(state.PendingConsent),
                 lastExpression = _lastExpression,
                 localHotseat = true,
@@ -400,6 +566,11 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 fingerprint = CoopRules.StateFingerprint(_room, state)
             };
 
+            PublishObservation(observation);
+        }
+
+        private static void PublishObservation(StateObservation observation)
+        {
             string json = JsonUtility.ToJson(observation);
             Debug.Log("COOP_STATE_OBSERVATION " + json);
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -423,9 +594,9 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private void FailInitialization(string message, string error)
         {
             _initialized = false;
+            _initializationFailed = true;
             _message = message;
             _loadError = error;
-            ConfigureFallbackRoomIfNeeded();
             PublishState();
         }
 
@@ -438,22 +609,38 @@ namespace Nectorial.SlideEscape.Unity.Coop
             _message = message;
         }
 
-        private void ConfigureFallbackRoomIfNeeded()
-        {
-            if (_room != null && _session != null) return;
-            _room = new CoopRoomDefinition { Id = "coop-c1", Width = 8, Height = 8, Rows = new[] { "........", "........", "........", "........", "........", "........", "........", "........" }, RulesVersion = "unknown", ContentVersion = "unknown" };
-        }
-
         private string NextCommandId()
         {
             _nextCommandId = checked(_nextCommandId + 1);
-            return "coop-local-" + _nextCommandId;
+            return _commandPrefix + _nextCommandId;
         }
 
-        private static GameCommand ParseDirection(string value)
+        private static bool TryParseDirection(string value, out GameCommand result)
         {
-            GameCommand result;
-            return Enum.TryParse(value, out result) ? result : GameCommand.Up;
+            result = GameCommand.Up;
+            if (string.Equals(value, "Up", StringComparison.Ordinal)) { result = GameCommand.Up; return true; }
+            if (string.Equals(value, "Down", StringComparison.Ordinal)) { result = GameCommand.Down; return true; }
+            if (string.Equals(value, "Left", StringComparison.Ordinal)) { result = GameCommand.Left; return true; }
+            if (string.Equals(value, "Right", StringComparison.Ordinal)) { result = GameCommand.Right; return true; }
+            return false;
+        }
+
+        private static bool TryParseActor(string value, out CoopActor result)
+        {
+            result = CoopActor.Circle;
+            if (string.Equals(value, "Circle", StringComparison.Ordinal)) return true;
+            if (string.Equals(value, "Diamond", StringComparison.Ordinal)) { result = CoopActor.Diamond; return true; }
+            return false;
+        }
+
+        private static bool TryParseExpression(string value, out CoopExpression result)
+        {
+            result = CoopExpression.Look;
+            if (string.Equals(value, "Look", StringComparison.Ordinal)) return true;
+            if (string.Equals(value, "ThumbsUp", StringComparison.Ordinal)) { result = CoopExpression.ThumbsUp; return true; }
+            if (string.Equals(value, "Handshake", StringComparison.Ordinal)) { result = CoopExpression.Handshake; return true; }
+            if (string.Equals(value, "Waiting", StringComparison.Ordinal)) { result = CoopExpression.Waiting; return true; }
+            return false;
         }
 
         private static string TranslateResult(CoopDispatchResult result)
@@ -513,6 +700,9 @@ namespace Nectorial.SlideEscape.Unity.Coop
             public string expression;
             public string requestId;
             public bool approve;
+            public long expectedRevision;
+            public bool hasExpectedRevision;
+            public string seat;
         }
 
         [Serializable]
@@ -534,6 +724,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
             public bool undoEnabled;
             public bool restartEnabled;
             public bool manualSaveEnabled;
+            public bool expressionEnabled;
             public bool savePending;
             public string saveStatus;
             public string saveError;
@@ -554,6 +745,8 @@ namespace Nectorial.SlideEscape.Unity.Coop
             public GridPoint diamondPosition;
             public GridPoint circleGoal;
             public GridPoint diamondGoal;
+            public bool circleAtGoal;
+            public bool diamondAtGoal;
             public PendingConsentObservation pendingConsent;
             public string lastExpression;
             public bool localHotseat;

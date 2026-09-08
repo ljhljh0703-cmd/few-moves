@@ -28,6 +28,10 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private CoopRoomDefinition _staticRoom;
         private Transform _circleActor;
         private Transform _diamondActor;
+        private Transform _movingActor;
+        private Vector3 _moveStart;
+        private Vector3 _moveEnd;
+        private bool _transitionActive;
         private bool _disposed;
 
         public CoopBoardView(Texture2D atlas)
@@ -67,10 +71,46 @@ namespace Nectorial.SlideEscape.Unity.Coop
             _root.position = new Vector3(-(room.Width - 1) * 0.5f, (room.Height - 1) * 0.5f, 0f);
         }
 
+        public bool BeginTransition(CoopRoomDefinition room, CoopState before, CoopState after, CoopActor actor)
+        {
+            if (_disposed || room == null || before == null || after == null) return false;
+            Render(room, before);
+            EnsureActors();
+            _movingActor = actor == CoopActor.Circle ? _circleActor : _diamondActor;
+            GridPoint from = actor == CoopActor.Circle ? before.CirclePosition : before.DiamondPosition;
+            GridPoint to = actor == CoopActor.Circle ? after.CirclePosition : after.DiamondPosition;
+            _moveStart = ToLocalPosition(from);
+            _moveEnd = ToLocalPosition(to);
+            _movingActor.localPosition = _moveStart;
+            _transitionActive = true;
+            return true;
+        }
+
+        public void AdvanceTransition(float progress)
+        {
+            if (!_transitionActive || _movingActor == null) return;
+            _movingActor.localPosition = Vector3.Lerp(_moveStart, _moveEnd, Mathf.Clamp01(progress));
+        }
+
+        public void CompleteTransition(CoopRoomDefinition room, CoopState state)
+        {
+            _transitionActive = false;
+            _movingActor = null;
+            Render(room, state);
+        }
+
+        public void CancelTransition()
+        {
+            _transitionActive = false;
+            _movingActor = null;
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
+            _transitionActive = false;
+            _movingActor = null;
             Application.quitting -= Dispose;
             Clear(_dynamicTiles);
             Clear(_staticTiles);
@@ -95,7 +135,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 }
             }
 
-            AddPrimitive(_staticTiles, "Circle Goal", CircleGoal, room.CircleGoal, new Vector2(0.78f, 0.78f), Vector2.zero, 4);
+            AddAtlas(_staticTiles, "Circle Goal", 2, CircleGoal, room.CircleGoal, 0.78f, 4);
             AddPrimitive(_staticTiles, "Diamond Goal", DiamondGoal, room.DiamondGoal, new Vector2(0.78f, 0.78f), Vector2.zero, 4, 45f);
         }
 
@@ -155,6 +195,20 @@ namespace Nectorial.SlideEscape.Unity.Coop
             renderer.sprite = _whiteSprite;
             renderer.color = color;
             renderer.sortingOrder = order;
+        }
+
+        private void AddAtlas(List<GameObject> owner, string name, int spriteIndex, Color color, GridPoint point, float scale, int order)
+        {
+            var tile = new GameObject(name);
+            tile.transform.SetParent(_root, false);
+            tile.transform.localPosition = new Vector3(point.X, -point.Y, 0f);
+            tile.transform.localScale = new Vector3(scale, scale, 1f);
+            var renderer = tile.AddComponent<SpriteRenderer>();
+            renderer.sprite = _sprites[spriteIndex];
+            renderer.color = color;
+            renderer.sharedMaterial = _atlasMaterial;
+            renderer.sortingOrder = order;
+            owner.Add(tile);
         }
 
         private void AddPrimitive(List<GameObject> owner, string name, Color color, GridPoint point, Vector2 scale, Vector2 offset, int order, float rotation = 0f)
