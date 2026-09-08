@@ -132,12 +132,26 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 #endif
                     ResetRoomView();
                     return;
-                case "Slide": SendCommand(input, 0, ParseDirection(input.direction), null, false); return;
-                case "RequestUndo": SendCommand(input, 2, 0, input.requestId, false); return;
-                case "ResolveUndo": SendCommand(input, 3, 0, input.requestId, input.approve); return;
-                case "RequestRestart": SendCommand(input, 4, 0, input.requestId, false); return;
-                case "ResolveRestart": SendCommand(input, 5, 0, input.requestId, input.approve); return;
-                case "Express": SendCommand(input, 6, 0, null, false); return;
+                case "Slide":
+                    int direction;
+                    if (!TryParseDirection(input.direction, out direction)) { FailMessage("이동 방향을 확인해 주세요", "online_direction_invalid"); return; }
+                    SendCommand(input, 0, direction, 0, null, false);
+                    return;
+                case "RequestUndo": SendCommand(input, 2, 0, 0, input.requestId, false); return;
+                case "ResolveUndo":
+                    if (!CanResolveConsent(input.requestId)) return;
+                    SendCommand(input, 3, 0, 0, input.requestId, input.approve);
+                    return;
+                case "RequestRestart": SendCommand(input, 4, 0, 0, input.requestId, false); return;
+                case "ResolveRestart":
+                    if (!CanResolveConsent(input.requestId)) return;
+                    SendCommand(input, 5, 0, 0, input.requestId, input.approve);
+                    return;
+                case "Express":
+                    int expression;
+                    if (!TryParseExpression(input.expression, out expression)) { FailMessage("표현을 확인해 주세요", "online_expression_invalid"); return; }
+                    SendCommand(input, 6, 0, expression, null, false);
+                    return;
                 default: FailMessage("알 수 없는 온라인 입력입니다", "online_kind_unknown"); return;
             }
         }
@@ -220,7 +234,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _diamondConnected = availability.diamondConnected;
         }
 
-        private void SendCommand(OnlineInput input, int kind, int direction, string requestId, bool approve)
+        private void SendCommand(OnlineInput input, int kind, int direction, int expressionCode, string requestId, bool approve)
         {
             if (!_joined || !_roomReady || _serverState == null || _availabilityCode != 1 || _transitioning)
             {
@@ -236,11 +250,31 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 direction = direction,
                 requestId = requestId,
                 approve = approve,
-                expression = ParseExpression(input.expression)
+                expression = expressionCode
             };
 #if UNITY_WEBGL && !UNITY_EDITOR
             NectorialOnlineCommand(JsonUtility.ToJson(command));
 #endif
+        }
+
+        private bool CanResolveConsent(string requestId)
+        {
+            if (_serverState == null || _serverState.PendingConsent == null || _seatCode < 0)
+            {
+                FailMessage("동의 요청을 다시 확인해 주세요", "online_consent_missing");
+                return false;
+            }
+            if ((int)_serverState.PendingConsent.Requester == _seatCode)
+            {
+                FailMessage("상대 좌석의 동의를 기다려 주세요", "online_consent_self");
+                return false;
+            }
+            if (!string.Equals(_serverState.PendingConsent.RequestId, requestId, StringComparison.Ordinal))
+            {
+                FailMessage("동의 요청이 바뀌었습니다", "online_consent_mismatch");
+                return false;
+            }
+            return true;
         }
 
         private void ApplyWireState(OnlineWireState wire, OnlineExpressions expressions, OnlineRoomView room)
@@ -522,20 +556,24 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             return _commandPrefix + _commandSequence;
         }
 
-        private static int ParseDirection(string value)
+        private static bool TryParseDirection(string value, out int direction)
         {
-            if (value == "Down") return 1;
-            if (value == "Left") return 2;
-            if (value == "Right") return 3;
-            return 0;
+            direction = 0;
+            if (value == "Up") return true;
+            if (value == "Down") { direction = 1; return true; }
+            if (value == "Left") { direction = 2; return true; }
+            if (value == "Right") { direction = 3; return true; }
+            return false;
         }
 
-        private static int ParseExpression(string value)
+        private static bool TryParseExpression(string value, out int expression)
         {
-            if (value == "ThumbsUp") return 1;
-            if (value == "Handshake") return 2;
-            if (value == "Waiting") return 3;
-            return 0;
+            expression = 0;
+            if (value == "Look") return true;
+            if (value == "ThumbsUp") { expression = 1; return true; }
+            if (value == "Handshake") { expression = 2; return true; }
+            if (value == "Waiting") { expression = 3; return true; }
+            return false;
         }
 
 #if UNITY_WEBGL && !UNITY_EDITOR

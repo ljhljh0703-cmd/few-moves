@@ -137,6 +137,8 @@
       var leaveButton = document.querySelector("#leave-button");
       var consentDialog = document.querySelector("#consent-dialog");
       var consentCopy = document.querySelector("#consent-copy");
+      var consentReject = document.querySelector("#consent-reject");
+      var consentApprove = document.querySelector("#consent-approve");
       function text(value, fallback) { return typeof value === "string" && value.length ? value : (fallback || ""); }
       function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.transportLocked === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
       function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
@@ -164,9 +166,12 @@
       }
       function renderConsent(state) {
         var consent = state.pendingConsent;
-        if (!consent || consent.active !== true || !consent.requestId) { currentConsent = null; close(consentDialog); return; }
+        if (!consent || consent.active !== true || !consent.requestId) { currentConsent = null; consentReject.disabled = true; consentApprove.disabled = true; close(consentDialog); return; }
         currentConsent = consent;
-        consentCopy.textContent = consent.kind === "Restart" ? "다시 시작하려면 상대 좌석의 동의가 필요합니다." : "되돌리려면 상대 좌석의 동의가 필요합니다.";
+        var requester = consent.requesterCode === state.seatCode;
+        consentReject.disabled = requester;
+        consentApprove.disabled = requester;
+        consentCopy.textContent = requester ? "상대 좌석의 동의를 기다리고 있습니다." : (consent.kind === "Restart" ? "다시 시작하려면 상대 좌석의 동의가 필요합니다." : "되돌리려면 상대 좌석의 동의가 필요합니다.");
         open(consentDialog);
       }
       function renderState(state) {
@@ -199,9 +204,9 @@
       resumeButton.addEventListener("click", function () { send({ kind:"Resume", inviteCode: inviteInput.value.trim() }); });
       document.querySelector("#leave-button").addEventListener("click", function () { send({ kind:"Leave" }); });
       document.querySelector("#leave-small").addEventListener("click", function () { send({ kind:"Leave" }); });
-      function resolverSeat() { return currentConsent && currentConsent.requester === "Circle" ? 1 : 0; }
-      document.querySelector("#consent-approve").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:true, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true, seat:resolverSeat() }); close(consentDialog); } });
-      document.querySelector("#consent-reject").addEventListener("click", function () { if (currentState && currentConsent) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:false, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true, seat:resolverSeat() }); close(consentDialog); } });
+      function canResolveConsent() { return currentState && currentConsent && currentConsent.requesterCode !== currentState.seatCode; }
+      consentApprove.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:true, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
+      consentReject.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:false, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
       window.__nectorialOnline = { state:null, receiveState:receiveState };
       var loader = document.createElement("script"); loader.src = "Build/{{{ LOADER_FILENAME }}}";
       loader.onload = function () { createUnityInstance(canvas, { dataUrl:"Build/{{{ DATA_FILENAME }}}", frameworkUrl:"Build/{{{ FRAMEWORK_FILENAME }}}", codeUrl:"Build/{{{ CODE_FILENAME }}}", streamingAssetsUrl:"StreamingAssets", companyName:"Independent", productName:"Few Moves Online Pilot", productVersion:"0.0.1-online", matchWebGLToCanvasSize:true, devicePixelRatio:1 }, function (progress) { feedback.textContent = "온라인 보드를 불러오는 중 " + Math.round(progress * 100) + "%"; }).then(function (instance) { unityInstance = instance; }).catch(function () { feedback.textContent = "온라인 보드를 시작할 수 없습니다."; }); };
