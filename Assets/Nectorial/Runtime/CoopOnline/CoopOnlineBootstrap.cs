@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Coop;
+using Nectorial.SlideEscape.Unity.Coop;
 using UnityEngine;
 
 namespace Nectorial.SlideEscape.Unity.CoopOnline

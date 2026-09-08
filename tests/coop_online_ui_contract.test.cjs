@@ -44,6 +44,7 @@ assert.match(bootstrap, /NectorialOnlineCreate/);
 assert.match(bootstrap, /NectorialOnlineJoin/);
 assert.match(bootstrap, /NectorialOnlineCommand/);
 assert.match(bootstrap, /bearer_derived/);
+assert.match(bootstrap, /using Nectorial\.SlideEscape\.Unity\.Coop;/);
 assert.match(bootstrap, /MatchesBundledRoom/);
 assert.match(bootstrap, /expressionHighWater/);
 assert.match(bootstrap, /COOP_ONLINE_STATE_OBSERVATION/);
@@ -52,6 +53,9 @@ assert.match(bootstrap, /bearer_derived/);
 assert.doesNotMatch(bootstrap, /CoopSession\.Dispatch|CoopRules\.ApplyAction/);
 assert.match(build, /PROJECT:CoopOnline/);
 assert.match(build, /COOP_ONLINE_WEBGL_RESULT/);
+assert.match(build, /previousCompanyName/);
+assert.match(build, /previousRunInBackground/);
+assert.match(build, /previousCompression/);
 assert.match(solo, /Few Moves Online Pilot/);
 
 console.log("Coop online UI contract checks passed");

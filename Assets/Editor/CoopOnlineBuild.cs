@@ -20,9 +20,16 @@ namespace Nectorial.Editor
             string outputPath = ReadArgument("-buildOutput");
             if (string.IsNullOrWhiteSpace(outputPath)) throw new InvalidOperationException("Missing required -buildOutput argument.");
 
+            string previousCompanyName = PlayerSettings.companyName;
             string previousProductName = PlayerSettings.productName;
             string previousBundleVersion = PlayerSettings.bundleVersion;
+            bool previousRunInBackground = PlayerSettings.runInBackground;
+            bool previousStripEngineCode = PlayerSettings.stripEngineCode;
+            bool previousSplash = PlayerSettings.SplashScreen.show;
             string previousTemplate = PlayerSettings.WebGL.template;
+            WebGLCompressionFormat previousCompression = PlayerSettings.WebGL.compressionFormat;
+            bool previousDecompressionFallback = PlayerSettings.WebGL.decompressionFallback;
+            bool previousDataCaching = PlayerSettings.WebGL.dataCaching;
             try
             {
                 ValidateRequiredAssets();
@@ -52,9 +59,16 @@ namespace Nectorial.Editor
             }
             finally
             {
+                PlayerSettings.companyName = previousCompanyName;
                 PlayerSettings.productName = previousProductName;
                 PlayerSettings.bundleVersion = previousBundleVersion;
+                PlayerSettings.runInBackground = previousRunInBackground;
+                PlayerSettings.stripEngineCode = previousStripEngineCode;
+                PlayerSettings.SplashScreen.show = previousSplash;
                 PlayerSettings.WebGL.template = previousTemplate;
+                PlayerSettings.WebGL.compressionFormat = previousCompression;
+                PlayerSettings.WebGL.decompressionFallback = previousDecompressionFallback;
+                PlayerSettings.WebGL.dataCaching = previousDataCaching;
             }
         }
 
