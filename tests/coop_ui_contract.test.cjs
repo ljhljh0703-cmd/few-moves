@@ -32,6 +32,15 @@ assert.match(template, /currentConsent\.requester === "Circle" \? "Diamond" : "C
 assert.doesNotMatch(template, /"revision /i);
 assert.doesNotMatch(template, /positionLabel\(state\.circle/);
 assert.doesNotMatch(template, /circlePosition|diamondPosition|circleGoal\.X|diamondGoal\.X/);
+assert.match(template, /consent\.active !== true/);
+assert.match(template, /\.dpad \{ position: relative; width: 180px; height: 168px/);
+assert.match(template, /\.dpad-up \{ left: 62px; top: 0; \}/);
+assert.match(template, /\.dpad-down \{ left: 62px; top: 112px; \}/);
+assert.match(template, /\.pass-button \{ position: absolute; left: 62px; top: 56px; width: 56px; height: 56px/);
+assert.match(template, /\.dpad button:not\(\.pass-button\)::after/);
+assert.doesNotMatch(template, /\.pass-button::(before|after)/);
+assert.match(template, /grid-template-rows: minmax\(0, 1fr\) 342px/);
+assert.match(template, /html, body \{ width: 100%; min-height: 100%; margin: 0; overflow: hidden/);
 assert.doesNotMatch(template, /left-right|좌우 전환|oversized|tutorial-image/i);
 assert.doesNotMatch(template, /board-grid|fakeBoard|staticBoard/i);
 assert.match(template, /createUnityInstance\(canvas, config/);
@@ -60,6 +69,7 @@ assert.match(bootstrap, /expressionEnabled = _initialized && !_restoreBlocked/);
 assert.match(bootstrap, /ExpressionCooldownSeconds = 2f/);
 assert.match(bootstrap, /Time\.unscaledTime < _expressionCooldownUntil/);
 assert.match(bootstrap, /state\.Status == CoopRunStatus\.Playing \|\| state\.Status == CoopRunStatus\.Cleared/);
+assert.match(bootstrap, /active = false/);
 assert.doesNotMatch(bootstrap, /UnityEngine\.Networking|UnityWebRequest|Socket|WebSocket/);
 assert.match(board, /CoopRoomDefinition/);
 assert.match(board, /CirclePosition/);
@@ -106,6 +116,14 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
   const restoreBlocked = { initialized: true, expressionEnabled: false, savePending: false, restoreBlocked: true };
   assert.equal(emojiAllowed(restoreBlocked), false, "restore-blocked state cannot accept an emoji that could overwrite rejected save data");
 
+  const emptyConsentFromCSharp = JSON.parse('{"active":false,"requestId":"","kind":"","statusCode":"","requester":"","requestedAtRevision":0}');
+  function consentVisible(consent) {
+    return !!consent && consent.active === true && !!consent.requestId &&
+      (consent.statusCode === "Undo" || consent.statusCode === "Restart");
+  }
+  assert.equal(consentVisible(emptyConsentFromCSharp), false, "JsonUtility empty consent object does not open the approval modal");
+  assert.equal(consentVisible({ active: true, requestId: "", kind: "Undo", statusCode: "Undo" }), false, "malformed consent cannot enable approval");
+
   let now = 0;
   let cooldownUntil = 0;
   let savedCount = 0;
@@ -120,6 +138,20 @@ assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMillisecond
   assert.equal(savedCount, 1, "a rejected rapid emoji does not autosave");
   now = 2;
   assert.equal(expressOnce(), true, "the emoji becomes available again after two seconds");
+
+  const dpad = { width: 180, height: 168, button: 56 };
+  const boxes = {
+    up: { x: 62, y: 0 },
+    left: { x: 0, y: 56 },
+    pass: { x: 62, y: 56 },
+    right: { x: 124, y: 56 },
+    down: { x: 62, y: 112 }
+  };
+  for (const box of Object.values(boxes)) {
+    assert.ok(box.x >= 0 && box.y >= 0 && box.x + dpad.button <= dpad.width && box.y + dpad.button <= dpad.height, "every control fits in the three-row D-pad");
+    assert.ok(dpad.button >= 48, "every D-pad target remains generous");
+  }
+  assert.equal(boxes.pass.x === boxes.down.x && boxes.pass.y === boxes.down.y, false, "Pass does not overlap Down");
 }
 
 {

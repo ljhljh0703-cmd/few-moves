@@ -581,9 +581,21 @@ namespace Nectorial.SlideEscape.Unity.Coop
 
         private static PendingConsentObservation ToObservation(CoopPendingConsent pending)
         {
-            if (pending == null) return null;
+            if (pending == null)
+            {
+                return new PendingConsentObservation
+                {
+                    active = false,
+                    requestId = string.Empty,
+                    kind = string.Empty,
+                    statusCode = "None",
+                    requester = string.Empty,
+                    requestedAtRevision = 0
+                };
+            }
             return new PendingConsentObservation
             {
+                active = true,
                 requestId = pending.RequestId,
                 kind = pending.Kind.ToString(),
                 statusCode = pending.Kind.ToString(),
@@ -709,6 +721,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
         [Serializable]
         private sealed class PendingConsentObservation
         {
+            public bool active;
             public string requestId;
             public string kind;
             public string statusCode;
