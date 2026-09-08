@@ -57,6 +57,8 @@ assert.match(bootstrap, /PendingConsent\.RequestId, payload\.requestId/);
 assert.match(bootstrap, /CanDispatchNow\(\)[\s\S]*_restoreBlocked[\s\S]*_manualSavePending/);
 assert.match(bootstrap, /NectorialCoopReportState\(json\)/);
 assert.match(bootstrap, /expressionEnabled = _initialized && !_restoreBlocked/);
+assert.match(bootstrap, /ExpressionCooldownSeconds = 2f/);
+assert.match(bootstrap, /Time\.unscaledTime < _expressionCooldownUntil/);
 assert.match(bootstrap, /state\.Status == CoopRunStatus\.Playing \|\| state\.Status == CoopRunStatus\.Cleared/);
 assert.doesNotMatch(bootstrap, /UnityEngine\.Networking|UnityWebRequest|Socket|WebSocket/);
 assert.match(board, /CoopRoomDefinition/);
@@ -70,6 +72,8 @@ assert.match(build, /finally\s*\{[\s\S]*PlayerSettings\.productName = previousPr
 assert.match(build, /template=PROJECT:CoopPilot entry=CoopPilotBuild\.Build/);
 assert.match(solo, /Few Moves Coop Pilot/);
 assert.match(asmdef, /Nectorial\.CoopCore/);
+assert.match(template, /ExpressionCooldownMilliseconds = 2000/);
+assert.match(template, /setTimeout\(renderButtons, ExpressionCooldownMilliseconds\)/);
 
 {
   function acceptsState(previous, next) {
@@ -101,6 +105,21 @@ assert.match(asmdef, /Nectorial\.CoopCore/);
   }
   const restoreBlocked = { initialized: true, expressionEnabled: false, savePending: false, restoreBlocked: true };
   assert.equal(emojiAllowed(restoreBlocked), false, "restore-blocked state cannot accept an emoji that could overwrite rejected save data");
+
+  let now = 0;
+  let cooldownUntil = 0;
+  let savedCount = 0;
+  function expressOnce() {
+    if (now < cooldownUntil) return false;
+    savedCount += 1;
+    cooldownUntil = now + 2;
+    return true;
+  }
+  assert.equal(expressOnce(), true, "the first allowed emoji is accepted");
+  assert.equal(expressOnce(), false, "a rapid second emoji is rejected before dispatch/save");
+  assert.equal(savedCount, 1, "a rejected rapid emoji does not autosave");
+  now = 2;
+  assert.equal(expressOnce(), true, "the emoji becomes available again after two seconds");
 }
 
 {

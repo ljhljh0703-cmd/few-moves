@@ -178,6 +178,7 @@
       var clearDialog = document.querySelector("#clear-dialog");
       var menuDialog = document.querySelector("#menu-dialog");
       var emojiCooldownUntil = 0;
+      var ExpressionCooldownMilliseconds = 2000;
 
       function asObject(value) { return value && typeof value === "object" ? value : null; }
       function text(value, fallback) { return typeof value === "string" && value.length > 0 ? value : (fallback || ""); }
@@ -293,7 +294,7 @@
         if (action === "Slide") command.direction = button.dataset.direction;
         if (action === "Express") command.expression = button.dataset.expression;
         if (action === "RequestUndo" || action === "RequestRestart") command.requestId = String(stateRevision) + "-" + action;
-        if (action === "Express") { emojiCooldownUntil = Date.now() + 350; renderButtons(); setTimeout(renderButtons, 360); }
+        if (action === "Express") { emojiCooldownUntil = Date.now() + ExpressionCooldownMilliseconds; renderButtons(); setTimeout(renderButtons, ExpressionCooldownMilliseconds); }
         send(command);
       }
       Array.from(document.querySelectorAll("button[data-coop-action]")).forEach(function (button) { button.addEventListener("click", function () { sendFromButton(button); }); });

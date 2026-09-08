@@ -14,6 +14,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private const string RoomResource = "CoopRooms/coop-c1";
         private const string AtlasResource = "Visuals/turn-escape-tiles";
         private const string SaveKey = "nectorial-coop.save.v1";
+        private const float ExpressionCooldownSeconds = 2f;
         private const float WebGLPersistenceTimeoutSeconds = 10f;
 
         private CoopRoomDefinition _room;
@@ -366,7 +367,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
                     if (result.Events[index] != null && string.Equals(result.Events[index].Type, "expression", StringComparison.Ordinal))
                     {
                         _lastExpression = result.Events[index].Detail;
-                        _expressionCooldownUntil = Time.unscaledTime + 0.35f;
+                        _expressionCooldownUntil = Time.unscaledTime + ExpressionCooldownSeconds;
                         _message = "표현을 보냈습니다";
                     }
                 }
