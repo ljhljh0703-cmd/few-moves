@@ -73,6 +73,9 @@ assert.match(bootstrap, /bearer_derived/);
 assert.match(bootstrap, /private static void ConfigureCamera\(\)/);
 assert.match(bootstrap, /using Nectorial\.SlideEscape\.Unity\.Coop;/);
 assert.match(bootstrap, /MatchesBundledRoom/);
+assert.match(bootstrap, /wire\.roomId, _room\.Id/);
+assert.doesNotMatch(bootstrap, /wire\.roomId, _roomId/);
+assert.match(bootstrap, /RoomId = wire\.roomId/);
 assert.match(bootstrap, /expressionHighWater/);
 assert.match(bootstrap, /_expressionHydrated/);
 assert.match(bootstrap, /result\.op == "resume"/);
@@ -99,6 +102,32 @@ assert.match(build, /previousCompanyName/);
 assert.match(build, /previousRunInBackground/);
 assert.match(build, /previousCompression/);
 assert.match(solo, /Few Moves Online Pilot/);
+
+const serverStateFixture = {
+  ok: true,
+  op: "state",
+  seat: 0,
+  room: {
+    roomId: "7b3c5a3d8c2f4e65a2b5d7089134c6de",
+    rulesVersion: "coop-rules-v1",
+    contentVersion: "coop-c1-v1",
+    roomFingerprint: "fe7f53267547b37fbaf1b566fdee9b7af3aa3d159488cdf55439739dc0a86a89"
+  },
+  state: {
+    roomId: "coop-c1",
+    authorityRevision: 0,
+    logicalActionCount: 0,
+    activeActor: 0,
+    status: 0,
+    circlePosition: { x: 1, y: 1 },
+    diamondPosition: { x: 2, y: 2 }
+  },
+  availability: { status: 1, circleConnected: true, diamondConnected: true },
+  expressions: { expressionSequence: 0, events: [] }
+};
+assert.notEqual(serverStateFixture.room.roomId, serverStateFixture.state.roomId, "network session and Core puzzle IDs are deliberately distinct");
+assert.equal(serverStateFixture.state.roomId, "coop-c1", "Core state keeps the bundled puzzle definition ID");
+assert.equal(serverStateFixture.room.roomId.length, 32, "network room identity remains the opaque session UUID");
 
 function deferred() {
   let resolve;

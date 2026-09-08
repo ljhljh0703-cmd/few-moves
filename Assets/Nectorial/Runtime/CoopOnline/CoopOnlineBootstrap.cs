@@ -23,6 +23,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private bool _joined;
         private bool _transitioning;
         private int _seatCode = -1;
+        // Network room UUID for seat/authentication and callback isolation; it is not the Core puzzle ID.
         private string _roomId = string.Empty;
         private string _inviteCode = string.Empty;
         private string _message = "온라인 방을 준비하세요";
@@ -279,7 +280,8 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private void ApplyWireState(OnlineWireState wire, OnlineExpressions expressions, OnlineRoomView room)
         {
-            if (wire == null || !_roomReady || !string.Equals(wire.roomId, _roomId, StringComparison.Ordinal)) return;
+            // Core state carries the bundled puzzle ID (for C1: coop-c1); _roomId is the server session UUID.
+            if (wire == null || !_roomReady || _room == null || !string.Equals(wire.roomId, _room.Id, StringComparison.Ordinal)) return;
             if (_authorityRevision >= 0 && (wire.authorityRevision < _authorityRevision ||
                 (wire.authorityRevision == _authorityRevision && wire.logicalActionCount < _logicalActionCount))) return;
             _authorityRevision = wire.authorityRevision;
