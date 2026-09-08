@@ -61,6 +61,12 @@ namespace Nectorial.SlideEscape.Unity
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
         {
+            if (string.Equals(Application.productName, "Few Moves Coop Pilot", StringComparison.Ordinal) ||
+                string.Equals(Application.productName, "Few Moves Online Pilot", StringComparison.Ordinal))
+            {
+                return;
+            }
+
             if (FindAnyObjectByType<GameBootstrap>() != null)
             {
                 return;

@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 WATCHED_DIRS = ("Assets", "Packages", "ProjectSettings")
 WATCHED_FILE = "global.json"
+EFFECTIVE_LOCAL_UNITY_INPUT = "ProjectSettings/UnityConnectSettings.asset"
 PROVENANCE_NAMES = frozenset(("unity-build.provenance.json", "artifact-provenance.json", "provenance.json"))
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_HEAD_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -115,10 +116,29 @@ def _head(repo: Path) -> str:
     except UnicodeError as exc: raise ParityError("git HEAD is not ASCII") from exc
     if not GIT_HEAD_RE.fullmatch(value): raise ParityError(f"unexpected git HEAD: {value!r}")
     return value
-def _clean(repo: Path) -> None:
+
+
+def _ignored(repo: Path, relative: str) -> bool:
+    try:
+        result = subprocess.run(["git", "check-ignore", "-q", "--", relative], cwd=repo, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+    except OSError as exc: raise ParityError(f"cannot run git check-ignore: {exc}") from exc
+    if result.returncode == 0: return True
+    if result.returncode == 1: return False
+    raise ParityError(f"git check-ignore failed: {result.stderr.decode('utf-8', 'replace').strip()}")
+
+
+def _clean(repo: Path) -> list[dict[str, Any]]:
     changed = _names(repo, "diff", "--name-only", "-z", "HEAD", "--", *WATCHED_DIRS, WATCHED_FILE)
-    untracked = _names(repo, "ls-files", "--others", "-z", "--", *WATCHED_DIRS, WATCHED_FILE)
+    untracked = set(_names(repo, "ls-files", "--others", "-z", "--", *WATCHED_DIRS, WATCHED_FILE))
+    effective = []
+    if EFFECTIVE_LOCAL_UNITY_INPUT in untracked:
+        if _ignored(repo, EFFECTIVE_LOCAL_UNITY_INPUT):
+            path = _safe(repo, EFFECTIVE_LOCAL_UNITY_INPUT, "effective local Unity input", True)
+            effective.append(_file(path, EFFECTIVE_LOCAL_UNITY_INPUT, "effective local Unity input"))
+            untracked.remove(EFFECTIVE_LOCAL_UNITY_INPUT)
+    untracked = sorted(untracked)
     if paths := sorted(set(changed + untracked)): raise ParityError("watched inputs are modified or untracked: " + ", ".join(paths))
+    return effective
 
 
 def _watch_roots(repo: Path) -> None:
@@ -129,13 +149,16 @@ def _file(path: Path, relative: str, label: str) -> dict[str, Any]:
         raw = path.read_bytes()
     except OSError as exc: raise ParityError(f"cannot read {label} {relative}: {exc}") from exc
     return {"path": relative, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
-def _sources(repo: Path) -> list[dict[str, Any]]:
+def _sources(repo: Path, effective_local: list[dict[str, Any]]) -> list[dict[str, Any]]:
     _watch_roots(repo)
     paths = _names(repo, "ls-files", "-z", "--", *WATCHED_DIRS, WATCHED_FILE)
     if not paths: raise ParityError("no tracked watched source files")
     result = []
     for relative in paths:
         result.append(_file(_safe(repo, relative, "source path", True), relative, "source path"))
+    result.extend(effective_local)
+    result.sort(key=lambda item: item["path"])
+    if len({item["path"] for item in result}) != len(result): raise ParityError("effective local input duplicates tracked source path")
     return result
 def _build_files(build: Path) -> list[dict[str, Any]]:
     result = []
@@ -195,33 +218,33 @@ def snapshot(repo_value: str, out_value: str) -> None:
     repo = _repo(repo_value)
     out = _output(repo, out_value)
     head = _head(repo)
-    _clean(repo)
-    source = _sources(repo)
-    _write(out, {"schema_version": 1, "kind": "nectorial-source-snapshot", "watched_dirs": list(WATCHED_DIRS), "watched_file_if_tracked": WATCHED_FILE, "git_head": head, "source_files": source, "source_sha256": _tree(source)})
+    effective = _clean(repo)
+    source = _sources(repo, effective)
+    _write(out, {"schema_version": 1, "kind": "nectorial-source-snapshot", "watched_dirs": list(WATCHED_DIRS), "watched_file_if_tracked": WATCHED_FILE, "source_files_semantics": "tracked watched source files plus the exact ignored local UnityConnectSettings input when present", "effective_local_inputs": [item["path"] for item in effective], "git_head": head, "source_files": source, "source_sha256": _tree(source)})
 def seal(repo_value: str, snapshot_value: str, build_value: str, out_value: str) -> None:
     repo = _repo(repo_value)
     snap = _snapshot(snapshot_value)
     build, build_root = _build(repo, build_value)
     out = _output(repo, out_value, build)
     head = _head(repo)
-    _clean(repo)
-    source = _sources(repo)
+    effective = _clean(repo)
+    source = _sources(repo, effective)
     if source != snap["source_files"]: raise ParityError("watched source tree differs from snapshot")
     artifacts = _build_files(build)
     provenance = sorted(item["path"] for item in artifacts if PurePosixPath(item["path"]).name in PROVENANCE_NAMES)
     if not provenance: raise ParityError("build must contain unity-build.provenance.json, artifact-provenance.json, or provenance.json")
-    _write(out, {"schema_version": 1, "kind": "nectorial-artifact-manifest", "snapshot_git_head": snap["git_head"], "seal_git_head": head, "git_head_changed": snap["git_head"] != head, "build_root": build_root, "source_files": source, "source_sha256": _tree(source), "build_files": artifacts, "build_sha256": _tree(artifacts), "provenance_files": provenance})
+    _write(out, {"schema_version": 1, "kind": "nectorial-artifact-manifest", "snapshot_git_head": snap["git_head"], "seal_git_head": head, "git_head_changed": snap["git_head"] != head, "build_root": build_root, "source_files_semantics": "tracked watched source files plus the exact ignored local UnityConnectSettings input when present", "effective_local_inputs": [item["path"] for item in effective], "source_files": source, "source_sha256": _tree(source), "build_files": artifacts, "build_sha256": _tree(artifacts), "provenance_files": provenance})
 def verify(repo_value: str, manifest_value: str, build_value: str) -> dict[str, Any]:
     repo = _repo(repo_value)
     manifest = _manifest(manifest_value)
     build, build_root = _build(repo, build_value)
     if build_root != manifest["build_root"]: raise ParityError(f"build root differs from manifest: {build_root} != {manifest['build_root']}")
     head = _head(repo)
-    _clean(repo)
-    source, artifacts = _sources(repo), _build_files(build)
+    effective = _clean(repo)
+    source, artifacts = _sources(repo, effective), _build_files(build)
     if source != manifest["source_files"]: raise ParityError("watched source tree differs from artifact manifest")
     if artifacts != manifest["build_files"]: raise ParityError("build tree differs from artifact manifest")
-    return {"kind": "nectorial-artifact-parity-verification", "status": "pass", "snapshot_git_head": manifest["snapshot_git_head"], "seal_git_head": manifest["seal_git_head"], "verified_git_head": head, "git_head_changed": head != manifest["seal_git_head"], "source_sha256": _tree(source), "build_sha256": _tree(artifacts), "provenance_files": manifest["provenance_files"], "runtime_execution": "not_performed", "build_execution_proof": "not_proven_by_manifest"}
+    return {"kind": "nectorial-artifact-parity-verification", "status": "pass", "snapshot_git_head": manifest["snapshot_git_head"], "seal_git_head": manifest["seal_git_head"], "verified_git_head": head, "git_head_changed": head != manifest["seal_git_head"], "effective_local_inputs": [item["path"] for item in effective], "source_sha256": _tree(source), "build_sha256": _tree(artifacts), "provenance_files": manifest["provenance_files"], "runtime_execution": "not_performed", "build_execution_proof": "not_proven_by_manifest"}
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)

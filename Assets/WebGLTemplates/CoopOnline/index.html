@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Few Moves 온라인</title>
+  <style>
+    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --surface:#f0ece2; --ink:#293238; --muted:#6e736f; --floor:#e5e0d3; --grid:#d2cbbb; --charcoal:#313a3b; --edge:#171e1f; --pressed:#151c1d; --focus:#5d8960; --circle:#437491; --diamond:#c88a40; }
+    * { box-sizing:border-box; }
+    html, body { width:100%; min-height:100%; margin:0; overflow-x:hidden; overflow-y:auto; background:var(--surface); }
+    body { min-height:100svh; color:var(--ink); }
+    button { min-width:48px; min-height:48px; border:0; background:transparent; color:inherit; font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+    button:focus-visible, input:focus-visible, canvas:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+    button:disabled { opacity:.36; cursor:default; }
+    main#app { width:min(640px,100%); min-height:100svh; height:100svh; margin:0 auto; padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); display:grid; grid-template-rows:64px minmax(0,1fr); gap:8px; }
+    .topbar { position:relative; min-height:64px; display:grid; grid-template-columns:48px 1fr 48px; align-items:center; gap:8px; }
+    .topbar h1 { margin:0; font-size:17px; line-height:1.2; text-align:center; }
+    .topbar small { display:block; margin-top:3px; color:var(--muted); font-size:11px; font-weight:600; }
+    .icon-button { display:grid; place-items:center; border-radius:12px; }
+    .icon-button:enabled:active { background:color-mix(in srgb,var(--charcoal) 9%,transparent); }
+    .online-layout { min-height:0; display:grid; grid-template-rows:minmax(150px,1fr) auto; gap:8px; justify-items:center; }
+    .board-stage { position:relative; width:100%; min-height:0; display:grid; place-items:center; }
+    #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1/1; border:1px solid var(--grid); border-radius:6px; background:var(--floor); box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 16%,transparent); image-rendering:pixelated; }
+    .expression-bubble { position:absolute; top:12px; left:56px; right:56px; z-index:3; display:flex; align-items:center; justify-content:center; gap:7px; width:auto; max-width:calc(100% - 112px); height:40px; min-height:40px; padding:6px 11px; border:1px solid var(--grid); border-radius:999px; background:color-mix(in srgb,var(--surface) 95%,var(--grid)); box-shadow:0 4px 12px color-mix(in srgb,var(--charcoal) 14%,transparent); font-size:20px; pointer-events:none; overflow:hidden; white-space:nowrap; }
+    .expression-bubble[hidden] { display:none; }
+    .expression-sender { width:12px; height:12px; border-radius:2px; background:var(--circle); }
+    .expression-sender.diamond { border-radius:2px; background:var(--diamond); transform:rotate(45deg); }
+    .expression-name { color:var(--muted); font-size:11px; font-weight:800; }
+    .online-controls { width:min(100%,360px); min-height:0; display:grid; align-content:start; gap:4px; }
+    .room-panel { min-height:48px; display:block; }
+    .room-form { width:100%; display:flex; align-items:center; gap:6px; }
+    .room-form input { flex:1 1 auto; width:0; }
+    .room-form button { flex:0 0 auto; white-space:nowrap; padding-left:9px; padding-right:9px; }
+    .room-panel input { min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:13px; }
+    .room-panel button, .room-action { min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; background:#fffdf7; font-size:12px; }
+    .room-panel .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
+    .room-info { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:48px; color:var(--muted); font-size:11px; }
+    .room-info > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #invite-code { display:inline-block; max-width:12ch; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; }
+    .room-info strong { color:var(--ink); font-size:13px; }
+    .invite-link-fallback { width:100%; min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:11px; }
+    .room-info[hidden], .room-form[hidden] { display:none; }
+    .status-row { min-height:40px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:5px; }
+    .goal-chip { display:inline-flex; align-items:center; justify-content:center; gap:5px; color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
+    .goal-chip strong { color:var(--ink); font-size:15px; }
+    .turn-label { display:grid; place-items:center; min-width:106px; min-height:40px; padding:4px 8px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; font-size:13px; line-height:1.15; text-align:center; }
+    .turn-label small { color:var(--muted); font-size:10px; }
+    .seat-dot { width:12px; height:12px; border-radius:2px; background:var(--circle); }
+    .seat-dot.diamond { border-radius:2px; background:var(--diamond); transform:rotate(45deg); }
+    .dpad { position:relative; width:180px; height:168px; margin:0 auto; }
+    .dpad button { position:absolute; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; color:var(--ink); background:transparent; }
+    .dpad button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--edge); }
+    .dpad button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:linear-gradient(135deg,var(--charcoal),color-mix(in srgb,var(--charcoal) 78%,var(--edge))); }
+    .dpad button:enabled:active::before { background:var(--pressed); }
+    .dpad button span { position:relative; z-index:2; color:var(--surface); font-size:24px; }
+    .dpad-up { left:62px; top:0; } .dpad-left { left:0; top:56px; } .dpad-right { left:124px; top:56px; } .dpad-down { left:62px; top:112px; }
+    .emoji-row { display:flex; justify-content:center; gap:7px; min-height:48px; }
+    .emoji-button { width:48px; height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--grid); border-radius:10px; background:#fffdf7; font-size:21px; }
+    .action-row { display:flex; justify-content:center; gap:7px; min-height:48px; }
+    .text-button { min-height:48px; padding:0 14px; border:1px solid var(--grid); border-radius:10px; background:transparent; font-size:12px; }
+    .feedback { min-height:22px; margin:0; color:var(--muted); font-size:11px; text-align:center; }
+    dialog { width:min(300px,calc(100% - 32px)); border:1px solid var(--charcoal); border-radius:13px; color:var(--ink); background:var(--surface); box-shadow:0 16px 50px color-mix(in srgb,var(--charcoal) 28%,transparent); }
+    dialog::backdrop { background:color-mix(in srgb,var(--charcoal) 38%,transparent); }
+    .dialog-card { display:grid; gap:12px; padding:18px; }
+    .dialog-title { margin:0; font-size:17px; font-weight:800; }
+    .dialog-copy { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .dialog-actions { display:flex; justify-content:flex-end; gap:7px; }
+    .dialog-actions button { min-height:44px; padding:0 13px; border:1px solid var(--grid); border-radius:9px; }
+    .dialog-actions .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
+    #clear-dialog { width:min(286px,calc(100% - 36px)); }
+    #clear-dialog .dialog-card { text-align:center; }
+    .clear-title { margin:0; font-size:24px; }
+    .clear-subtitle { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <header class="topbar">
+      <button id="leave-button" class="icon-button" type="button" disabled aria-label="온라인 방 나가기"><span aria-hidden="true">×</span></button>
+      <h1>Few Moves<small id="connection-label">온라인 방</small></h1>
+      <span aria-hidden="true"></span>
+      <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden><span id="expression-sender" class="expression-sender" aria-hidden="true"></span><span id="expression-icon" aria-hidden="true"></span><span id="expression-name" class="expression-name"></span></p>
+    </header>
+    <section class="online-layout" aria-label="Few Moves 온라인 협력">
+      <section class="board-stage" aria-label="온라인 협력 보드"><canvas id="unity-canvas" tabindex="0" aria-label="사각형과 마름모 온라인 협력 보드"></canvas></section>
+      <section class="online-controls" aria-label="온라인 조작">
+        <section class="room-panel" aria-label="방 연결">
+          <div id="room-form" class="room-form">
+            <button id="create-button" class="primary" type="button">방 만들기</button>
+            <input id="invite-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="초대 코드" aria-label="초대 코드">
+            <button id="join-button" type="button">참여</button>
+            <button id="resume-button" type="button">저장된 방</button>
+          </div>
+          <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="copy-invite-button" class="room-action" type="button">초대 링크 복사</button></div>
+          <input id="invite-link-fallback" class="invite-link-fallback" type="text" readonly hidden aria-label="복사할 초대 링크">
+        </section>
+        <div class="status-row">
+          <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">사각형</strong><span id="circle-goal">진행 중</span></span>
+          <span id="turn-label" class="turn-label">온라인 대기<small>행동 0</small></span>
+          <span class="goal-chip"><span class="seat-dot diamond" aria-hidden="true"></span><strong id="diamond-progress">마름모</strong><span id="diamond-goal">진행 중</span></span>
+        </div>
+        <div class="dpad" aria-label="방향 조작">
+          <button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="사각형 또는 마름모를 위로 이동"><span aria-hidden="true">▲</span></button>
+          <button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="사각형 또는 마름모를 왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
+          <button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="사각형 또는 마름모를 오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
+          <button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="사각형 또는 마름모를 아래로 이동"><span aria-hidden="true">▼</span></button>
+        </div>
+        <div class="emoji-row" role="group" aria-label="고정 표현">
+          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button>
+          <button class="emoji-button" type="button" data-online-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요">👍</button>
+          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Handshake" disabled aria-label="협력">🤝</button>
+          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Waiting" disabled aria-label="기다리기">⏳</button>
+        </div>
+        <div class="action-row"><button class="text-button" type="button" data-online-action="RequestUndo" disabled>되돌림 동의</button><button class="text-button" type="button" data-online-action="RequestRestart" disabled>다시 시작</button></div>
+        <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+  </main>
+  <dialog id="consent-dialog" aria-labelledby="consent-title"><div class="dialog-card"><p id="consent-title" class="dialog-title">동의가 필요합니다</p><p id="consent-copy" class="dialog-copy">상대 좌석의 확인을 기다리고 있습니다.</p><div class="dialog-actions"><button id="consent-reject" type="button">거절</button><button id="consent-approve" class="primary" type="button">동의</button></div></div></dialog>
+  <dialog id="clear-dialog" aria-labelledby="clear-title"><div class="dialog-card"><p id="clear-title" class="clear-title">둘 다 도착</p><p id="clear-copy" class="clear-subtitle">두 말이 목표에 도착했습니다.</p><div class="dialog-actions"><button id="clear-restart" class="primary" type="button" data-online-action="RequestRestart">다시하기</button></div></div></dialog>
+  <script>
+    (function () {
+      "use strict";
+      var canvas = document.querySelector("#unity-canvas");
+      var unityInstance = null;
+      var currentState = null;
+      var currentConsent = null;
+      var stateRevision = 0;
+      var boardStage = document.querySelector(".board-stage");
+      var expressionBubble = document.querySelector("#expression-bubble");
+      var expressionSender = document.querySelector("#expression-sender");
+      var expressionIcon = document.querySelector("#expression-icon");
+      var expressionName = document.querySelector("#expression-name");
+      var lastExpressionSequence = 0;
+      var expressionTimer = null;
+      var expressionCooldownUntil = 0;
+      var expressionIcons = { Look:"👀", ThumbsUp:"👍", Handshake:"🤝", Waiting:"⏳" };
+      var feedback = document.querySelector("#feedback");
+      var connectionLabel = document.querySelector("#connection-label");
+      var roomForm = document.querySelector("#room-form");
+      var roomInfo = document.querySelector("#room-info");
+      var inviteInput = document.querySelector("#invite-input");
+      var inviteCode = document.querySelector("#invite-code");
+      var resumeButton = document.querySelector("#resume-button");
+      var copyInviteButton = document.querySelector("#copy-invite-button");
+      var inviteLinkFallback = document.querySelector("#invite-link-fallback");
+      var roomStatus = document.querySelector("#room-status");
+      var turnLabel = document.querySelector("#turn-label");
+      var circleGoal = document.querySelector("#circle-goal");
+      var diamondGoal = document.querySelector("#diamond-goal");
+      var leaveButton = document.querySelector("#leave-button");
+      var consentDialog = document.querySelector("#consent-dialog");
+      var consentCopy = document.querySelector("#consent-copy");
+      var consentReject = document.querySelector("#consent-reject");
+      var consentApprove = document.querySelector("#consent-approve");
+      var clearDialog = document.querySelector("#clear-dialog");
+      var clearCopy = document.querySelector("#clear-copy");
+      function text(value, fallback) { return typeof value === "string" && value.length ? value : (fallback || ""); }
+      function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.transportLocked === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
+      function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
+      function close(dialog) { if (!dialog || !dialog.open) return; if (dialog.close) dialog.close(); else dialog.removeAttribute("open"); }
+      function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("CoopOnlineBootstrap", "HandleOnlineCommand", JSON.stringify(command)); return true; }
+      function activeLabel(state) { return state.activeActorCode === "Diamond" ? "마름모 차례" : "사각형 차례"; }
+      function allowed(button) {
+        if (!currentState || !currentState.initialized || currentState.transportLocked || currentState.transitioning) return false;
+        if (currentState.pendingConsent && currentState.pendingConsent.active === true) return false;
+        var action = button.dataset.onlineAction;
+        if (action === "Slide") return currentState.inputEnabled && currentState.availabilityCode === 1;
+        if (action === "Express") return currentState.availabilityCode === 1 && Date.now() >= expressionCooldownUntil;
+        if (action === "RequestRestart" && currentState.statusCode === "Cleared") {
+          return currentState.availabilityCode === 1 && currentState.seatCode >= 0 && currentState.activeActorCode === (currentState.seatCode === 1 ? "Diamond" : "Circle");
+        }
+        return currentState.availabilityCode === 1 && currentState.statusCode === "Playing";
+      }
+      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; copyInviteButton.disabled = !currentState || !currentState.joined || !currentState.inviteCode; }
+      function renderExpression(state) {
+        if (state.expressionSequence <= lastExpressionSequence || !expressionIcons[state.expression]) return;
+        lastExpressionSequence = state.expressionSequence;
+        expressionSender.className = "expression-sender" + (state.expressionSender === "Diamond" ? " diamond" : "");
+        expressionIcon.textContent = expressionIcons[state.expression];
+        expressionName.textContent = state.expressionSender === "Diamond" ? "마름모" : "사각형";
+        expressionBubble.hidden = false;
+        if (expressionTimer) clearTimeout(expressionTimer);
+        expressionTimer = setTimeout(function () { expressionBubble.hidden = true; }, 2500);
+      }
+      function renderConsent(state) {
+        var consent = state.pendingConsent;
+        if (!consent || consent.active !== true || !consent.requestId) { currentConsent = null; consentReject.disabled = true; consentApprove.disabled = true; close(consentDialog); return; }
+        currentConsent = consent;
+        var requester = consent.requesterCode === state.seatCode;
+        consentReject.disabled = requester;
+        consentApprove.disabled = requester;
+        consentCopy.textContent = requester ? "상대 좌석의 동의를 기다리고 있습니다." : (consent.kind === "Restart" ? "다시 시작하려면 상대 좌석의 동의가 필요합니다." : "되돌리려면 상대 좌석의 동의가 필요합니다.");
+        open(consentDialog);
+      }
+      function renderClear(state) {
+        var consent = state.pendingConsent;
+        if (state.statusCode !== "Cleared" || (consent && consent.active === true && consent.requestId)) { close(clearDialog); return; }
+        var activeSeat = state.seatCode >= 0 && state.activeActorCode === (state.seatCode === 1 ? "Diamond" : "Circle");
+        clearCopy.textContent = activeSeat ? "다시하기를 요청하면 상대 좌석의 동의를 기다립니다." : "상대 좌석의 다시하기 요청을 기다리고 있습니다.";
+        open(clearDialog);
+      }
+      function renderState(state) {
+        if (!validState(state)) return;
+        currentState = state;
+        roomForm.hidden = state.joined; roomInfo.hidden = !state.joined;
+        if (!state.joined) inviteLinkFallback.hidden = true;
+        if (!state.joined && state.inviteCode) inviteInput.value = state.inviteCode;
+        inviteCode.textContent = state.inviteCode || "—";
+        roomStatus.textContent = state.availabilityStatus || "대기 중";
+        connectionLabel.textContent = state.seatCode === 1 ? "마름모 좌석 · 온라인" : (state.seatCode === 0 ? "사각형 좌석 · 온라인" : "온라인 방");
+        turnLabel.innerHTML = activeLabel(state) + "<small>행동 " + state.logicalActionCount + "</small>";
+        circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
+        diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
+        feedback.textContent = text(state.message, text(state.error, ""));
+        renderConsent(state); renderClear(state); renderExpression(state); renderButtons();
+      }
+      function receiveState(json) { try { var state = JSON.parse(json); if (!validState(state)) return; var roomChanged = currentState && state.roomId !== currentState.roomId; var lockState = state.transportLocked || !state.joined; if (currentState && !roomChanged && !lockState && (state.authorityRevision < currentState.authorityRevision || (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount))) return; renderState(state); } catch (error) { feedback.textContent = "온라인 상태를 확인할 수 없습니다."; } }
+      function action(button) {
+        if (!allowed(button)) return;
+        var kind = button.dataset.onlineAction;
+        var command = { kind: kind, expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: currentState.seatCode };
+        if (kind === "Slide") command.direction = button.dataset.direction;
+        if (kind === "Express") { command.expression = button.dataset.expression; expressionCooldownUntil = Date.now() + 2000; renderButtons(); setTimeout(renderButtons, 2000); }
+        if (kind === "RequestUndo" || kind === "RequestRestart") command.requestId = "online-" + stateRevision + "-" + kind;
+        if (kind === "RequestRestart") close(clearDialog);
+        send(command);
+      }
+      function resizeCanvasToStage() {
+        if (!boardStage || !canvas) return;
+        var rect = boardStage.getBoundingClientRect();
+        var side = Math.floor(Math.min(rect.width, rect.height));
+        if (side <= 0) return;
+        canvas.style.width = side + "px";
+        canvas.style.height = side + "px";
+      }
+      if (typeof ResizeObserver === "function") new ResizeObserver(resizeCanvasToStage).observe(boardStage);
+      window.addEventListener("resize", resizeCanvasToStage);
+      resizeCanvasToStage();
+      Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.addEventListener("click", function () { action(button); }); });
+      document.querySelector("#create-button").addEventListener("click", function () { send({ kind:"Create" }); });
+      document.querySelector("#join-button").addEventListener("click", function () { send({ kind:"Join", inviteCode: inviteInput.value.trim() }); });
+      resumeButton.addEventListener("click", function () { send({ kind:"Resume", inviteCode: inviteInput.value.trim() }); });
+      document.querySelector("#leave-button").addEventListener("click", function () { send({ kind:"Leave" }); });
+      function inviteLink() {
+        if (!currentState || !currentState.inviteCode || typeof location === "undefined") return "";
+        return location.origin + location.pathname + "?invite=" + encodeURIComponent(currentState.inviteCode);
+      }
+      function showInviteLinkFallback(link) {
+        inviteLinkFallback.hidden = false;
+        inviteLinkFallback.value = link;
+        inviteLinkFallback.focus();
+        inviteLinkFallback.select();
+        feedback.textContent = "링크를 선택했습니다. 복사해 친구에게 보내세요.";
+      }
+      copyInviteButton.addEventListener("click", function () {
+        var link = inviteLink();
+        if (!link) return;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(link).then(function () {
+            inviteLinkFallback.hidden = true;
+            feedback.textContent = "초대 링크를 복사했습니다.";
+          }).catch(function () { showInviteLinkFallback(link); });
+        } else showInviteLinkFallback(link);
+      });
+      function canResolveConsent() { return currentState && currentConsent && currentConsent.requesterCode !== currentState.seatCode; }
+      consentApprove.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:true, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
+      consentReject.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:false, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
+      window.__nectorialOnline = { state:null, receiveState:receiveState };
+      var loader = document.createElement("script"); loader.src = "Build/{{{ LOADER_FILENAME }}}";
+      loader.onload = function () { createUnityInstance(canvas, { dataUrl:"Build/{{{ DATA_FILENAME }}}", frameworkUrl:"Build/{{{ FRAMEWORK_FILENAME }}}", codeUrl:"Build/{{{ CODE_FILENAME }}}", streamingAssetsUrl:"StreamingAssets", companyName:"Independent", productName:"Few Moves Online Pilot", productVersion:"0.0.1-online", matchWebGLToCanvasSize:true, devicePixelRatio:1 }, function (progress) { feedback.textContent = "온라인 보드를 불러오는 중 " + Math.round(progress * 100) + "%"; }).then(function (instance) { unityInstance = instance; }).catch(function () { feedback.textContent = "온라인 보드를 시작할 수 없습니다."; }); };
+      loader.onerror = function () { feedback.textContent = "온라인 빌드 파일을 불러올 수 없습니다."; };
+      document.body.appendChild(loader);
+    }());
+  </script>
+</body>
+</html>

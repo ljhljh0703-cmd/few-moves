@@ -1,0 +1,16 @@
+{
+  "name": "Nectorial.CoopCore",
+  "rootNamespace": "Nectorial.SlideEscape.Coop",
+  "references": [
+    "Nectorial.SlideCore"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

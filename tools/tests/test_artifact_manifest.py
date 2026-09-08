@@ -25,7 +25,8 @@ class ArtifactManifestTests(unittest.TestCase):
         self.write("Assets/scene.txt", "scene-v1\n")
         self.write("Packages/manifest.json", "{}\n")
         self.write("ProjectSettings/settings.txt", "settings-v1\n")
-        self.git("add", "Assets", "Packages", "ProjectSettings")
+        self.write(".gitignore", "/ProjectSettings/UnityConnectSettings.asset\n/Assets/ignored-local.cs\n")
+        self.git("add", "Assets", "Packages", "ProjectSettings", ".gitignore")
         self.git("commit", "-qm", "initial")
         self.build = self.repo / "Builds" / "WebGL"
         self.build.mkdir(parents=True)
@@ -74,6 +75,42 @@ class ArtifactManifestTests(unittest.TestCase):
         receipt = json.loads(result.stdout)
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(receipt["runtime_execution"], "not_performed")
+        self.assertEqual([], receipt["effective_local_inputs"])
+
+    def test_ignored_unity_connect_is_effective_source_and_tamper_breaks_parity(self) -> None:
+        local = "ProjectSettings/UnityConnectSettings.asset"
+        self.write(local, "generated-local-v1\n")
+        self.make_snapshot()
+        snapshot = json.loads(self.snapshot.read_text(encoding="utf-8"))
+        self.assertIn(local, snapshot["effective_local_inputs"])
+        self.assertIn(local, [item["path"] for item in snapshot["source_files"]])
+        result = self.run_cli("seal", "--repo", str(self.repo), "--snapshot", str(self.snapshot), "--build", str(self.build), "--out", str(self.manifest))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        verified = self.verify_manifest()
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        self.assertEqual([local], json.loads(verified.stdout)["effective_local_inputs"])
+        self.write(local, "generated-local-v2\n")
+        self.assertNotEqual(self.verify_manifest().returncode, 0)
+
+    def test_ignored_unity_connect_change_after_snapshot_breaks_seal(self) -> None:
+        self.write("ProjectSettings/UnityConnectSettings.asset", "generated-local-v1\n")
+        self.make_snapshot()
+        self.write("ProjectSettings/UnityConnectSettings.asset", "generated-local-v2\n")
+        result = self.run_cli("seal", "--repo", str(self.repo), "--snapshot", str(self.snapshot), "--build", str(self.build), "--out", str(self.manifest))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("differs from snapshot", result.stderr)
+
+    def test_unknown_ignored_asset_remains_blocked(self) -> None:
+        self.write("Assets/ignored-local.cs", "ignored but unknown\n")
+        result = self.run_cli("snapshot", "--repo", str(self.repo), "--out", str(self.snapshot))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Assets/ignored-local.cs", result.stderr)
+
+    def test_symlinked_unity_connect_is_rejected(self) -> None:
+        os.symlink(self.repo / "ProjectSettings" / "settings.txt", self.repo / "ProjectSettings" / "UnityConnectSettings.asset")
+        result = self.run_cli("snapshot", "--repo", str(self.repo), "--out", str(self.snapshot))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr)
 
     def test_source_mutation_add_delete_fail(self) -> None:
         self.make_manifest()

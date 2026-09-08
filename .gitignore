@@ -50,3 +50,6 @@ tools/**/obj/
 # Packaged output
 *.ait
 node_modules/
+
+# 구버전 턴제 코어 격리 (content-v2 계열, 현행 SlideCore 로 대체됨)
+_legacy-turnescape-20260906/

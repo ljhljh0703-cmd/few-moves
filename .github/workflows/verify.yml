@@ -42,6 +42,8 @@ jobs:
         run: |
           node tests/mobile_ui_contract.test.cjs
           node tests/webgl_persistence_contract.test.cjs
+          node tests/coop_ui_contract.test.cjs
+          node tests/coop_online_ui_contract.test.cjs
 
       # actions/setup-dotnet v5.2.0
       - name: Set up .NET SDK
@@ -51,6 +53,12 @@ jobs:
 
       - name: Run sliding puzzle checks
         run: dotnet run --project tools/SlideChecks/SlideChecks.csproj --configuration Release
+
+      - name: Run co-op core checks
+        run: dotnet run --project tools/CoopChecks/CoopChecks.csproj --configuration Release
+
+      - name: Run co-op server HTTP checks
+        run: dotnet run --project tools/CoopServerChecks/CoopServerChecks.csproj --configuration Release
 
       - name: Run Toss policy checks
         run: dotnet run --project tools/TossPlatformChecks/TossPlatformChecks.csproj --configuration Release

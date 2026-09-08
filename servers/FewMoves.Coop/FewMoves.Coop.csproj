@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Server/**/*.cs" />
+    <Compile Include="../../Assets/Nectorial/SlideCore/**/*.cs" Link="SlideCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/Nectorial/CoopCore/**/*.cs" Link="CoopCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="../../Assets/Nectorial/Resources/CoopRooms/coop-c1.json" Link="CoopRooms/coop-c1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
