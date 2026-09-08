@@ -67,6 +67,10 @@
     .dialog-actions { display:flex; justify-content:flex-end; gap:7px; }
     .dialog-actions button { min-height:44px; padding:0 13px; border:1px solid var(--grid); border-radius:9px; }
     .dialog-actions .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
+    #clear-dialog { width:min(286px,calc(100% - 36px)); }
+    #clear-dialog .dialog-card { text-align:center; }
+    .clear-title { margin:0; font-size:24px; }
+    .clear-subtitle { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
     [hidden] { display:none !important; }
   </style>
 </head>
@@ -114,6 +118,7 @@
     </section>
   </main>
   <dialog id="consent-dialog" aria-labelledby="consent-title"><div class="dialog-card"><p id="consent-title" class="dialog-title">동의가 필요합니다</p><p id="consent-copy" class="dialog-copy">상대 좌석의 확인을 기다리고 있습니다.</p><div class="dialog-actions"><button id="consent-reject" type="button">거절</button><button id="consent-approve" class="primary" type="button">동의</button></div></div></dialog>
+  <dialog id="clear-dialog" aria-labelledby="clear-title"><div class="dialog-card"><p id="clear-title" class="clear-title">둘 다 도착</p><p id="clear-copy" class="clear-subtitle">두 말이 목표에 도착했습니다.</p><div class="dialog-actions"><button id="clear-restart" class="primary" type="button" data-online-action="RequestRestart">다시하기</button></div></div></dialog>
   <script>
     (function () {
       "use strict";
@@ -149,6 +154,8 @@
       var consentCopy = document.querySelector("#consent-copy");
       var consentReject = document.querySelector("#consent-reject");
       var consentApprove = document.querySelector("#consent-approve");
+      var clearDialog = document.querySelector("#clear-dialog");
+      var clearCopy = document.querySelector("#clear-copy");
       function text(value, fallback) { return typeof value === "string" && value.length ? value : (fallback || ""); }
       function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.transportLocked === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
       function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
@@ -161,6 +168,9 @@
         var action = button.dataset.onlineAction;
         if (action === "Slide") return currentState.inputEnabled && currentState.availabilityCode === 1;
         if (action === "Express") return currentState.availabilityCode === 1 && Date.now() >= expressionCooldownUntil;
+        if (action === "RequestRestart" && currentState.statusCode === "Cleared") {
+          return currentState.availabilityCode === 1 && currentState.seatCode >= 0 && currentState.activeActorCode === (currentState.seatCode === 1 ? "Diamond" : "Circle");
+        }
         return currentState.availabilityCode === 1 && currentState.statusCode === "Playing";
       }
       function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; copyInviteButton.disabled = !currentState || !currentState.joined || !currentState.inviteCode; }
@@ -184,6 +194,13 @@
         consentCopy.textContent = requester ? "상대 좌석의 동의를 기다리고 있습니다." : (consent.kind === "Restart" ? "다시 시작하려면 상대 좌석의 동의가 필요합니다." : "되돌리려면 상대 좌석의 동의가 필요합니다.");
         open(consentDialog);
       }
+      function renderClear(state) {
+        var consent = state.pendingConsent;
+        if (state.statusCode !== "Cleared" || (consent && consent.active === true && consent.requestId)) { close(clearDialog); return; }
+        var activeSeat = state.seatCode >= 0 && state.activeActorCode === (state.seatCode === 1 ? "Diamond" : "Circle");
+        clearCopy.textContent = activeSeat ? "다시하기를 요청하면 상대 좌석의 동의를 기다립니다." : "상대 좌석의 다시하기 요청을 기다리고 있습니다.";
+        open(clearDialog);
+      }
       function renderState(state) {
         if (!validState(state)) return;
         currentState = state;
@@ -197,7 +214,7 @@
         circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
         diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
         feedback.textContent = text(state.message, text(state.error, ""));
-        renderConsent(state); renderExpression(state); renderButtons();
+        renderConsent(state); renderClear(state); renderExpression(state); renderButtons();
       }
       function receiveState(json) { try { var state = JSON.parse(json); if (!validState(state)) return; var roomChanged = currentState && state.roomId !== currentState.roomId; var lockState = state.transportLocked || !state.joined; if (currentState && !roomChanged && !lockState && (state.authorityRevision < currentState.authorityRevision || (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount))) return; renderState(state); } catch (error) { feedback.textContent = "온라인 상태를 확인할 수 없습니다."; } }
       function action(button) {
@@ -207,6 +224,7 @@
         if (kind === "Slide") command.direction = button.dataset.direction;
         if (kind === "Express") { command.expression = button.dataset.expression; expressionCooldownUntil = Date.now() + 2000; renderButtons(); setTimeout(renderButtons, 2000); }
         if (kind === "RequestUndo" || kind === "RequestRestart") command.requestId = "online-" + stateRevision + "-" + kind;
+        if (kind === "RequestRestart") close(clearDialog);
         send(command);
       }
       function resizeCanvasToStage() {
