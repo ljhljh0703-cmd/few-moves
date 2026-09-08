@@ -34,6 +34,8 @@ assert.match(template, /currentConsent\.requester === "Circle" \? "Diamond" : "C
 assert.match(template, /expression-bubble/);
 assert.match(template, /lastExpressionSequence/);
 assert.match(template, /expressionSender/);
+assert.match(template, /\.seat-dot \{ width: 12px; height: 12px; border-radius: 2px/);
+assert.match(template, /\.expression-sender \{ width: 12px; height: 12px; border-radius: 2px/);
 assert.match(template, /<header class="topbar">[\s\S]*id="expression-bubble"[\s\S]*<\/header>/);
 assert.doesNotMatch(template, /<section class="board-stage"[\s\S]*id="expression-bubble"/);
 assert.match(template, /turnLabel\.innerHTML = activeLabel\(state\) \+ "<small>행동 "/);
@@ -92,6 +94,9 @@ assert.doesNotMatch(bootstrap, /UnityEngine\.Networking|UnityWebRequest|Socket|W
 assert.match(board, /CoopRoomDefinition/);
 assert.match(board, /CirclePosition/);
 assert.match(board, /DiamondPosition/);
+assert.match(board, /"Circle Goal", 2, CircleGoal/);
+assert.match(board, /"Diamond Goal", 2, DiamondGoal/);
+assert.match(board, /CreateCircleActor[\s\S]*AddActorPrimitive\(actor\.transform, "Circle Piece"/);
 assert.match(board, /SpriteRenderer/);
 assert.match(build, /PlayerSettings\.WebGL\.template = "PROJECT:CoopPilot"/);
 assert.match(build, /Assets\/Nectorial\/Resources\/CoopRooms\/coop-c1\.json/);

@@ -135,8 +135,8 @@ namespace Nectorial.SlideEscape.Unity.Coop
                 }
             }
 
-            AddAtlas(_staticTiles, "Circle Goal", 2, CircleGoal, room.CircleGoal, 0.78f, 4);
-            AddPrimitive(_staticTiles, "Diamond Goal", DiamondGoal, room.DiamondGoal, new Vector2(0.78f, 0.78f), Vector2.zero, 4, 45f);
+            AddAtlas(_staticTiles, "Circle Goal", 2, CircleGoal, room.CircleGoal, 0.58f, 4);
+            AddAtlas(_staticTiles, "Diamond Goal", 2, DiamondGoal, room.DiamondGoal, 0.58f, 4);
         }
 
         private void DrawWall(GridPoint point)
@@ -159,7 +159,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
             var actor = new GameObject("Circle");
             actor.transform.SetParent(_root, false);
             _dynamicTiles.Add(actor);
-            AddActorAtlas(actor.transform, "Circle Piece", 2, Circle, 0.82f, 8);
+            AddActorPrimitive(actor.transform, "Circle Piece", Circle, new Vector2(0.62f, 0.62f), Vector2.zero, 8, 0f);
             return actor.transform;
         }
 
