@@ -242,6 +242,21 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
         }
 
+        private static PendingConsentObservation ToObservation(CoopPendingConsent pending)
+        {
+            if (pending == null) return null;
+            return new PendingConsentObservation
+            {
+                active = true,
+                requestId = pending.RequestId,
+                kind = pending.Kind.ToString(),
+                statusCode = pending.Kind.ToString(),
+                requester = pending.Requester.ToString(),
+                requesterCode = (int)pending.Requester,
+                requestedAtRevision = pending.RequestedAtRevision
+            };
+        }
+
         private bool MatchesBundledRoom(OnlineRoomView room)
         {
             return room != null && string.Equals(room.contentVersion, _room.ContentVersion, StringComparison.Ordinal) &&
@@ -282,6 +297,13 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _logicalActionCount = 0;
             _expressionHighWater = 0;
             _expressionHydrated = false;
+            _visibleExpressionSequence = 0;
+            _visibleExpressionSender = string.Empty;
+            _visibleExpression = string.Empty;
+            _availabilityCode = 0;
+            _circleConnected = false;
+            _diamondConnected = false;
+            _roomView = null;
             _message = "온라인 방을 준비하세요";
             _error = string.Empty;
             PublishState();
@@ -459,6 +481,6 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         {
             public bool initialized; public int availabilityCode; public bool circleConnected; public bool diamondConnected; public string activeActorCode; public long authorityRevision; public int logicalActionCount; public string statusCode; public bool circleAtGoal; public bool diamondAtGoal; public long expressionSequence; public string expressionSender; public string stateFingerprint;
         }
-        [Serializable] private sealed class PendingConsentObservation { public bool active; public string requestId; public string kind; public string statusCode; public string requester; public long requestedAtRevision; }
+        [Serializable] private sealed class PendingConsentObservation { public bool active; public string requestId; public string kind; public string statusCode; public string requester; public int requesterCode; public long requestedAtRevision; }
     }
 }
