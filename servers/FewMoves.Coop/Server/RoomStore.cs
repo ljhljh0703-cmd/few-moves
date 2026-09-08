@@ -183,7 +183,7 @@ namespace FewMoves.Coop.Server
         public StoreResult Dispatch(string roomId, string bearer, CommandRequest request, DateTimeOffset now)
         {
             if (request == null || !IsCommandId(request.CommandId)) return Failure(400, "command_id_invalid", null);
-            string payloadHash = Hash("command", CanonicalPayload(request));
+            string payloadHash = CurrentPayloadHash(request);
             lock (_gate)
             {
                 RoomRuntime runtime;
@@ -196,7 +196,8 @@ namespace FewMoves.Coop.Server
                 PersistedCommandLedgerEntry existing = FindCommand(runtime.Record, request.CommandId);
                 if (existing != null)
                 {
-                    if (!ConstantEquals(existing.PayloadHash, payloadHash)) return CommandFailure(409, "command_id_payload_conflict", runtime, seat, now);
+                    string expectedHash = IsCurrentPayloadHash(existing.PayloadHash) ? payloadHash : LegacyPayloadHash(request);
+                    if (!ConstantEquals(existing.PayloadHash, expectedHash)) return CommandFailure(409, "command_id_payload_conflict", runtime, seat, now);
                     return new StoreResult
                     {
                         Ok = true,
@@ -862,7 +863,24 @@ namespace FewMoves.Coop.Server
             return true;
         }
 
-        private static string CanonicalPayload(CommandRequest request)
+        private static string CurrentPayloadHash(CommandRequest request)
+        {
+            return "v2:" + Hash("command", CanonicalPayload(request));
+        }
+
+        private static bool IsCurrentPayloadHash(string value)
+        {
+            return !string.IsNullOrEmpty(value) && value.StartsWith("v2:", StringComparison.Ordinal);
+        }
+
+        private static string LegacyPayloadHash(CommandRequest request)
+        {
+            // Unprefixed persisted entries were created before field presence participated in idempotency.
+            // They retain their old retry interpretation; newly persisted entries always use the v2 prefix.
+            return Hash("command", LegacyCanonicalPayload(request));
+        }
+
+        private static string LegacyCanonicalPayload(CommandRequest request)
         {
             return request.ExpectedRevision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
                 + request.Kind.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
@@ -870,6 +888,22 @@ namespace FewMoves.Coop.Server
                 + (request.RequestId ?? string.Empty) + "|"
                 + (request.Approve ? "1" : "0") + "|"
                 + request.Expression.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static string CanonicalPayload(CommandRequest request)
+        {
+            return LegacyCanonicalPayload(request) + "|"
+                + Presence(request.HasExpectedRevision) + "|"
+                + Presence(request.HasKind) + "|"
+                + Presence(request.HasDirection) + "|"
+                + Presence(request.HasRequestId) + "|"
+                + Presence(request.HasApprove) + "|"
+                + Presence(request.HasExpression);
+        }
+
+        private static string Presence(bool value)
+        {
+            return value ? "1" : "0";
         }
     }
 }

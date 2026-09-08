@@ -4,8 +4,10 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using FewMoves.Coop.Server;
 using Microsoft.AspNetCore.Builder;
@@ -23,6 +25,7 @@ internal static class Program
         await Run("http_command_race_idempotency_stale_and_public_pass", CheckCommands);
         await Run("http_consent_expression_cooldown_and_reconnect", CheckConsentExpressionAndReconnect);
         await Run("http_atomic_persistence_restart_and_corrupt_fail_closed", CheckPersistenceRestartAndCorruption);
+        await Run("legacy_payload_hash_retry_compatibility", CheckLegacyPayloadHashCompatibility);
         await Run("http_body_general_room_and_ttl_limits", CheckLimits);
 
         int passed = 0;
@@ -107,6 +110,14 @@ internal static class Program
                 AssertStatus(circlePoll, 200, "circle normal poll budget");
                 AssertStatus(diamondPoll, 200, "diamond normal poll budget");
             }
+            HttpResponse missingDirection = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId),
+                "{\"commandId\":\"presence-direction\",\"expectedRevision\":0,\"kind\":0}", session.CircleToken);
+            AssertStatus(missingDirection, 400, "missing slide direction");
+            AssertEqual("direction_missing", ErrorCode(missingDirection), "missing direction code");
+            HttpResponse explicitDirection = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId),
+                CommandBody("presence-direction", 0, CoopCommandKind.Slide, GameCommand.Up), session.CircleToken);
+            AssertStatus(explicitDirection, 409, "missing to explicit direction reuses no command identity");
+            AssertEqual("command_id_payload_conflict", ErrorCode(explicitDirection), "direction presence collision code");
             CoopCommand first = NoPassTrace()[0];
             Task<HttpResponse> circleTask = harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody("race-circle", 0, first.Kind, first.Direction), session.CircleToken);
             Task<HttpResponse> diamondTask = harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody("race-diamond", 0, CoopCommandKind.Slide, GameCommand.Up), session.DiamondToken);
@@ -149,6 +160,14 @@ internal static class Program
             AssertStatus(request, 200, "restart request");
             AssertEqual(1L, request.Root.GetProperty("state").GetProperty("authorityRevision").GetInt64(), "request grows revision");
 
+            HttpResponse missingApprove = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId),
+                "{\"commandId\":\"presence-approve\",\"expectedRevision\":1,\"kind\":5,\"requestId\":\"restart-request-id-abcdefghijkl\"}", session.DiamondToken);
+            AssertStatus(missingApprove, 400, "missing consent approval");
+            AssertEqual("approve_missing", ErrorCode(missingApprove), "missing approval code");
+            HttpResponse explicitApprove = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("presence-approve", 1, CoopCommandKind.ResolveRestart, "restart-request-id-abcdefghijkl", false), session.DiamondToken);
+            AssertStatus(explicitApprove, 409, "missing to explicit approval reuses no command identity");
+            AssertEqual("command_id_payload_conflict", ErrorCode(explicitApprove), "approval presence collision code");
+
             HttpResponse selfApprove = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("restart-self", 1, CoopCommandKind.ResolveRestart, "restart-request-id-abcdefghijkl", true), session.CircleToken);
             AssertStatus(selfApprove, 409, "requester cannot self-approve");
             AssertEqual("consent_same_seat", ErrorCode(selfApprove), "self-approval code");
@@ -159,6 +178,14 @@ internal static class Program
             HttpResponse duplicateApproval = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("restart-other", 1, CoopCommandKind.ResolveRestart, "restart-request-id-abcdefghijkl", true), session.DiamondToken);
             AssertStatus(duplicateApproval, 200, "duplicate approval");
             Assert(duplicateApproval.Root.GetProperty("idempotent").GetBoolean(), "duplicate approval stays idempotent");
+
+            HttpResponse missingExpression = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId),
+                "{\"commandId\":\"presence-expression\",\"expectedRevision\":2,\"kind\":6}", session.CircleToken);
+            AssertStatus(missingExpression, 400, "missing expression value");
+            AssertEqual("expression_missing", ErrorCode(missingExpression), "missing expression code");
+            HttpResponse explicitExpression = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ExpressionBody("presence-expression", 2, 0), session.CircleToken);
+            AssertStatus(explicitExpression, 409, "missing to explicit expression reuses no command identity");
+            AssertEqual("command_id_payload_conflict", ErrorCode(explicitExpression), "expression presence collision code");
 
             HttpResponse expression = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ExpressionBody("expression-one", 2, 0), session.CircleToken);
             AssertStatus(expression, 200, "first expression");
@@ -278,6 +305,27 @@ internal static class Program
         Assert(limiter.TryAllow("new-client", at.AddMilliseconds(30)), "expired request bucket is evicted for a new client");
     }
 
+    private static async Task CheckLegacyPayloadHashCompatibility()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            SessionInfo session = await CreateAndJoin(harness);
+            HttpResponse first = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody("legacy-pass", 0, CoopCommandKind.Pass, GameCommand.Up), session.CircleToken);
+            AssertStatus(first, 422, "legacy fixture pass rejection");
+            await harness.StopAsync();
+
+            JsonObject root = JsonNode.Parse(File.ReadAllText(harness.StateFilePath)).AsObject();
+            JsonObject entry = root["rooms"].AsArray()[0]["commandLedger"].AsArray()[0].AsObject();
+            entry["payloadHash"] = LegacyPayloadHash(0, (int)CoopCommandKind.Pass, (int)GameCommand.Up, null, false, 0);
+            File.WriteAllText(harness.StateFilePath, root.ToJsonString());
+
+            await harness.RestartAsync();
+            HttpResponse retry = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody("legacy-pass", 0, CoopCommandKind.Pass, GameCommand.Up), session.CircleToken);
+            AssertStatus(retry, 422, "legacy payload retry preserves prior rejection");
+            Assert(retry.Root.GetProperty("idempotent").GetBoolean(), "legacy stored hash remains retry-compatible");
+        }
+    }
+
     private static async Task<SessionInfo> CreateAndJoin(ServerHarness harness)
     {
         const string createId = "create-primary-abcdefghijklmnopqrstuvwxyz";
@@ -327,6 +375,17 @@ internal static class Program
             if (File.Exists(candidate)) return candidate;
         }
         throw new InvalidOperationException("C1 room path unavailable for server checks.");
+    }
+
+    private static string LegacyPayloadHash(long revision, int kind, int direction, string requestId, bool approve, int expression)
+    {
+        string canonical = revision.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
+            + kind.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
+            + direction.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|"
+            + (requestId ?? string.Empty) + "|"
+            + (approve ? "1" : "0") + "|"
+            + expression.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes("command|" + canonical)));
     }
 
     private static void AssertPrivateStatePermissions(ServerHarness harness)
