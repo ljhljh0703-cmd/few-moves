@@ -174,7 +174,8 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 }
             }
             if (result.state != null) ApplyWireState(result.state, result.expressions, result.room);
-            if (result.op == "created" || result.op == "joined" || result.op == "resumed" || result.op == "resume")
+            bool sessionPresent = result.seat == 0 || result.seat == 1;
+            if (result.op == "created" || result.op == "joined" || result.op == "resumed" || (result.op == "resume" && sessionPresent))
             {
                 _joined = true;
                 _message = result.op == "created" ? "초대 코드를 공유하세요" : "온라인 방에 들어왔습니다";

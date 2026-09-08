@@ -57,6 +57,7 @@ assert.match(bootstrap, /MatchesBundledRoom/);
 assert.match(bootstrap, /expressionHighWater/);
 assert.match(bootstrap, /_expressionHydrated/);
 assert.match(bootstrap, /result\.op == "resume"/);
+assert.match(bootstrap, /result\.op == "resume" && sessionPresent/);
 assert.match(bootstrap, /_roomView = null/);
 assert.match(bootstrap, /COOP_ONLINE_STATE_OBSERVATION/);
 assert.match(bootstrap, /OnlineSafeLog/);
@@ -92,6 +93,12 @@ assert.match(solo, /Few Moves Online Pilot/);
   assert.equal(rawCreate.seatToken, "bearer-secret", "raw create response is not mutated before private storage");
   assert.equal(safeProjection.seatToken, undefined, "Unity projection excludes bearer token");
   assert.equal(safeProjection.inviteCode, "ABC", "safe Unity projection may retain invite code");
+
+  function joinedFromResume(op, seat) {
+    return op === "created" || op === "joined" || op === "resumed" || (op === "resume" && (seat === 0 || seat === 1));
+  }
+  assert.equal(joinedFromResume("resume", -1), false, "fresh no-session resume remains in create/join lobby");
+  assert.equal(joinedFromResume("resume", 1), true, "saved positive seat resumes the same tab session");
 }
 
 console.log("Coop online UI contract checks passed");
