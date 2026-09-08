@@ -109,13 +109,21 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             switch (input.kind)
             {
                 case "Create":
+                    BeginRoomAttempt("온라인 방을 만드는 중입니다");
 #if UNITY_WEBGL && !UNITY_EDITOR
                     NectorialOnlineCreate();
 #endif
                     return;
                 case "Join":
+                    BeginRoomAttempt("온라인 방에 연결하는 중입니다");
 #if UNITY_WEBGL && !UNITY_EDITOR
                     NectorialOnlineJoin(input.inviteCode ?? string.Empty);
+#endif
+                    return;
+                case "Resume":
+#if UNITY_WEBGL && !UNITY_EDITOR
+                    if (string.IsNullOrEmpty(input.inviteCode)) NectorialOnlineResume();
+                    else NectorialOnlineResumeInvite(input.inviteCode);
 #endif
                     return;
                 case "Leave":
@@ -142,30 +150,21 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             catch (Exception exception) { FailMessage("서버 응답을 읽지 못했습니다", "online_response:" + exception.GetType().Name); return; }
             if (result == null) return;
 
-            if (result.room != null) _roomView = result.room;
-            if (result.seat >= 0) _seatCode = result.seat;
-            if (!string.IsNullOrEmpty(result.inviteCode)) _inviteCode = result.inviteCode;
-            if (result.availability != null)
-            {
-                _availabilityCode = result.availability.status;
-                _circleConnected = result.availability.circleConnected;
-                _diamondConnected = result.availability.diamondConnected;
-            }
-
             if (!result.ok)
             {
                 _error = result.error != null ? result.error.code : "online_request_failed";
                 _message = FriendlyError(_error);
-                if (result.state != null) ApplyWireState(result.state, result.expressions, result.room);
+                if (!ApplyAuthenticatedResult(result)) LockForTransportFailure(_error);
                 PublishState();
                 return;
             }
 
             _error = string.Empty;
+            if (result.seat == 0 || result.seat == 1) _seatCode = result.seat;
+            if (!string.IsNullOrEmpty(result.inviteCode)) _inviteCode = result.inviteCode;
             if (result.room != null)
             {
-                _roomId = result.room.roomId ?? _roomId;
-                _roomReady = MatchesBundledRoom(result.room);
+                SetRoom(result.room);
                 if (!_roomReady)
                 {
                     _message = "서버 방 자료가 현재 빌드와 다릅니다";
@@ -173,16 +172,52 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                     return;
                 }
             }
-            if (result.state != null) ApplyWireState(result.state, result.expressions, result.room);
+            ApplyAvailability(result.availability);
+            bool authenticatedState = ApplyAuthenticatedResult(result);
             bool sessionPresent = result.seat == 0 || result.seat == 1;
             if (result.op == "created" || result.op == "joined" || result.op == "resumed" || (result.op == "resume" && sessionPresent))
             {
                 _joined = true;
                 _message = result.op == "created" ? "초대 코드를 공유하세요" : "온라인 방에 들어왔습니다";
             }
+            else if (result.op == "resume" && !sessionPresent)
+            {
+                _joined = false;
+                _message = string.IsNullOrEmpty(result.inviteCode) ? "방을 만들거나 초대 코드로 참여하세요" : "초대 코드에 연결할 저장된 좌석이 없습니다";
+            }
             else if (result.op == "command") _message = FriendlyCommand(result.reason, result.accepted, result.idempotent);
             else if (result.op == "state") _message = AvailabilityMessage();
+            else if (authenticatedState) _message = AvailabilityMessage();
             PublishState();
+        }
+
+        private bool ApplyAuthenticatedResult(OnlineResult result)
+        {
+            if (result == null || result.room == null || result.state == null || (result.seat != 0 && result.seat != 1)) return false;
+            SetRoom(result.room);
+            if (!_roomReady) return false;
+            _seatCode = result.seat;
+            ApplyAvailability(result.availability);
+            ApplyWireState(result.state, result.expressions, result.room);
+            _joined = true;
+            return true;
+        }
+
+        private void SetRoom(OnlineRoomView room)
+        {
+            if (room == null || string.IsNullOrEmpty(room.roomId)) return;
+            if (!string.Equals(_roomId, room.roomId, StringComparison.Ordinal)) ClearAuthoritativeState(true);
+            _roomView = room;
+            _roomId = room.roomId;
+            _roomReady = MatchesBundledRoom(room);
+        }
+
+        private void ApplyAvailability(OnlineAvailability availability)
+        {
+            if (availability == null) return;
+            _availabilityCode = availability.status;
+            _circleConnected = availability.circleConnected;
+            _diamondConnected = availability.diamondConnected;
         }
 
         private void SendCommand(OnlineInput input, int kind, int direction, string requestId, bool approve)
@@ -210,7 +245,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private void ApplyWireState(OnlineWireState wire, OnlineExpressions expressions, OnlineRoomView room)
         {
-            if (wire == null) return;
+            if (wire == null || !_roomReady || !string.Equals(wire.roomId, _roomId, StringComparison.Ordinal)) return;
             if (_authorityRevision >= 0 && (wire.authorityRevision < _authorityRevision ||
                 (wire.authorityRevision == _authorityRevision && wire.logicalActionCount < _logicalActionCount))) return;
             _authorityRevision = wire.authorityRevision;
@@ -227,6 +262,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             if (!_expressionHydrated)
             {
                 _expressionHighWater = incoming;
+                _visibleExpressionSequence = incoming;
                 _expressionHydrated = true;
                 return;
             }
@@ -293,21 +329,58 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _roomId = string.Empty;
             _inviteCode = string.Empty;
             _seatCode = -1;
+            _roomView = null;
+            ClearAuthoritativeState(true);
+            _message = "온라인 방을 준비하세요";
+            _error = string.Empty;
+            PublishState();
+        }
+
+        private void BeginRoomAttempt(string message)
+        {
+            _joined = false;
+            _roomReady = false;
+            _roomId = string.Empty;
+            _inviteCode = string.Empty;
+            _seatCode = -1;
+            _roomView = null;
+            ClearAuthoritativeState(true);
+            _message = message;
+            _error = string.Empty;
+            PublishState();
+        }
+
+        private void LockForTransportFailure(string code)
+        {
+            bool terminal = code == "room_expired" || code == "seat_token_invalid" || code == "room_access_denied" || code == "room_not_found";
+            ClearAuthoritativeState(terminal);
+            _availabilityCode = code == "room_expired" ? 3 : 0;
+            if (terminal)
+            {
+                _joined = false;
+                _roomReady = false;
+                _roomId = string.Empty;
+                _inviteCode = string.Empty;
+                _seatCode = -1;
+                _roomView = null;
+            }
+        }
+
+        private void ClearAuthoritativeState(bool resetExpressions)
+        {
             _serverState = null;
             _authorityRevision = -1;
             _logicalActionCount = 0;
+            _availabilityCode = 0;
+            _circleConnected = false;
+            _diamondConnected = false;
+            _transitioning = false;
+            if (!resetExpressions) return;
             _expressionHighWater = 0;
             _expressionHydrated = false;
             _visibleExpressionSequence = 0;
             _visibleExpressionSender = string.Empty;
             _visibleExpression = string.Empty;
-            _availabilityCode = 0;
-            _circleConnected = false;
-            _diamondConnected = false;
-            _roomView = null;
-            _message = "온라인 방을 준비하세요";
-            _error = string.Empty;
-            PublishState();
         }
 
         private void Fail(string message, string error)
@@ -355,7 +428,8 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 expression = _visibleExpression,
                 localHotseat = false,
                 seatAuthority = "bearer_derived",
-                roomMismatch = _joined && !_roomReady
+                roomMismatch = _joined && !_roomReady,
+                transportLocked = _serverState == null || _availabilityCode != 1
             };
             var safeLog = new OnlineSafeLog
             {
@@ -468,6 +542,8 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         [DllImport("__Internal")]
         private static extern void NectorialOnlineResume();
         [DllImport("__Internal")]
+        private static extern void NectorialOnlineResumeInvite(string inviteCode);
+        [DllImport("__Internal")]
         private static extern void NectorialOnlineCreate();
         [DllImport("__Internal")]
         private static extern void NectorialOnlineJoin(string inviteCode);
@@ -492,7 +568,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         [Serializable] private sealed class OnlineError { public string code; }
         [Serializable] private sealed class OnlineObservation
         {
-            public bool initialized; public bool online; public bool joined; public string roomId; public string inviteCode; public int seatCode; public int availabilityCode; public string availabilityStatus; public bool circleConnected; public bool diamondConnected; public bool inputEnabled; public string activeActorCode; public long authorityRevision; public int logicalActionCount; public string statusCode; public string message; public string error; public bool transitioning; public bool circleAtGoal; public bool diamondAtGoal; public PendingConsentObservation pendingConsent; public long expressionSequence; public string expressionSender; public string expression; public bool localHotseat; public string seatAuthority; public bool roomMismatch;
+            public bool initialized; public bool online; public bool joined; public string roomId; public string inviteCode; public int seatCode; public int availabilityCode; public string availabilityStatus; public bool circleConnected; public bool diamondConnected; public bool inputEnabled; public string activeActorCode; public long authorityRevision; public int logicalActionCount; public string statusCode; public string message; public string error; public bool transitioning; public bool circleAtGoal; public bool diamondAtGoal; public PendingConsentObservation pendingConsent; public long expressionSequence; public string expressionSender; public string expression; public bool localHotseat; public string seatAuthority; public bool roomMismatch; public bool transportLocked;
         }
         [Serializable] private sealed class OnlineSafeLog
         {

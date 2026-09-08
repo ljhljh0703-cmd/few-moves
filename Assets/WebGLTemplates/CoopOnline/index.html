@@ -80,6 +80,7 @@
             <button id="create-button" class="primary" type="button">방 만들기</button>
             <input id="invite-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="초대 코드" aria-label="초대 코드">
             <button id="join-button" type="button">참여</button>
+            <button id="resume-button" type="button">저장된 방</button>
           </div>
           <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="leave-small" class="room-action" type="button">나가기</button></div>
         </section>
@@ -128,6 +129,7 @@
       var roomInfo = document.querySelector("#room-info");
       var inviteInput = document.querySelector("#invite-input");
       var inviteCode = document.querySelector("#invite-code");
+      var resumeButton = document.querySelector("#resume-button");
       var roomStatus = document.querySelector("#room-status");
       var turnLabel = document.querySelector("#turn-label");
       var circleGoal = document.querySelector("#circle-goal");
@@ -136,20 +138,20 @@
       var consentDialog = document.querySelector("#consent-dialog");
       var consentCopy = document.querySelector("#consent-copy");
       function text(value, fallback) { return typeof value === "string" && value.length ? value : (fallback || ""); }
-      function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
+      function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.transportLocked === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
       function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
       function close(dialog) { if (!dialog || !dialog.open) return; if (dialog.close) dialog.close(); else dialog.removeAttribute("open"); }
       function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("CoopOnlineBootstrap", "HandleOnlineCommand", JSON.stringify(command)); return true; }
       function activeLabel(state) { return state.activeActorCode === "Diamond" ? "마름모 차례" : "사각형 차례"; }
       function allowed(button) {
-        if (!currentState || !currentState.initialized || currentState.transitioning) return false;
+        if (!currentState || !currentState.initialized || currentState.transportLocked || currentState.transitioning) return false;
         if (currentState.pendingConsent && currentState.pendingConsent.active === true) return false;
         var action = button.dataset.onlineAction;
         if (action === "Slide") return currentState.inputEnabled && currentState.availabilityCode === 1;
         if (action === "Express") return currentState.availabilityCode === 1 && Date.now() >= expressionCooldownUntil;
         return currentState.availabilityCode === 1 && currentState.statusCode === "Playing";
       }
-      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; }
+      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; }
       function renderExpression(state) {
         if (state.expressionSequence <= lastExpressionSequence || !expressionIcons[state.expression]) return;
         lastExpressionSequence = state.expressionSequence;
@@ -171,6 +173,7 @@
         if (!validState(state)) return;
         currentState = state;
         roomForm.hidden = state.joined; roomInfo.hidden = !state.joined;
+        if (!state.joined && state.inviteCode) inviteInput.value = state.inviteCode;
         inviteCode.textContent = state.inviteCode || "—";
         roomStatus.textContent = state.availabilityStatus || "대기 중";
         connectionLabel.textContent = state.seatCode === 1 ? "마름모 좌석 · 온라인" : (state.seatCode === 0 ? "사각형 좌석 · 온라인" : "온라인 방");
@@ -180,7 +183,7 @@
         feedback.textContent = text(state.message, text(state.error, ""));
         renderConsent(state); renderExpression(state); renderButtons();
       }
-      function receiveState(json) { try { var state = JSON.parse(json); if (!validState(state)) return; if (currentState && (state.authorityRevision < currentState.authorityRevision || (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount))) return; renderState(state); } catch (error) { feedback.textContent = "온라인 상태를 확인할 수 없습니다."; } }
+      function receiveState(json) { try { var state = JSON.parse(json); if (!validState(state)) return; var roomChanged = currentState && state.roomId !== currentState.roomId; var lockState = state.transportLocked || !state.joined; if (currentState && !roomChanged && !lockState && (state.authorityRevision < currentState.authorityRevision || (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount))) return; renderState(state); } catch (error) { feedback.textContent = "온라인 상태를 확인할 수 없습니다."; } }
       function action(button) {
         if (!allowed(button)) return;
         var kind = button.dataset.onlineAction;
@@ -193,6 +196,7 @@
       Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.addEventListener("click", function () { action(button); }); });
       document.querySelector("#create-button").addEventListener("click", function () { send({ kind:"Create" }); });
       document.querySelector("#join-button").addEventListener("click", function () { send({ kind:"Join", inviteCode: inviteInput.value.trim() }); });
+      resumeButton.addEventListener("click", function () { send({ kind:"Resume", inviteCode: inviteInput.value.trim() }); });
       document.querySelector("#leave-button").addEventListener("click", function () { send({ kind:"Leave" }); });
       document.querySelector("#leave-small").addEventListener("click", function () { send({ kind:"Leave" }); });
       function resolverSeat() { return currentConsent && currentConsent.requester === "Circle" ? 1 : 0; }
