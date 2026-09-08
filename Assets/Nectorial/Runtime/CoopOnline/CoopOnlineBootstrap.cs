@@ -21,6 +21,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private bool _initialized;
         private bool _roomReady;
         private bool _joined;
+        private bool _transportLocked = true;
         private bool _transitioning;
         private int _seatCode = -1;
         // Network room UUID for seat/authentication and callback isolation; it is not the Core puzzle ID.
@@ -213,14 +214,22 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private bool ApplyAuthenticatedResult(OnlineResult result)
         {
-            if (result == null || result.room == null || result.state == null || (result.seat != 0 && result.seat != 1)) return false;
+            if (!HasAuthenticatedState(result)) return false;
             SetRoom(result.room);
             if (!_roomReady) return false;
             _seatCode = result.seat;
             ApplyAvailability(result.availability);
             if (!ApplyWireState(result.state, result.expressions, result.room)) return false;
             _joined = true;
+            _transportLocked = false;
             return true;
+        }
+
+        private static bool HasAuthenticatedState(OnlineResult result)
+        {
+            return result != null && result.room != null && !string.IsNullOrEmpty(result.room.roomId) &&
+                result.state != null && !string.IsNullOrEmpty(result.state.roomId) &&
+                (result.seat == 0 || result.seat == 1);
         }
 
         private void SetRoom(OnlineRoomView room)
@@ -454,17 +463,23 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private void LockForTransportFailure(string code)
         {
             bool terminal = code == "room_expired" || code == "seat_token_invalid" || code == "room_access_denied" || code == "room_not_found";
-            ClearAuthoritativeState(terminal);
-            _availabilityCode = code == "room_expired" ? 3 : 0;
             if (terminal)
             {
+                ClearAuthoritativeState(true);
+                _availabilityCode = code == "room_expired" ? 3 : 0;
                 _joined = false;
                 _roomReady = false;
                 _roomId = string.Empty;
                 _inviteCode = string.Empty;
                 _seatCode = -1;
                 _roomView = null;
+                return;
             }
+            _transportLocked = true;
+            _availabilityCode = 0;
+            _circleConnected = false;
+            _diamondConnected = false;
+            _transitioning = false;
         }
 
         private void ClearAuthoritativeState(bool resetExpressions)
@@ -475,6 +490,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _availabilityCode = 0;
             _circleConnected = false;
             _diamondConnected = false;
+            _transportLocked = true;
             _transitioning = false;
             if (!resetExpressions) return;
             _expressionHighWater = 0;
@@ -513,7 +529,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 availabilityStatus = AvailabilityName(_availabilityCode),
                 circleConnected = _circleConnected,
                 diamondConnected = _diamondConnected,
-                inputEnabled = _joined && _roomReady && _serverState != null && _availabilityCode == 1 && !_transitioning && IsMyTurn(),
+                inputEnabled = _joined && _roomReady && _serverState != null && !_transportLocked && _availabilityCode == 1 && !_transitioning && IsMyTurn(),
                 activeActorCode = _serverState == null ? string.Empty : _serverState.ActiveActor.ToString(),
                 authorityRevision = _authorityRevision,
                 logicalActionCount = _logicalActionCount,
@@ -530,7 +546,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 localHotseat = false,
                 seatAuthority = "bearer_derived",
                 roomMismatch = _joined && !_roomReady,
-                transportLocked = _serverState == null || _availabilityCode != 1
+                transportLocked = _transportLocked
             };
             var safeLog = new OnlineSafeLog
             {

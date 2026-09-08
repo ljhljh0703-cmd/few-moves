@@ -82,6 +82,9 @@ assert.match(bootstrap, /TryNormalizeWirePending/);
 assert.match(bootstrap, /CoopSaveSerializationAdapter\.TryNormalizePendingConsent/);
 assert.match(bootstrap, /CoopRules\.ValidateState/);
 assert.match(bootstrap, /TryDeserializeServerStateForCheck/);
+assert.match(bootstrap, /HasAuthenticatedState/);
+assert.match(bootstrap, /_transportLocked = true/);
+assert.match(bootstrap, /inputEnabled = _joined && _roomReady && _serverState != null && !_transportLocked/);
 assert.match(bootstrap, /expressionHighWater/);
 assert.match(bootstrap, /_expressionHydrated/);
 assert.match(bootstrap, /result\.op == "resume"/);
@@ -112,6 +115,8 @@ assert.match(solo, /Few Moves Online Pilot/);
 assert.match(onlineSerialization, /pending-null/);
 assert.match(onlineSerialization, /active-pending/);
 assert.match(onlineSerialization, /malformed-pending/);
+assert.match(onlineSerialization, /error-without-state preserve=pass input=locked/);
+assert.match(onlineSerialization, /recovered-auth-state unlock=pass/);
 assert.match(onlineSerialization, /COOP_ONLINE_JSON_PROBE_RESULT pass=true/);
 
 const serverStateFixture = {
