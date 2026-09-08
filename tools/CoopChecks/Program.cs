@@ -11,12 +11,14 @@ internal static class Program
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { IncludeFields = true };
     private static CoopRoomDefinition C1;
     private static CoopSolverResult C1Solution;
+    private static CoopSolverResult C1NoPassSolution;
     private static CoopSolverResult C1NoCircleStop;
     private static CoopSolverResult C1NoDiamondStop;
 
     private static int Main()
     {
         Run("c1_resource_solver_replay_and_witness", CheckC1);
+        Run("c1_no_pass_solver_replay", CheckC1NoPass);
         Run("geometry_parity_wall_boundary_partner_goal", CheckGeometryParity);
         Run("ownership_alternation_pass_and_soft_goals", CheckOwnershipAndPass);
         Run("idempotency_stale_and_revision_monotonic_undo", CheckIdempotencyAndUndo);
@@ -34,6 +36,10 @@ internal static class Program
             Failed = Records.Count - passed,
             Checks = Records.ToArray(),
             C1OptimalActionCount = C1Solution == null ? -1 : C1Solution.OptimalActionCount,
+            C1NoPassStatus = C1NoPassSolution == null ? "not_run" : C1NoPassSolution.Status.ToString(),
+            C1NoPassOptimalActionCount = C1NoPassSolution == null ? -1 : C1NoPassSolution.OptimalActionCount,
+            C1NoPassVisitedStates = C1NoPassSolution == null ? -1 : C1NoPassSolution.VisitedCount,
+            C1NoPassTrace = C1NoPassSolution == null ? new CoopCommand[0] : C1NoPassSolution.Commands,
             C1VisitedStates = C1Solution == null ? -1 : C1Solution.VisitedCount,
             C1ForbidCircleStopStatus = C1NoCircleStop == null ? "not_run" : C1NoCircleStop.Status.ToString(),
             C1ForbidCircleStopCost = C1NoCircleStop == null ? -1 : C1NoCircleStop.OptimalActionCount,
@@ -117,6 +123,22 @@ internal static class Program
         state = CoopRules.CreateInitialState(goalPass);
         Assert(CoopRules.TrySlide(goalPass, state, CoopActor.Circle, GameCommand.Right, out destination, out distance, out stopped, out reason), "goal line slide must be valid");
         AssertEqual(new GridPoint(3, 2), destination, "partner remains the stopper; goal itself is pass-through geometry");
+    }
+
+    private static void CheckC1NoPass()
+    {
+        if (C1 == null || C1Solution == null) CheckC1();
+        C1NoPassSolution = CoopSolver.FindSolution(C1, 500000, new CoopSolverOptions { AllowPass = false });
+        AssertEqual(CoopSolverStatus.Solved, C1NoPassSolution.Status, "C1 must remain solvable without Pass");
+        AssertEqual(13, C1NoPassSolution.OptimalActionCount, "C1 measured no-Pass optimum");
+        CoopSession session = CoopSession.Create(C1);
+        for (int index = 0; index < C1NoPassSolution.Commands.Length; index++)
+        {
+            CoopCommand command = C1NoPassSolution.Commands[index];
+            Assert(command.Kind != CoopCommandKind.Pass, "no-Pass solver trace must not contain Pass");
+            Assert(session.Dispatch(command).Accepted, "no-Pass solver command must replay: " + index);
+        }
+        AssertEqual(CoopRunStatus.Cleared, session.State.Status, "no-Pass trace must reach both goals");
     }
 
     private static void CheckOwnershipAndPass()
@@ -313,6 +335,10 @@ internal static class Program
         public int Failed;
         public CheckRecord[] Checks;
         public int C1OptimalActionCount;
+        public string C1NoPassStatus;
+        public int C1NoPassOptimalActionCount;
+        public int C1NoPassVisitedStates;
+        public CoopCommand[] C1NoPassTrace;
         public int C1VisitedStates;
         public string C1ForbidCircleStopStatus;
         public int C1ForbidCircleStopCost;
