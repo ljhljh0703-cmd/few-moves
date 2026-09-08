@@ -103,6 +103,7 @@ assert.match(bootstrap, /bearer_derived/);
 assert.doesNotMatch(bootstrap, /CoopSession\.Dispatch|CoopRules\.ApplyAction/);
 assert.match(build, /PROJECT:CoopOnline/);
 assert.match(build, /COOP_ONLINE_WEBGL_RESULT/);
+assert.match(build, /CoopOnlineSerializationChecks\.Run\(\)/);
 assert.match(build, /previousCompanyName/);
 assert.match(build, /previousRunInBackground/);
 assert.match(build, /previousCompression/);

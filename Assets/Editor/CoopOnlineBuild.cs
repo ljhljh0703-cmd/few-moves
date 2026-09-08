@@ -45,6 +45,7 @@ namespace Nectorial.Editor
                 PlayerSettings.WebGL.dataCaching = false;
                 PlayerSettings.WebGL.template = "PROJECT:CoopOnline";
                 CoopSerializationChecks.Run();
+                CoopOnlineSerializationChecks.Run();
 
                 BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
