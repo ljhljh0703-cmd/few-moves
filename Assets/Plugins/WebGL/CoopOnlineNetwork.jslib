@@ -147,6 +147,7 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  NectorialOnlineResume__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineResume: function () {
     var session = NectorialOnlineBridge.readSession();
     var query = typeof location !== "undefined" ? new URLSearchParams(location.search) : null;
@@ -154,6 +155,7 @@ mergeInto(LibraryManager.library, {
     if (session) NectorialOnlineBridge.startPoll();
   },
 
+  NectorialOnlineCreate__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineCreate: function () {
     NectorialOnlineBridge.stopPoll();
     var requestId = NectorialOnlineBridge.retrySecret("create");
@@ -181,6 +183,7 @@ mergeInto(LibraryManager.library, {
     }, generation);
   },
 
+  NectorialOnlineJoin__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineJoin: function (inviteCodePointer) {
     NectorialOnlineBridge.stopPoll();
     var inviteCode = UTF8ToString(inviteCodePointer);
@@ -214,6 +217,7 @@ mergeInto(LibraryManager.library, {
     }, generation);
   },
 
+  NectorialOnlineCommand__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineCommand: function (jsonPointer) {
     var session = NectorialOnlineBridge.readSession();
     if (!session) {
@@ -232,6 +236,7 @@ mergeInto(LibraryManager.library, {
     }, generation);
   },
 
+  NectorialOnlineLeave__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineLeave: function () {
     NectorialOnlineBridge.left = true;
     NectorialOnlineBridge.stopPoll();

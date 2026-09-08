@@ -73,7 +73,7 @@
       <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden><span id="expression-sender" class="expression-sender" aria-hidden="true"></span><span id="expression-icon" aria-hidden="true"></span><span id="expression-name" class="expression-name"></span></p>
     </header>
     <section class="online-layout" aria-label="Few Moves 온라인 협력">
-      <section class="board-stage" aria-label="온라인 협력 보드"><canvas id="unity-canvas" tabindex="0" aria-label="원과 마름모 온라인 협력 보드"></canvas></section>
+      <section class="board-stage" aria-label="온라인 협력 보드"><canvas id="unity-canvas" tabindex="0" aria-label="사각형과 마름모 온라인 협력 보드"></canvas></section>
       <section class="online-controls" aria-label="온라인 조작">
         <section class="room-panel" aria-label="방 연결">
           <div id="room-form" class="room-form">
@@ -84,15 +84,15 @@
           <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="leave-small" class="room-action" type="button">나가기</button></div>
         </section>
         <div class="status-row">
-          <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">원</strong><span id="circle-goal">진행 중</span></span>
+          <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">사각형</strong><span id="circle-goal">진행 중</span></span>
           <span id="turn-label" class="turn-label">온라인 대기<small>행동 0</small></span>
           <span class="goal-chip"><span class="seat-dot diamond" aria-hidden="true"></span><strong id="diamond-progress">마름모</strong><span id="diamond-goal">진행 중</span></span>
         </div>
         <div class="dpad" aria-label="방향 조작">
-          <button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button>
-          <button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
-          <button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
-          <button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button>
+          <button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="사각형 또는 마름모를 위로 이동"><span aria-hidden="true">▲</span></button>
+          <button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="사각형 또는 마름모를 왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
+          <button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="사각형 또는 마름모를 오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
+          <button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="사각형 또는 마름모를 아래로 이동"><span aria-hidden="true">▼</span></button>
         </div>
         <div class="emoji-row" role="group" aria-label="고정 표현">
           <button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button>
@@ -140,7 +140,7 @@
       function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
       function close(dialog) { if (!dialog || !dialog.open) return; if (dialog.close) dialog.close(); else dialog.removeAttribute("open"); }
       function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("CoopOnlineBootstrap", "HandleOnlineCommand", JSON.stringify(command)); return true; }
-      function activeLabel(state) { return state.activeActorCode === "Diamond" ? "마름모 차례" : "원 차례"; }
+      function activeLabel(state) { return state.activeActorCode === "Diamond" ? "마름모 차례" : "사각형 차례"; }
       function allowed(button) {
         if (!currentState || !currentState.initialized || currentState.transitioning) return false;
         if (currentState.pendingConsent && currentState.pendingConsent.active === true) return false;
@@ -155,7 +155,7 @@
         lastExpressionSequence = state.expressionSequence;
         expressionSender.className = "expression-sender" + (state.expressionSender === "Diamond" ? " diamond" : "");
         expressionIcon.textContent = expressionIcons[state.expression];
-        expressionName.textContent = state.expressionSender === "Diamond" ? "마름모" : "원";
+        expressionName.textContent = state.expressionSender === "Diamond" ? "마름모" : "사각형";
         expressionBubble.hidden = false;
         if (expressionTimer) clearTimeout(expressionTimer);
         expressionTimer = setTimeout(function () { expressionBubble.hidden = true; }, 2500);
@@ -173,7 +173,7 @@
         roomForm.hidden = state.joined; roomInfo.hidden = !state.joined;
         inviteCode.textContent = state.inviteCode || "—";
         roomStatus.textContent = state.availabilityStatus || "대기 중";
-        connectionLabel.textContent = state.seatCode === 1 ? "마름모 좌석 · 온라인" : (state.seatCode === 0 ? "원 좌석 · 온라인" : "온라인 방");
+        connectionLabel.textContent = state.seatCode === 1 ? "마름모 좌석 · 온라인" : (state.seatCode === 0 ? "사각형 좌석 · 온라인" : "온라인 방");
         turnLabel.innerHTML = activeLabel(state) + "<small>행동 " + state.logicalActionCount + "</small>";
         circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
         diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";

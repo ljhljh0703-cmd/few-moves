@@ -12,6 +12,9 @@ const solo = readFileSync(path.join(root, "Assets/Nectorial/Runtime/GameBootstra
 
 assert.match(template, /data-online-action="Slide" data-direction="Up"/);
 assert.doesNotMatch(template, /data-online-action="Pass"|>Pass</);
+assert.doesNotMatch(template, /원과 마름모|원 차례|원 좌석|>원</);
+assert.match(template, /circle-progress">사각형/);
+assert.match(template, /activeLabel\(state\).*사각형 차례/);
 assert.match(template, /data-online-action="Express" data-expression="Look"/);
 assert.match(template, /id="create-button"/);
 assert.match(template, /id="invite-input"/);
@@ -43,6 +46,11 @@ assert.match(bridge, /NectorialOnlineCreate/);
 assert.match(bridge, /NectorialOnlineJoin/);
 assert.match(bridge, /NectorialOnlineCommand/);
 assert.match(bridge, /NectorialOnlineReportState/);
+assert.match(bridge, /NectorialOnlineResume__deps/);
+assert.match(bridge, /NectorialOnlineCreate__deps/);
+assert.match(bridge, /NectorialOnlineJoin__deps/);
+assert.match(bridge, /NectorialOnlineCommand__deps/);
+assert.match(bridge, /NectorialOnlineLeave__deps/);
 assert.match(bridge, /sanitizedCopy/);
 assert.match(bridge, /delete copy\.seatToken/);
 assert.doesNotMatch(bridge, /console\.log\(.*seatToken|console\.log\(.*bearer/);
