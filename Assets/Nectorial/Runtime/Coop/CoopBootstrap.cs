@@ -204,6 +204,7 @@ namespace Nectorial.SlideEscape.Unity.Coop
         private bool TryRestore(CoopSaveEnvelope envelope, out string error)
         {
             error = null;
+            if (!CoopSaveSerializationAdapter.TryNormalizePendingConsent(envelope, out error)) return false;
             CoopSession restored;
             if (!CoopSaveCodec.TryRestore(_room, envelope, out restored, out error)) return false;
             _session = restored;

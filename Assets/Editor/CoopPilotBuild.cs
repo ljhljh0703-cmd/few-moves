@@ -43,6 +43,7 @@ namespace Nectorial.Editor
                 ValidateRequiredAssets();
                 EnsureBootstrapScene();
                 ConfigurePlayer();
+                CoopSerializationChecks.Run();
 
                 BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
