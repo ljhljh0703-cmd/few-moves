@@ -51,6 +51,7 @@ assert.match(bootstrap, /NectorialOnlineCreate/);
 assert.match(bootstrap, /NectorialOnlineJoin/);
 assert.match(bootstrap, /NectorialOnlineCommand/);
 assert.match(bootstrap, /bearer_derived/);
+assert.match(bootstrap, /private static void ConfigureCamera\(\)/);
 assert.match(bootstrap, /using Nectorial\.SlideEscape\.Unity\.Coop;/);
 assert.match(bootstrap, /MatchesBundledRoom/);
 assert.match(bootstrap, /expressionHighWater/);

@@ -425,6 +425,22 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
         }
 
+        private static void ConfigureCamera()
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                var cameraObject = new GameObject("Main Camera");
+                cameraObject.tag = "MainCamera";
+                camera = cameraObject.AddComponent<Camera>();
+            }
+            camera.orthographic = true;
+            camera.orthographicSize = 4.65f;
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color32(0xf0, 0xec, 0xe2, 0xff);
+        }
+
         private string NextCommandId()
         {
             _commandSequence = checked(_commandSequence + 1);
