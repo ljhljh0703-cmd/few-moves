@@ -222,7 +222,8 @@ mergeInto(LibraryManager.library, {
         NectorialOnlineBridge.report({ ok: false, op: "resume", inviteCode: inviteCode || "", seat: -1, error: { code: NectorialOnlineBridge.lastSessionError } });
         return;
       }
-      NectorialOnlineBridge.report({ ok: true, op: "resume", inviteCode: inviteCode || "", seat: session ? session.seat : -1 });
+      var reportedInvite = session && session.inviteCode ? session.inviteCode : (inviteCode || "");
+      NectorialOnlineBridge.report({ ok: true, op: "resume", inviteCode: reportedInvite, seat: session ? session.seat : -1 });
       if (session) NectorialOnlineBridge.startPoll();
     }
   },
@@ -287,9 +288,10 @@ mergeInto(LibraryManager.library, {
       method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
       body: JSON.stringify({ inviteCode: inviteCode, joinRequestId: requestId })
     }, "joined", function (body) {
+      var sessionStored = false;
       if (body.ok && body.room && body.seatToken) {
-        var stored = NectorialOnlineBridge.writeSession({ roomId: body.room.roomId, seat: body.seat, seatToken: body.seatToken, inviteCode: inviteCode });
-        if (stored) {
+        sessionStored = NectorialOnlineBridge.writeSession({ roomId: body.room.roomId, seat: body.seat, seatToken: body.seatToken, inviteCode: inviteCode });
+        if (sessionStored) {
           NectorialOnlineBridge.clearRetry(retryScope);
           NectorialOnlineBridge.startPoll();
         } else {
@@ -298,6 +300,7 @@ mergeInto(LibraryManager.library, {
       }
       var safe = NectorialOnlineBridge.sanitizedCopy(body);
       safe.op = "joined";
+      if (sessionStored) safe.inviteCode = inviteCode;
       NectorialOnlineBridge.report(safe);
     }, generation);
   },

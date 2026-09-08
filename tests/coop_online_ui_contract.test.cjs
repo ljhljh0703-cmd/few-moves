@@ -64,6 +64,7 @@ assert.match(bridge, /NectorialOnlineCommand__deps/);
 assert.match(bridge, /NectorialOnlineLeave__deps/);
 assert.match(bridge, /sanitizedCopy/);
 assert.match(bridge, /delete copy\.seatToken/);
+assert.match(bridge, /session && session\.inviteCode/);
 assert.doesNotMatch(bridge, /delete records\[/);
 assert.doesNotMatch(bridge, /console\.log\(.*seatToken|console\.log\(.*bearer/);
 
@@ -223,7 +224,23 @@ async function runBridgeFixtures() {
     harness.library.NectorialOnlineResume();
     assert.equal(harness.reports.at(-1).op, "resume", "return starts through the resume operation");
     assert.equal(harness.reports.at(-1).seat, 0, "Leave then return restores the same stored seat");
+    assert.equal(harness.reports.at(-1).inviteCode, "INV-1", "stored host invite is projected on a no-query resume");
+    assert.equal(harness.reports.at(-1).seatToken, undefined, "resume report never carries a bearer token");
     assert.equal(harness.requests.length, 1, "resume starts a fresh authoritative poll");
+    bridgeRuntime.stopPoll();
+  }
+
+  {
+    const harness = fixture();
+    const bridgeRuntime = harness.sandbox.NectorialOnlineBridge;
+    harness.library.NectorialOnlineJoin("INV-GUEST");
+    assert.equal(harness.requests.length, 1, "join submits the invite request");
+    harness.requests[0].item.resolve(response({ ok: true, room: { roomId: "room-guest" }, seat: 1, seatToken: "token-private-guest" }));
+    await settle();
+    const joined = harness.reports.find(item => item.op === "joined");
+    assert.equal(joined.inviteCode, "INV-GUEST", "join projects the entered invite when the server response omits it");
+    assert.equal(joined.seatToken, undefined, "join projection never carries a bearer token");
+    assert.match(harness.local.get(bridgeRuntime.storageKey), /INV-GUEST/, "guest invite remains only in private browser storage");
     bridgeRuntime.stopPoll();
   }
 
