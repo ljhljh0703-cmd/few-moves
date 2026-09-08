@@ -18,7 +18,7 @@
     .topbar small { display:block; margin-top:3px; color:var(--muted); font-size:11px; font-weight:600; }
     .icon-button { display:grid; place-items:center; border-radius:12px; }
     .icon-button:enabled:active { background:color-mix(in srgb,var(--charcoal) 9%,transparent); }
-    .online-layout { min-height:0; display:grid; grid-template-rows:minmax(0,1fr) 360px; gap:8px; justify-items:center; }
+    .online-layout { min-height:0; display:grid; grid-template-rows:minmax(150px,1fr) auto; gap:8px; justify-items:center; }
     .board-stage { position:relative; width:100%; min-height:0; display:grid; place-items:center; }
     #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1/1; border:1px solid var(--grid); border-radius:6px; background:var(--floor); box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 16%,transparent); image-rendering:pixelated; }
     .expression-bubble { position:absolute; top:12px; left:56px; right:56px; z-index:3; display:flex; align-items:center; justify-content:center; gap:7px; width:auto; max-width:calc(100% - 112px); height:40px; min-height:40px; padding:6px 11px; border:1px solid var(--grid); border-radius:999px; background:color-mix(in srgb,var(--surface) 95%,var(--grid)); box-shadow:0 4px 12px color-mix(in srgb,var(--charcoal) 14%,transparent); font-size:20px; pointer-events:none; overflow:hidden; white-space:nowrap; }
@@ -27,12 +27,18 @@
     .expression-sender.diamond { border-radius:2px; background:var(--diamond); transform:rotate(45deg); }
     .expression-name { color:var(--muted); font-size:11px; font-weight:800; }
     .online-controls { width:min(100%,360px); min-height:0; display:grid; align-content:start; gap:4px; }
-    .room-panel { min-height:64px; display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center; }
+    .room-panel { min-height:48px; display:block; }
+    .room-form { width:100%; display:flex; align-items:center; gap:6px; }
+    .room-form input { flex:1 1 auto; width:0; }
+    .room-form button { flex:0 0 auto; white-space:nowrap; padding-left:9px; padding-right:9px; }
     .room-panel input { min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:13px; }
     .room-panel button, .room-action { min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; background:#fffdf7; font-size:12px; }
     .room-panel .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
-    .room-info { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:48px; color:var(--muted); font-size:11px; }
+    .room-info { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:48px; color:var(--muted); font-size:11px; }
+    .room-info > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #invite-code { display:inline-block; max-width:12ch; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; }
     .room-info strong { color:var(--ink); font-size:13px; }
+    .invite-link-fallback { width:100%; min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:11px; }
     .room-info[hidden], .room-form[hidden] { display:none; }
     .status-row { min-height:40px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:5px; }
     .goal-chip { display:inline-flex; align-items:center; justify-content:center; gap:5px; color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
@@ -82,7 +88,8 @@
             <button id="join-button" type="button">참여</button>
             <button id="resume-button" type="button">저장된 방</button>
           </div>
-          <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="leave-small" class="room-action" type="button">나가기</button></div>
+          <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="copy-invite-button" class="room-action" type="button">초대 링크 복사</button></div>
+          <input id="invite-link-fallback" class="invite-link-fallback" type="text" readonly hidden aria-label="복사할 초대 링크">
         </section>
         <div class="status-row">
           <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">사각형</strong><span id="circle-goal">진행 중</span></span>
@@ -115,6 +122,7 @@
       var currentState = null;
       var currentConsent = null;
       var stateRevision = 0;
+      var boardStage = document.querySelector(".board-stage");
       var expressionBubble = document.querySelector("#expression-bubble");
       var expressionSender = document.querySelector("#expression-sender");
       var expressionIcon = document.querySelector("#expression-icon");
@@ -130,6 +138,8 @@
       var inviteInput = document.querySelector("#invite-input");
       var inviteCode = document.querySelector("#invite-code");
       var resumeButton = document.querySelector("#resume-button");
+      var copyInviteButton = document.querySelector("#copy-invite-button");
+      var inviteLinkFallback = document.querySelector("#invite-link-fallback");
       var roomStatus = document.querySelector("#room-status");
       var turnLabel = document.querySelector("#turn-label");
       var circleGoal = document.querySelector("#circle-goal");
@@ -153,7 +163,7 @@
         if (action === "Express") return currentState.availabilityCode === 1 && Date.now() >= expressionCooldownUntil;
         return currentState.availabilityCode === 1 && currentState.statusCode === "Playing";
       }
-      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; }
+      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; copyInviteButton.disabled = !currentState || !currentState.joined || !currentState.inviteCode; }
       function renderExpression(state) {
         if (state.expressionSequence <= lastExpressionSequence || !expressionIcons[state.expression]) return;
         lastExpressionSequence = state.expressionSequence;
@@ -178,6 +188,7 @@
         if (!validState(state)) return;
         currentState = state;
         roomForm.hidden = state.joined; roomInfo.hidden = !state.joined;
+        if (!state.joined) inviteLinkFallback.hidden = true;
         if (!state.joined && state.inviteCode) inviteInput.value = state.inviteCode;
         inviteCode.textContent = state.inviteCode || "—";
         roomStatus.textContent = state.availabilityStatus || "대기 중";
@@ -198,12 +209,43 @@
         if (kind === "RequestUndo" || kind === "RequestRestart") command.requestId = "online-" + stateRevision + "-" + kind;
         send(command);
       }
+      function resizeCanvasToStage() {
+        if (!boardStage || !canvas) return;
+        var rect = boardStage.getBoundingClientRect();
+        var side = Math.floor(Math.min(rect.width, rect.height));
+        if (side <= 0) return;
+        canvas.style.width = side + "px";
+        canvas.style.height = side + "px";
+      }
+      if (typeof ResizeObserver === "function") new ResizeObserver(resizeCanvasToStage).observe(boardStage);
+      window.addEventListener("resize", resizeCanvasToStage);
+      resizeCanvasToStage();
       Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.addEventListener("click", function () { action(button); }); });
       document.querySelector("#create-button").addEventListener("click", function () { send({ kind:"Create" }); });
       document.querySelector("#join-button").addEventListener("click", function () { send({ kind:"Join", inviteCode: inviteInput.value.trim() }); });
       resumeButton.addEventListener("click", function () { send({ kind:"Resume", inviteCode: inviteInput.value.trim() }); });
       document.querySelector("#leave-button").addEventListener("click", function () { send({ kind:"Leave" }); });
-      document.querySelector("#leave-small").addEventListener("click", function () { send({ kind:"Leave" }); });
+      function inviteLink() {
+        if (!currentState || !currentState.inviteCode || typeof location === "undefined") return "";
+        return location.origin + location.pathname + "?invite=" + encodeURIComponent(currentState.inviteCode);
+      }
+      function showInviteLinkFallback(link) {
+        inviteLinkFallback.hidden = false;
+        inviteLinkFallback.value = link;
+        inviteLinkFallback.focus();
+        inviteLinkFallback.select();
+        feedback.textContent = "링크를 선택했습니다. 복사해 친구에게 보내세요.";
+      }
+      copyInviteButton.addEventListener("click", function () {
+        var link = inviteLink();
+        if (!link) return;
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(link).then(function () {
+            inviteLinkFallback.hidden = true;
+            feedback.textContent = "초대 링크를 복사했습니다.";
+          }).catch(function () { showInviteLinkFallback(link); });
+        } else showInviteLinkFallback(link);
+      });
       function canResolveConsent() { return currentState && currentConsent && currentConsent.requesterCode !== currentState.seatCode; }
       consentApprove.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:true, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
       consentReject.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:false, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
