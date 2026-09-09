@@ -55,9 +55,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private bool _hasShared;
         private RecordSummaryObservation _mine;
         private RecordSummaryObservation _shared;
+        private string _mineCapsule = string.Empty;
         private string _recordCapsule = string.Empty;
         private string _recordStatus = "idle";
         private string _recordError = string.Empty;
+        private string _lastAutoRecordFingerprint = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -100,6 +102,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
                 _room = initial;
                 _activeDefinitionId = _selectedDefinitionId;
+                LoadBestRecord();
 
                 _board = new CoopBoardView(atlas);
                 _initialized = true;
@@ -284,6 +287,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _room = definition;
             _activeDefinitionId = definitionId;
             _roomReady = MatchesBundledRoom(room, definition);
+            LoadBestRecord();
         }
 
         private bool LoadBundledDefinitions()
@@ -409,6 +413,15 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _serverState = converted;
             if (_board != null && _roomReady) _board.Render(_room, _serverState);
             ApplyExpressions(expressions);
+            if (_serverState.Status == CoopRunStatus.Cleared)
+            {
+                string fingerprint = CoopRules.StateFingerprint(_room, _serverState);
+                if (!string.Equals(_lastAutoRecordFingerprint, fingerprint, StringComparison.Ordinal))
+                {
+                    _lastAutoRecordFingerprint = fingerprint;
+                    RequestRecord(false);
+                }
+            }
             return true;
         }
 
@@ -552,18 +565,23 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private void GetRecord()
         {
+            RequestRecord(true);
+        }
+
+        private void RequestRecord(bool userRequested)
+        {
             if (!_joined || !_roomReady || _serverState == null || _serverState.Status != CoopRunStatus.Cleared)
             {
-                SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
+                if (userRequested) SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
                 return;
             }
             _recordStatus = "loading";
             _recordError = string.Empty;
-            _message = "완주 기록을 확인하는 중입니다";
+            if (userRequested) _message = "완주 기록을 확인하는 중입니다";
 #if UNITY_WEBGL && !UNITY_EDITOR
             NectorialOnlineGetRecord();
 #endif
-            PublishState();
+            if (userRequested) PublishState();
         }
 
         private void ApplyRecordResult(OnlineResult result)
@@ -583,11 +601,10 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 SetRecordFailure(string.IsNullOrEmpty(error) ? "record_active_definition_mismatch" : error, "완주 기록이 현재 판과 맞지 않습니다");
                 return;
             }
-            _mine = summary;
-            _hasMine = true;
             _recordCapsule = result.capsule;
+            ConsiderBestRecord(result.capsule, summary);
             _recordStatus = "ready";
-            _recordError = string.Empty;
+            if (string.IsNullOrEmpty(_recordError)) _recordError = string.Empty;
             _message = "완주 기록을 준비했습니다";
         }
 
@@ -648,6 +665,53 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             return true;
         }
 
+        private void LoadBestRecord()
+        {
+            _hasMine = false;
+            _mine = null;
+            _mineCapsule = string.Empty;
+            if (_room == null) return;
+            RecordCapsule identity = CurrentRecordIdentity(_room);
+            string encoded;
+            if (!LocalRecordBestStore.TryRead(identity, out encoded)) return;
+            RecordSummaryObservation summary;
+            string error;
+            if (!TryValidateCoopRecord(encoded, out summary, out error)) return;
+            if (!string.Equals(summary.definitionId, _activeDefinitionId, StringComparison.Ordinal)) return;
+            _mine = summary;
+            _mineCapsule = encoded;
+            _hasMine = true;
+        }
+
+        private void ConsiderBestRecord(string encoded, RecordSummaryObservation candidate)
+        {
+            if (_room == null || !RecordObservationGuard.IsUsable(true, candidate)) return;
+            if (_hasMine && !LocalRecordBestStore.IsBetter(candidate, _mine)) return;
+            RecordCapsule identity = CurrentRecordIdentity(_room);
+            if (!LocalRecordBestStore.TryWrite(identity, encoded))
+            {
+                _recordError = "record_best_write_failed";
+                return;
+            }
+            _mine = candidate;
+            _mineCapsule = encoded;
+            _hasMine = true;
+        }
+
+        private static RecordCapsule CurrentRecordIdentity(CoopRoomDefinition room)
+        {
+            return new RecordCapsule
+            {
+                SchemaVersion = RecordCapsuleRules.SchemaVersion,
+                ModeId = RecordCapsuleRules.CoopModeId,
+                DefinitionId = room.Id,
+                RulesVersion = room.RulesVersion,
+                ContentVersion = room.ContentVersion,
+                DefinitionFingerprint = CoopRules.RoomFingerprint(room),
+                InputSequence = string.Empty
+            };
+        }
+
         private void SetRecordFailure(string code, string message)
         {
             _recordStatus = code == "record_not_cleared" ? "unavailable" : "invalid";
@@ -680,6 +744,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _selectedDefinitionId = definitionId;
             _room = definition;
             _activeDefinitionId = definitionId;
+            LoadBestRecord();
             return true;
         }
 
@@ -754,6 +819,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _diamondConnected = false;
             _transportLocked = true;
             _transitioning = false;
+            _lastAutoRecordFingerprint = string.Empty;
             if (!resetExpressions) return;
             _expressionHighWater = 0;
             _expressionHydrated = false;

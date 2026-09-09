@@ -35,6 +35,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private bool _hasShared;
         private RecordSummaryObservation _mine;
         private RecordSummaryObservation _shared;
+        private string _mineCapsule = string.Empty;
         private string _recordCapsule = string.Empty;
         private string _sharedCapsule = string.Empty;
         private string _recordStatus = "idle";
@@ -222,6 +223,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (_board != null) _board.CompleteAction(_arena, _session.State);
             _message = Describe(completed);
             SaveCurrent();
+            if (_session.State.Status == RaidRunStatus.Cleared) CaptureCurrentRecord(false);
             PublishState();
         }
 
@@ -281,6 +283,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _board = new RaidBoardView();
                 _initialized = true;
                 RestoreIfPresent();
+                LoadBestRecord();
                 if (_board != null) _board.Render(_arena, _session.State);
                 if (!_restoreBlocked && string.IsNullOrEmpty(_message)) _message = "레이드를 시작하세요";
                 PublishState();
@@ -345,19 +348,56 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private void GetRecord()
         {
+            CaptureCurrentRecord(true);
+        }
+
+        private bool CaptureCurrentRecord(bool userRequested)
+        {
             if (!_initialized || _arena == null || _session == null || _session.State.Status != RaidRunStatus.Cleared)
             {
-                SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
-                return;
+                if (userRequested) SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
+                return false;
             }
             string inputSequence;
             string error;
             if (!TryRecordInputSequence(_session.ExportReplay().Moves, out inputSequence, out error))
             {
-                SetRecordFailure(error, "기록 입력을 확인하지 못했습니다");
-                return;
+                if (userRequested) SetRecordFailure(error, "기록 입력을 확인하지 못했습니다");
+                else _recordError = error;
+                return false;
             }
-            var capsule = new RecordCapsule
+            RecordCapsule capsule = CurrentRecordIdentity();
+            capsule.InputSequence = inputSequence;
+            RecordVerification verification;
+            string encoded;
+            if (!RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification) || !RecordCapsuleCodec.TryEncode(capsule, out encoded, out error))
+            {
+                if (userRequested) SetRecordFailure(string.IsNullOrEmpty(error) ? verification.ErrorCode : error, "기록을 검증하지 못했습니다");
+                else _recordError = string.IsNullOrEmpty(error) ? verification.ErrorCode : error;
+                return false;
+            }
+            RecordSummaryObservation summary = RecordSummaryObservation.From(verification);
+            if (!RecordObservationGuard.IsUsable(true, summary))
+            {
+                if (userRequested) SetRecordFailure("record_summary_invalid", "기록 요약을 확인하지 못했습니다");
+                else _recordError = "record_summary_invalid";
+                return false;
+            }
+            _recordCapsule = encoded;
+            ConsiderBest(capsule, encoded, summary);
+            _recordStatus = "ready";
+            if (string.IsNullOrEmpty(_recordError)) _recordError = string.Empty;
+            if (userRequested)
+            {
+                _message = "완주 기록을 준비했습니다";
+                PublishState();
+            }
+            return true;
+        }
+
+        private RecordCapsule CurrentRecordIdentity()
+        {
+            return new RecordCapsule
             {
                 SchemaVersion = RecordCapsuleRules.SchemaVersion,
                 ModeId = RecordCapsuleRules.RaidModeId,
@@ -365,26 +405,37 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 RulesVersion = _arena.RulesVersion,
                 ContentVersion = _arena.ContentVersion,
                 DefinitionFingerprint = RaidRules.ArenaFingerprint(_arena),
-                InputSequence = inputSequence
+                InputSequence = string.Empty
             };
+        }
+
+        private void LoadBestRecord()
+        {
+            if (_arena == null) return;
+            string encoded;
+            if (!LocalRecordBestStore.TryRead(CurrentRecordIdentity(), out encoded)) return;
+            RecordCapsule capsule;
+            string error;
             RecordVerification verification;
-            if (!RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification) || !RecordCapsuleCodec.TryEncode(capsule, out _recordCapsule, out error))
-            {
-                SetRecordFailure(string.IsNullOrEmpty(error) ? verification.ErrorCode : error, "기록을 검증하지 못했습니다");
-                return;
-            }
+            if (!RecordCapsuleCodec.TryDecode(encoded, out capsule, out error) || !RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification)) return;
             RecordSummaryObservation summary = RecordSummaryObservation.From(verification);
-            if (!RecordObservationGuard.IsUsable(true, summary))
+            if (!RecordObservationGuard.IsUsable(true, summary)) return;
+            _mine = summary;
+            _mineCapsule = encoded;
+            _hasMine = true;
+        }
+
+        private void ConsiderBest(RecordCapsule identity, string encoded, RecordSummaryObservation candidate)
+        {
+            if (_hasMine && !LocalRecordBestStore.IsBetter(candidate, _mine)) return;
+            if (!LocalRecordBestStore.TryWrite(identity, encoded))
             {
-                SetRecordFailure("record_summary_invalid", "기록 요약을 확인하지 못했습니다");
+                _recordError = "record_best_write_failed";
                 return;
             }
-            _mine = summary;
+            _mine = candidate;
+            _mineCapsule = encoded;
             _hasMine = true;
-            _recordStatus = "ready";
-            _recordError = string.Empty;
-            _message = "완주 기록을 준비했습니다";
-            PublishState();
         }
 
         private void LoadSharedRecord(string encoded)

@@ -210,7 +210,10 @@ namespace Nectorial.Editor
         {
             PreferenceSnapshot priorSave = CapturePreference(SaveKey);
             PreferenceSnapshot priorFailedSave = CapturePreference(FailedSaveKey);
+            string bestKey = "nectorial.record.best.v1.raid-v1." + arena.Id + "." + RaidRules.ArenaFingerprint(arena);
+            PreferenceSnapshot priorBest = CapturePreference(bestKey);
             GameObject host = null;
+            GameObject reloadedHost = null;
             try
             {
                 PlayerPrefs.DeleteKey(SaveKey);
@@ -231,19 +234,28 @@ namespace Nectorial.Editor
                 if (!ReadPrivate<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Raid runtime did not create mine record.");
                 string capsule = ReadPrivateString(bootstrap, "_recordCapsule");
                 if (string.IsNullOrEmpty(capsule)) throw new InvalidOperationException("Raid runtime did not encode record capsule.");
+                string bestBeforeShared = ReadPrivateString(bootstrap, "_mineCapsule");
                 bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\"}");
                 if (!ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime did not validate shared record.");
+                if (ReadPrivateString(bootstrap, "_mineCapsule") != bestBeforeShared) throw new InvalidOperationException("Raid shared import changed the local best record.");
                 bootstrap.HandleCommand("{\"kind\":\"Challenge\"}");
                 if (!string.Equals(beforeChallenge, RaidRules.StateFingerprint(arena, bootstrap.State), StringComparison.Ordinal)) throw new InvalidOperationException("Raid challenge mutated the active save state.");
                 bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"fm1.invalid\"}");
                 if (ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime retained invalid shared record as valid.");
+                UnityEngine.Object.DestroyImmediate(host);
+                host = null;
+                RaidBootstrap reloaded = CreateBootstrap("Raid record reload probe", out reloadedHost);
+                if (!ReadPrivate<bool>(reloaded, "_hasMine") || ReadPrivateString(reloaded, "_mineCapsule") != bestBeforeShared)
+                    throw new InvalidOperationException("Raid runtime did not revalidate the local best record after reload.");
                 Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge state=pass");
             }
             finally
             {
                 if (host != null) UnityEngine.Object.DestroyImmediate(host);
+                if (reloadedHost != null) UnityEngine.Object.DestroyImmediate(reloadedHost);
                 RestorePreference(SaveKey, priorSave);
                 RestorePreference(FailedSaveKey, priorFailedSave);
+                RestorePreference(bestKey, priorBest);
             }
         }
 

@@ -106,8 +106,13 @@ namespace Nectorial.Editor
         private static void CheckRecordResultDoesNotReplaceActiveRoom(CoopRoomDefinition room)
         {
             GameObject probe = null;
+            GameObject reloadProbe = null;
+            string bestKey = "nectorial.record.best.v1.coop-v1." + room.Id + "." + CoopRules.RoomFingerprint(room);
+            PreferenceSnapshot priorBest = CapturePreference(bestKey);
             try
             {
+                PlayerPrefs.DeleteKey(bestKey);
+                PlayerPrefs.Save();
                 probe = new GameObject("CoopOnlineRecordProbe");
                 CoopOnlineBootstrap bootstrap = probe.AddComponent<CoopOnlineBootstrap>();
                 SetField(bootstrap, "_room", CoopRules.CloneRoom(room));
@@ -136,16 +141,32 @@ namespace Nectorial.Editor
                 if (!RecordCapsuleCodec.TryEncode(capsule, out encoded, out encodeError)) throw new InvalidOperationException("Coop record probe capsule failed: " + encodeError);
                 bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"record\",\"capsule\":\"" + encoded + "\"}");
                 if (!ReadField<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Coop runtime did not accept its verified mine record.");
+                string bestBeforeShared = ReadField<string>(bootstrap, "_mineCapsule");
                 bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\"}");
                 if (!ReadField<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Coop runtime did not accept its verified shared record.");
+                if (ReadField<string>(bootstrap, "_mineCapsule") != bestBeforeShared) throw new InvalidOperationException("Coop shared import changed local best record.");
                 bootstrap.HandleOnlineCommand("{\"kind\":\"Challenge\"}");
                 if (ReadField<string>(bootstrap, "_activeDefinitionId") != room.Id || ReadField<string>(bootstrap, "_selectedDefinitionId") != room.Id || ReadField<string>(bootstrap, "_recordError") != "challenge_requires_new_room")
                     throw new InvalidOperationException("Coop shared record changed an active room or skipped the explicit new-room gate.");
+                UnityEngine.Object.DestroyImmediate(probe);
+                probe = null;
+                reloadProbe = new GameObject("CoopOnlineRecordReloadProbe");
+                CoopOnlineBootstrap reloaded = reloadProbe.AddComponent<CoopOnlineBootstrap>();
+                if (!ReadField<bool>(reloaded, "_initialized"))
+                {
+                    MethodInfo awake = typeof(CoopOnlineBootstrap).GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (awake == null) throw new InvalidOperationException("Coop online bootstrap Awake was unavailable.");
+                    awake.Invoke(reloaded, null);
+                }
+                if (!ReadField<bool>(reloaded, "_hasMine") || ReadField<string>(reloaded, "_mineCapsule") != bestBeforeShared)
+                    throw new InvalidOperationException("Coop runtime did not revalidate local best record after reload.");
                 Debug.Log("COOP_ONLINE_JSON_PROBE case=record-mine-shared-active-room-preserved state=pass");
             }
             finally
             {
                 if (probe != null) UnityEngine.Object.DestroyImmediate(probe);
+                if (reloadProbe != null) UnityEngine.Object.DestroyImmediate(reloadProbe);
+                RestorePreference(bestKey, priorBest);
             }
         }
 
@@ -163,6 +184,18 @@ namespace Nectorial.Editor
             field.SetValue(bootstrap, value);
         }
 
+        private static PreferenceSnapshot CapturePreference(string key)
+        {
+            return new PreferenceSnapshot { Exists = PlayerPrefs.HasKey(key), Value = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null };
+        }
+
+        private static void RestorePreference(string key, PreferenceSnapshot snapshot)
+        {
+            if (snapshot.Exists) PlayerPrefs.SetString(key, snapshot.Value);
+            else PlayerPrefs.DeleteKey(key);
+            PlayerPrefs.Save();
+        }
+
         private static string OnlineResultJson(CoopRoomDefinition room, string onlineRoomId, long revision, int actions)
         {
             return "{\"ok\":true,\"op\":\"state\",\"seat\":0,\"room\":{\"roomId\":\"" + onlineRoomId + "\",\"rulesVersion\":\"" + room.RulesVersion + "\",\"contentVersion\":\"" + room.ContentVersion + "\",\"roomFingerprint\":\"" + CoopRules.RoomFingerprint(room) + "\"},\"state\":" + StateJson(room, "null", revision, actions) + ",\"availability\":{\"status\":1,\"circleConnected\":true,\"diamondConnected\":true},\"expressions\":{\"expressionSequence\":0,\"events\":[]}}";
@@ -172,5 +205,7 @@ namespace Nectorial.Editor
         {
             return "{\"roomId\":\"" + room.Id + "\",\"circlePosition\":{\"x\":" + room.CircleStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.CircleStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"diamondPosition\":{\"x\":" + room.DiamondStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.DiamondStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"activeActor\":0,\"authorityRevision\":" + revision.ToString(CultureInfo.InvariantCulture) + ",\"logicalActionCount\":" + actions.ToString(CultureInfo.InvariantCulture) + ",\"status\":0,\"pendingConsent\":" + pending + "}";
         }
+
+        private sealed class PreferenceSnapshot { public bool Exists; public string Value; }
     }
 }
