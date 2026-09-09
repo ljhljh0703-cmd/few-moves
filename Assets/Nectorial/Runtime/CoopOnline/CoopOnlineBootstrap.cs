@@ -17,6 +17,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private const string DefaultDefinitionId = "coop-c1";
         private const string AtlasResource = "Visuals/turn-escape-tiles";
         private const float PollExpressionCooldownSeconds = 2f;
+        private const int SharedRecordRequestIdMaximumLength = 96;
         private static readonly string[] DefinitionIds = { "coop-c1", "coop-c2", "coop-c3" };
 
         private CoopRoomDefinition _room;
@@ -57,8 +58,12 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private RecordSummaryObservation _shared;
         private string _mineCapsule = string.Empty;
         private string _recordCapsule = string.Empty;
+        private string _sharedRecordRequestId = string.Empty;
         private string _recordStatus = "idle";
         private string _recordError = string.Empty;
+#if UNITY_EDITOR
+        private string _lastObservationJsonForCheck = string.Empty;
+#endif
         private string _lastAutoRecordFingerprint = string.Empty;
         private string _pendingAutoRecordFingerprint = string.Empty;
         private int _recordRequestSequence;
@@ -167,7 +172,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                     GetRecord();
                     return;
                 case "LoadSharedRecord":
-                    LoadSharedRecord(input.capsule);
+                    LoadSharedRecord(input.capsule, input.requestId);
                     return;
                 case "Challenge":
                     ChallengeSharedRecord();
@@ -724,8 +729,9 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
         }
 
-        private void LoadSharedRecord(string encoded)
+        private void LoadSharedRecord(string encoded, string requestId)
         {
+            _sharedRecordRequestId = NormalizeSharedRecordRequestId(requestId);
             _hasShared = false;
             _shared = null;
             RecordSummaryObservation summary;
@@ -741,6 +747,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _recordError = string.Empty;
             _message = "공유 기록을 확인했습니다";
             PublishState();
+        }
+
+        private static string NormalizeSharedRecordRequestId(string requestId)
+        {
+            return string.IsNullOrEmpty(requestId) || requestId.Length > SharedRecordRequestIdMaximumLength ? string.Empty : requestId;
         }
 
         private void ChallengeSharedRecord()
@@ -1000,8 +1011,13 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 mine = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mine : null,
                 hasShared = _hasShared && RecordObservationGuard.IsUsable(true, _shared),
                 shared = _hasShared && RecordObservationGuard.IsUsable(true, _shared) ? _shared : null,
+                sharedRecordRequestId = _sharedRecordRequestId,
                 recordError = _recordError
             };
+            string observationJson = JsonUtility.ToJson(observation);
+#if UNITY_EDITOR
+            _lastObservationJsonForCheck = observationJson;
+#endif
             var safeLog = new OnlineSafeLog
             {
                 initialized = observation.initialized,
@@ -1020,7 +1036,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             };
             Debug.Log("COOP_ONLINE_STATE_OBSERVATION " + JsonUtility.ToJson(safeLog));
 #if UNITY_WEBGL && !UNITY_EDITOR
-            NectorialOnlineReportState(JsonUtility.ToJson(observation));
+            NectorialOnlineReportState(observationJson);
 #endif
         }
 
@@ -1149,7 +1165,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         [Serializable] private sealed class OnlineError { public string code; }
         [Serializable] private sealed class OnlineObservation
         {
-            public bool initialized; public bool online; public bool joined; public string roomId; public string inviteCode; public int seatCode; public int availabilityCode; public string availabilityStatus; public bool circleConnected; public bool diamondConnected; public bool inputEnabled; public string activeActorCode; public long authorityRevision; public int logicalActionCount; public string statusCode; public string message; public string error; public bool transitioning; public bool circleAtGoal; public bool diamondAtGoal; public PendingConsentObservation pendingConsent; public long expressionSequence; public string expressionSender; public string expression; public bool localHotseat; public string seatAuthority; public bool roomMismatch; public bool transportLocked; public OnlineDefinitionView[] definitions; public string activeDefinitionId; public string selectedDefinitionId; public string recordStatus; public string recordCapsule; public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string recordError;
+            public bool initialized; public bool online; public bool joined; public string roomId; public string inviteCode; public int seatCode; public int availabilityCode; public string availabilityStatus; public bool circleConnected; public bool diamondConnected; public bool inputEnabled; public string activeActorCode; public long authorityRevision; public int logicalActionCount; public string statusCode; public string message; public string error; public bool transitioning; public bool circleAtGoal; public bool diamondAtGoal; public PendingConsentObservation pendingConsent; public long expressionSequence; public string expressionSender; public string expression; public bool localHotseat; public string seatAuthority; public bool roomMismatch; public bool transportLocked; public OnlineDefinitionView[] definitions; public string activeDefinitionId; public string selectedDefinitionId; public string recordStatus; public string recordCapsule; public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string sharedRecordRequestId; public string recordError;
         }
         [Serializable] private sealed class OnlineSafeLog
         {

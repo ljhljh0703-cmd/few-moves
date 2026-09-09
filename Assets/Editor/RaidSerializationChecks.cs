@@ -296,11 +296,23 @@ namespace Nectorial.Editor
                 string capsule = ReadPrivateString(bootstrap, "_recordCapsule");
                 if (string.IsNullOrEmpty(capsule)) throw new InvalidOperationException("Raid runtime did not encode record capsule.");
                 string bestBeforeShared = ReadPrivateString(bootstrap, "_mineCapsule");
-                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\"}");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\",\"requestId\":\"shared-a\"}");
                 if (!ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime did not validate shared record.");
                 if (ReadPrivateString(bootstrap, "_mineCapsule") != bestBeforeShared) throw new InvalidOperationException("Raid shared import changed the local best record.");
+                string delayedAObservation = ReadPrivateString(bootstrap, "_lastObservationJsonForCheck");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\",\"requestId\":\"shared-b\"}");
+                AssertSharedRecordRequestId(delayedAObservation, "shared-a", "Raid delayed A observation lost its request id.");
+                AssertSharedRecordRequestId(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Raid B success observation did not carry B request id.");
                 bootstrap.HandleCommand("{\"kind\":\"Challenge\"}");
                 if (!string.Equals(beforeChallenge, RaidRules.StateFingerprint(arena, bootstrap.State), StringComparison.Ordinal)) throw new InvalidOperationException("Raid challenge mutated the active save state.");
+                AssertSharedRecordRequestId(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Raid subsequent observation did not preserve B request id.");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"fm1.invalid\",\"requestId\":\"shared-b\"}");
+                AssertSharedRecordRequestId(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Raid B failure observation did not carry B request id.");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\"}");
+                if (!ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid legacy shared record input no longer validates.");
+                AssertSharedRecordRequestId(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"), string.Empty, "Raid legacy shared record input did not expose an empty request id.");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\",\"requestId\":\"" + new string('x', 97) + "\"}");
+                AssertSharedRecordRequestId(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"), string.Empty, "Raid oversized shared record request id was not bounded.");
                 bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"fm1.invalid\"}");
                 if (ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime retained invalid shared record as valid.");
                 UnityEngine.Object.DestroyImmediate(host);
@@ -308,7 +320,7 @@ namespace Nectorial.Editor
                 RaidBootstrap reloaded = CreateBootstrap("Raid record reload probe", out reloadedHost);
                 if (!ReadPrivate<bool>(reloaded, "_hasMine") || ReadPrivateString(reloaded, "_mineCapsule") != bestBeforeShared)
                     throw new InvalidOperationException("Raid runtime did not revalidate the local best record after reload.");
-                Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge state=pass");
+                Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge-and-request-correlation state=pass");
             }
             finally
             {
@@ -328,6 +340,12 @@ namespace Nectorial.Editor
         private static string ReadPrivateString(object target, string fieldName)
         {
             return ReadPrivate<string>(target, fieldName);
+        }
+
+        private static void AssertSharedRecordRequestId(string json, string expected, string failure)
+        {
+            SharedRecordRequestObservation observation = JsonUtility.FromJson<SharedRecordRequestObservation>(json);
+            if (observation == null || !string.Equals(observation.sharedRecordRequestId, expected, StringComparison.Ordinal)) throw new InvalidOperationException(failure);
         }
 
         private static T ReadPrivate<T>(object target, string fieldName)
@@ -355,6 +373,9 @@ namespace Nectorial.Editor
             else PlayerPrefs.DeleteKey(key);
             PlayerPrefs.Save();
         }
+
+        [Serializable]
+        private sealed class SharedRecordRequestObservation { public string sharedRecordRequestId; }
 
         private sealed class PreferenceSnapshot { public bool Exists; public string Value; }
     }

@@ -278,12 +278,24 @@ namespace Nectorial.Editor
                 bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"record\",\"recordRequestId\":\"record-probe-1\",\"capsule\":\"" + encoded + "\"}");
                 if (!ReadField<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Coop runtime did not accept its verified mine record.");
                 string bestBeforeShared = ReadField<string>(bootstrap, "_mineCapsule");
-                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\"}");
+                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\",\"requestId\":\"shared-a\"}");
                 if (!ReadField<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Coop runtime did not accept its verified shared record.");
                 if (ReadField<string>(bootstrap, "_mineCapsule") != bestBeforeShared) throw new InvalidOperationException("Coop shared import changed local best record.");
+                string delayedAObservation = ReadField<string>(bootstrap, "_lastObservationJsonForCheck");
+                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\",\"requestId\":\"shared-b\"}");
+                AssertSharedRecordRequestId(delayedAObservation, "shared-a", "Coop delayed A observation lost its request id.");
+                AssertSharedRecordRequestId(ReadField<string>(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Coop B success observation did not carry B request id.");
                 bootstrap.HandleOnlineCommand("{\"kind\":\"Challenge\"}");
                 if (ReadField<string>(bootstrap, "_activeDefinitionId") != room.Id || ReadField<string>(bootstrap, "_selectedDefinitionId") != room.Id || ReadField<string>(bootstrap, "_recordError") != "challenge_requires_new_room")
                     throw new InvalidOperationException("Coop shared record changed an active room or skipped the explicit new-room gate.");
+                AssertSharedRecordRequestId(ReadField<string>(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Coop subsequent observation did not preserve B request id.");
+                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"fm1.invalid\",\"requestId\":\"shared-b\"}");
+                AssertSharedRecordRequestId(ReadField<string>(bootstrap, "_lastObservationJsonForCheck"), "shared-b", "Coop B failure observation did not carry B request id.");
+                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\"}");
+                if (!ReadField<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Coop legacy shared record input no longer validates.");
+                AssertSharedRecordRequestId(ReadField<string>(bootstrap, "_lastObservationJsonForCheck"), string.Empty, "Coop legacy shared record input did not expose an empty request id.");
+                bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\",\"requestId\":\"" + new string('x', 97) + "\"}");
+                AssertSharedRecordRequestId(ReadField<string>(bootstrap, "_lastObservationJsonForCheck"), string.Empty, "Coop oversized shared record request id was not bounded.");
                 UnityEngine.Object.DestroyImmediate(probe);
                 probe = null;
                 reloadProbe = new GameObject("CoopOnlineRecordReloadProbe");
@@ -296,7 +308,7 @@ namespace Nectorial.Editor
                 }
                 if (!ReadField<bool>(reloaded, "_hasMine") || ReadField<string>(reloaded, "_mineCapsule") != bestBeforeShared)
                     throw new InvalidOperationException("Coop runtime did not revalidate local best record after reload.");
-                Debug.Log("COOP_ONLINE_JSON_PROBE case=record-mine-shared-active-room-preserved state=pass");
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=record-mine-shared-request-correlation-active-room-preserved state=pass");
             }
             finally
             {
@@ -332,6 +344,12 @@ namespace Nectorial.Editor
             PlayerPrefs.Save();
         }
 
+        private static void AssertSharedRecordRequestId(string json, string expected, string failure)
+        {
+            SharedRecordRequestObservation observation = JsonUtility.FromJson<SharedRecordRequestObservation>(json);
+            if (observation == null || !string.Equals(observation.sharedRecordRequestId, expected, StringComparison.Ordinal)) throw new InvalidOperationException(failure);
+        }
+
         private static string OnlineResultJson(CoopRoomDefinition room, string onlineRoomId, long revision, int actions)
         {
             return AuthenticatedResultJson(room, onlineRoomId, StateJson(room, "null", revision, actions));
@@ -361,6 +379,9 @@ namespace Nectorial.Editor
         {
             return "{\"roomId\":\"" + room.Id + "\",\"circlePosition\":{\"x\":" + room.CircleStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.CircleStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"diamondPosition\":{\"x\":" + room.DiamondStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.DiamondStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"activeActor\":0,\"authorityRevision\":" + revision.ToString(CultureInfo.InvariantCulture) + ",\"logicalActionCount\":" + actions.ToString(CultureInfo.InvariantCulture) + ",\"status\":0,\"pendingConsent\":" + pending + "}";
         }
+
+        [Serializable]
+        private sealed class SharedRecordRequestObservation { public string sharedRecordRequestId; }
 
         private sealed class PreferenceSnapshot { public bool Exists; public string Value; }
     }

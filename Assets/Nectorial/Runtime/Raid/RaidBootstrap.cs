@@ -15,6 +15,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private const string ArenaResource = RaidContent.DefaultArenaResource;
         private const string SaveKey = "nectorial-raid.save.v1";
         private const string FailedSaveKey = "nectorial-raid.save.v1.restore-failed";
+        private const int SharedRecordRequestIdMaximumLength = 96;
 
         private RaidArenaDefinition _arena;
         private RaidSession _session;
@@ -38,8 +39,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private string _mineCapsule = string.Empty;
         private string _recordCapsule = string.Empty;
         private string _sharedCapsule = string.Empty;
+        private string _sharedRecordRequestId = string.Empty;
         private string _recordStatus = "idle";
         private string _recordError = string.Empty;
+#if UNITY_EDITOR
+        private string _lastObservationJsonForCheck = string.Empty;
+#endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -145,7 +150,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             }
             if (string.Equals(input.kind, "LoadSharedRecord", StringComparison.Ordinal))
             {
-                LoadSharedRecord(input.capsule);
+                LoadSharedRecord(input.capsule, input.requestId);
                 return;
             }
             if (string.Equals(input.kind, "Challenge", StringComparison.Ordinal))
@@ -438,8 +443,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _hasMine = true;
         }
 
-        private void LoadSharedRecord(string encoded)
+        private void LoadSharedRecord(string encoded, string requestId)
         {
+            _sharedRecordRequestId = NormalizeSharedRecordRequestId(requestId);
             _hasShared = false;
             _shared = null;
             _sharedCapsule = string.Empty;
@@ -469,6 +475,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _recordError = string.Empty;
             _message = "공유 기록을 확인했습니다";
             PublishState();
+        }
+
+        private static string NormalizeSharedRecordRequestId(string requestId)
+        {
+            return string.IsNullOrEmpty(requestId) || requestId.Length > SharedRecordRequestIdMaximumLength ? string.Empty : requestId;
         }
 
         private void ChallengeSharedRecord()
@@ -597,15 +608,20 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 mine = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mine : null,
                 hasShared = _hasShared && RecordObservationGuard.IsUsable(true, _shared),
                 shared = _hasShared && RecordObservationGuard.IsUsable(true, _shared) ? _shared : null,
+                sharedRecordRequestId = _sharedRecordRequestId,
                 recordError = _recordError,
                 message = _message,
                 saveStatus = _saveStatus,
                 saveError = _saveError,
                 stateFingerprint = state == null || _arena == null ? string.Empty : RaidRules.StateFingerprint(_arena, state)
             };
-            Debug.Log("RAID_STATE_OBSERVATION " + JsonUtility.ToJson(observation));
+            string observationJson = JsonUtility.ToJson(observation);
+#if UNITY_EDITOR
+            _lastObservationJsonForCheck = observationJson;
+#endif
+            Debug.Log("RAID_STATE_OBSERVATION " + observationJson);
 #if UNITY_WEBGL && !UNITY_EDITOR
-            NectorialRaidReportState(JsonUtility.ToJson(observation));
+            NectorialRaidReportState(observationJson);
 #endif
         }
 
@@ -683,7 +699,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
 #endif
 
         [Serializable]
-        private sealed class RaidInput { public string kind; public string direction; public string capsule; }
+        private sealed class RaidInput { public string kind; public string direction; public string capsule; public string requestId; }
         [Serializable]
         private sealed class RaidObservation
         {
@@ -691,7 +707,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             public int actions; public int hits; public int shieldCharges; public int magnetStepsRemaining; public int slowStepsRemaining;
             public int tailCount; public int tailTarget; public int playerX; public int playerY; public int snakeHeadIndex;
             public string activeDefinitionId; public string selectedDefinitionId; public string recordStatus; public string recordCapsule;
-            public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string recordError;
+            public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string sharedRecordRequestId; public string recordError;
             public string message; public string saveStatus; public string saveError; public string stateFingerprint;
         }
     }
