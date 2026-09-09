@@ -12,7 +12,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
     public sealed class RaidBootstrap : MonoBehaviour
     {
         private const string ProductName = "Few Moves Raid Pilot";
-        private const string ArenaResource = "RaidArenas/raid-01";
+        private const string ArenaResource = RaidContent.DefaultArenaResource;
         private const string SaveKey = "nectorial-raid.save.v1";
         private const string FailedSaveKey = "nectorial-raid.save.v1.restore-failed";
 

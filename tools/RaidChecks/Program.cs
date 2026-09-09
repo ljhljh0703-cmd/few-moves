@@ -15,6 +15,7 @@ internal static class Program
     private static int Main()
     {
         Run("raid_arena_solver_trace_and_all_items", CheckWinningTrace);
+        Run("default_raid_v2_witnesses_and_content_identity", CheckDefaultV2Witnesses);
         Run("microstep_vacated_tail_and_collision_before_pickup", CheckCollisionSemantics);
         Run("shield_recovery_keeps_snake_phase", CheckShieldRecovery);
         Run("slow_and_magnet_timing", CheckBuffTiming);
@@ -68,6 +69,26 @@ internal static class Program
         }
         AssertEqual(RaidRunStatus.Cleared, session.State.Status, "winning trace clears from initial state");
         Assert(itemKinds.Contains("Shield") && itemKinds.Contains("Magnet") && itemKinds.Contains("Slow"), "winning trace must collect each distinct item kind");
+    }
+
+    private static void CheckDefaultV2Witnesses()
+    {
+        RaidArenaDefinition arena = LoadArena("raid-01-v2.json");
+        AssertEqual(RaidContent.DefaultArenaId, arena.Id, "default Raid content ID is v2");
+        AssertEqual("9b1d5ed6c3cdda15d42956570fee57de4c629718a0d45b49f701470c287430da", RaidRules.ArenaFingerprint(arena), "default Raid v2 fingerprint is exact");
+        RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
+        AssertEqual(RaidSolverStatus.Solved, shortest.Status, "v2 shortest solver status");
+        AssertEqual(5, shortest.OptimalActionCount, "v2 shortest cost");
+        AssertEqual("RDULR", Directions(shortest.Moves), "v2 shortest trace");
+        RaidState shortState = Replay(arena, "RDULR");
+        AssertEqual(RaidRunStatus.Cleared, shortState.Status, "v2 short trace clears");
+        AssertEqual(1, shortState.Hits, "v2 short trace uses one hit");
+        RaidState noHitState = Replay(arena, "DURDLRU");
+        AssertEqual(RaidRunStatus.Cleared, noHitState.Status, "v2 no-hit trace clears");
+        AssertEqual(0, noHitState.Hits, "v2 no-hit trace has no hits");
+        AssertEqual(3, noHitState.CollectedItemIds.Length, "v2 no-hit trace collects three items");
+        RaidState danger = Replay(arena, "DRUU");
+        AssertEqual(RaidRunStatus.Failed, danger.Status, "v2 danger trace fails");
     }
 
     private static void CheckCollisionSemantics()
@@ -226,10 +247,35 @@ internal static class Program
 
     private static RaidArenaDefinition LoadArena()
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "RaidArenas", "raid-01.json");
+        return LoadArena("raid-01.json");
+    }
+
+    private static RaidArenaDefinition LoadArena(string fileName)
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "RaidArenas", fileName);
         RaidArenaDefinition arena = JsonSerializer.Deserialize<RaidArenaDefinition>(File.ReadAllText(path), JsonOptions);
         if (arena == null) throw new InvalidOperationException("Raid arena JSON did not deserialize.");
         return arena;
+    }
+
+    private static RaidState Replay(RaidArenaDefinition arena, string trace)
+    {
+        RaidState state = RaidRules.CreateInitialState(arena);
+        for (int index = 0; index < trace.Length; index++)
+        {
+            GameCommand direction = trace[index] == 'U' ? GameCommand.Up : trace[index] == 'D' ? GameCommand.Down : trace[index] == 'L' ? GameCommand.Left : GameCommand.Right;
+            RaidDispatchResult result = RaidRules.Step(arena, state, direction);
+            Assert(result.Accepted, "v2 replay action accepted: " + index.ToString());
+            state = result.State;
+        }
+        return state;
+    }
+
+    private static string Directions(RaidMove[] moves)
+    {
+        var values = new char[moves.Length];
+        for (int index = 0; index < moves.Length; index++) values[index] = moves[index].Direction == GameCommand.Up ? 'U' : moves[index].Direction == GameCommand.Down ? 'D' : moves[index].Direction == GameCommand.Left ? 'L' : 'R';
+        return new string(values);
     }
 
     private static bool Contains(string[] values, string value)

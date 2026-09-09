@@ -5,13 +5,14 @@ using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Nectorial.SlideEscape.Raid;
 
 namespace Nectorial.Editor
 {
     public static class RaidBuild
     {
         private const string ScenePath = "Assets/Scenes/Bootstrap.unity";
-        private const string ArenaPath = "Assets/Nectorial/Resources/RaidArenas/raid-01.json";
+        private const string ArenaPath = RaidContent.DefaultArenaAssetPath;
         private const string TemplatePath = "Assets/WebGLTemplates/Raid/index.html";
         private const string StateBridgePath = "Assets/Plugins/WebGL/RaidState.jslib";
         private const string ProductName = "Few Moves Raid Pilot";

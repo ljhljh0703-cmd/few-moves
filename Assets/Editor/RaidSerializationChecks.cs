@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Raid;
 using Nectorial.SlideEscape.Unity.Raid;
 using UnityEditor;
@@ -9,9 +10,10 @@ namespace Nectorial.Editor
 {
     public static class RaidSerializationChecks
     {
-        private const string ArenaResource = "RaidArenas/raid-01";
+        private const string ArenaResource = RaidContent.DefaultArenaResource;
         private const string SaveKey = "nectorial-raid.save.v1";
         private const string FailedSaveKey = "nectorial-raid.save.v1.restore-failed";
+        private const string DefaultArenaFingerprint = "9b1d5ed6c3cdda15d42956570fee57de4c629718a0d45b49f701470c287430da";
 
         [MenuItem("Few Moves/Raid/Run JSON serialization checks")]
         public static void Run()
@@ -21,6 +23,7 @@ namespace Nectorial.Editor
             RaidArenaDefinition arena = JsonUtility.FromJson<RaidArenaDefinition>(asset.text);
             string[] errors = RaidRules.ValidateArena(arena);
             if (errors.Length > 0) throw new InvalidOperationException("Raid arena invalid: " + errors[0]);
+            CheckDefaultV2Witnesses(arena);
 
             RaidSession fresh = RaidSession.Create(arena);
             CheckRoundTrip(arena, "fresh", fresh);
@@ -72,6 +75,44 @@ namespace Nectorial.Editor
             Debug.Log("RAID_JSON_PROBE_RESULT pass=true");
         }
 
+        private static void CheckDefaultV2Witnesses(RaidArenaDefinition arena)
+        {
+            if (arena.Id != RaidContent.DefaultArenaId || RaidRules.ArenaFingerprint(arena) != DefaultArenaFingerprint)
+                throw new InvalidOperationException("Default Raid arena identity is not v2.");
+            RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
+            if (shortest.Status != RaidSolverStatus.Solved || shortest.OptimalActionCount != 5 || Directions(shortest.Moves) != "RDULR")
+                throw new InvalidOperationException("Default Raid v2 shortest witness did not match.");
+            RaidState shortState = Replay(arena, "RDULR");
+            if (shortState.Status != RaidRunStatus.Cleared || shortState.Actions != 5 || shortState.Hits != 1)
+                throw new InvalidOperationException("Default Raid v2 short witness did not clear with one hit.");
+            RaidState noHitState = Replay(arena, "DURDLRU");
+            if (noHitState.Status != RaidRunStatus.Cleared || noHitState.Actions != 7 || noHitState.Hits != 0 || noHitState.CollectedItemIds == null || noHitState.CollectedItemIds.Length != 3)
+                throw new InvalidOperationException("Default Raid v2 no-hit witness did not collect all items.");
+            RaidState failureState = Replay(arena, "DRUU");
+            if (failureState.Status != RaidRunStatus.Failed) throw new InvalidOperationException("Default Raid v2 danger witness did not fail.");
+            Debug.Log("RAID_JSON_PROBE case=default-v2-witnesses state=pass fingerprint=" + DefaultArenaFingerprint);
+        }
+
+        private static RaidState Replay(RaidArenaDefinition arena, string trace)
+        {
+            RaidState state = RaidRules.CreateInitialState(arena);
+            for (int index = 0; index < trace.Length; index++)
+            {
+                GameCommand direction = trace[index] == 'U' ? GameCommand.Up : trace[index] == 'D' ? GameCommand.Down : trace[index] == 'L' ? GameCommand.Left : GameCommand.Right;
+                RaidDispatchResult result = RaidRules.Step(arena, state, direction);
+                if (!result.Accepted) throw new InvalidOperationException("Default Raid v2 witness rejected: " + index.ToString());
+                state = result.State;
+            }
+            return state;
+        }
+
+        private static string Directions(RaidMove[] moves)
+        {
+            var values = new char[moves.Length];
+            for (int index = 0; index < moves.Length; index++) values[index] = moves[index].Direction == GameCommand.Up ? 'U' : moves[index].Direction == GameCommand.Down ? 'D' : moves[index].Direction == GameCommand.Left ? 'L' : 'R';
+            return new string(values);
+        }
+
         private static void CheckRoundTrip(RaidArenaDefinition arena, string label, RaidSession source)
         {
             RaidSaveEnvelope captured = RaidSaveCodec.Capture(source);
@@ -102,19 +143,24 @@ namespace Nectorial.Editor
                 PlayerPrefs.DeleteKey(SaveKey);
                 PlayerPrefs.DeleteKey(FailedSaveKey);
                 PlayerPrefs.Save();
+                RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
+                if (solution.Status != RaidSolverStatus.Solved || solution.Moves == null || solution.Moves.Length < 2 || solution.Moves[0].Direction == solution.Moves[1].Direction)
+                    throw new InvalidOperationException("Raid bootstrap probe requires a distinct first and second v2 move.");
+                int armingIndex = FindArmingIndex(arena, solution.Moves);
+                if (armingIndex < 1) throw new InvalidOperationException("Raid bootstrap probe could not find an Armed transition.");
 
                 RaidBootstrap source = CreateBootstrap("Raid serialization source", out sourceObject);
                 source.HandleCommand("{\"kind\":\"Save\"}");
                 if (!PlayerPrefs.HasKey(SaveKey)) throw new InvalidOperationException("Raid bootstrap did not persist a command save.");
                 if (ReadPrivateString(source, "_message") != "저장했습니다") throw new InvalidOperationException("Raid bootstrap did not report an explicit save success.");
                 RaidDispatchResult first;
-                if (!source.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out first) || !first.Accepted || first.Idempotent)
+                if (!source.TryStartMove(solution.Moves[0].Direction, out first) || !first.Accepted || first.Idempotent)
                     throw new InvalidOperationException("Raid bootstrap source move was not accepted.");
                 source.CompleteActionPresentation();
                 source.RestartRaid();
                 if (source.State.Actions != 0 || ReadBoardPlayerLocalPosition(source) != new Vector3(arena.PlayerStart.X, -arena.PlayerStart.Y, 0f))
                     throw new InvalidOperationException("Raid bootstrap restart did not render the initial board state.");
-                if (!source.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out first) || !first.Accepted || first.Idempotent)
+                if (!source.TryStartMove(solution.Moves[0].Direction, out first) || !first.Accepted || first.Idempotent)
                     throw new InvalidOperationException("Raid bootstrap source replay move was not accepted.");
                 source.CompleteActionPresentation();
                 string sourceFingerprint = RaidRules.StateFingerprint(arena, source.State);
@@ -125,15 +171,18 @@ namespace Nectorial.Editor
                 if (!string.Equals(sourceFingerprint, RaidRules.StateFingerprint(arena, restored.State), StringComparison.Ordinal))
                     throw new InvalidOperationException("Raid bootstrap did not restore the saved state.");
                 RaidDispatchResult afterRestore;
-                if (!restored.TryStartMove(Nectorial.SlideEscape.GameCommand.Left, out afterRestore) || !afterRestore.Accepted || afterRestore.Idempotent)
+                if (!restored.TryStartMove(solution.Moves[1].Direction, out afterRestore) || !afterRestore.Accepted || afterRestore.Idempotent)
                     throw new InvalidOperationException("Raid bootstrap reused a saved command ID after restore.");
                 restored.CompleteActionPresentation();
-                RaidDispatchResult down;
-                if (!restored.TryStartMove(Nectorial.SlideEscape.GameCommand.Down, out down) || !down.Accepted)
-                    throw new InvalidOperationException("Raid bootstrap post-restore setup move was not accepted.");
-                restored.CompleteActionPresentation();
+                for (int index = 2; index < armingIndex; index++)
+                {
+                    RaidDispatchResult setup;
+                    if (!restored.TryStartMove(solution.Moves[index].Direction, out setup) || !setup.Accepted)
+                        throw new InvalidOperationException("Raid bootstrap post-restore setup move was not accepted: " + index.ToString());
+                    restored.CompleteActionPresentation();
+                }
                 RaidDispatchResult arming;
-                if (!restored.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out arming) || !arming.Accepted)
+                if (!restored.TryStartMove(solution.Moves[armingIndex].Direction, out arming) || !arming.Accepted)
                     throw new InvalidOperationException("Raid bootstrap arming move was not accepted.");
                 string transitionFingerprint = RaidRules.StateFingerprint(arena, restored.State);
                 restored.HandleCommand("{\"kind\":\"Restart\"}");
@@ -204,6 +253,18 @@ namespace Nectorial.Editor
             }
             if (bootstrap.State == null) throw new InvalidOperationException("Raid bootstrap did not initialize.");
             return bootstrap;
+        }
+
+        private static int FindArmingIndex(RaidArenaDefinition arena, RaidMove[] moves)
+        {
+            RaidSession session = RaidSession.Create(arena);
+            for (int index = 0; index < moves.Length; index++)
+            {
+                RaidDispatchResult result = session.Dispatch(moves[index]);
+                if (!result.Accepted) return -1;
+                if (result.State.Status == RaidRunStatus.Armed) return index;
+            }
+            return -1;
         }
 
         private static void CheckRaidRecordRuntime(RaidArenaDefinition arena)

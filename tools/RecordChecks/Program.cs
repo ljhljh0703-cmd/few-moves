@@ -18,6 +18,7 @@ internal static class Program
     {
         Run("capsule_codec_bounds_and_canonical_round_trip", CheckCodec);
         Run("raid_capsule_replays_actual_clear_only", CheckRaidCapsule);
+        Run("default_raid_v2_capsule_replays_no_hit_clear", CheckDefaultRaidV2Capsule);
         Run("coop_capsule_replays_no_pass_clear_only", CheckCoopCapsule);
         Run("coop_effective_stack_undo_restart_and_erased_pass", CheckEffectiveStack);
 
@@ -74,6 +75,24 @@ internal static class Program
         capsule.InputSequence = Directions(solution.Moves);
         capsule.DefinitionFingerprint = "wrong";
         Assert(!RecordCapsuleVerifier.TryVerifyRaid(arena, capsule, out verification) && verification.ErrorCode == "definition_identity_mismatch", "raid fingerprint mismatch rejects");
+    }
+
+    private static void CheckDefaultRaidV2Capsule()
+    {
+        RaidArenaDefinition arena = Load<RaidArenaDefinition>("RaidArenas", "raid-01-v2.json");
+        var capsule = new RecordCapsule
+        {
+            SchemaVersion = RecordCapsuleRules.SchemaVersion,
+            ModeId = RecordCapsuleRules.RaidModeId,
+            DefinitionId = arena.Id,
+            RulesVersion = arena.RulesVersion,
+            ContentVersion = arena.ContentVersion,
+            DefinitionFingerprint = RaidRules.ArenaFingerprint(arena),
+            InputSequence = "DURDLRU"
+        };
+        RecordVerification verification;
+        Assert(RecordCapsuleVerifier.TryVerifyRaid(arena, capsule, out verification), "v2 no-hit record capsule validates: " + verification.ErrorCode);
+        Assert(verification.Hits == 0 && verification.EffectiveActionCount == 7 && verification.StatusCode == RaidRunStatus.Cleared.ToString(), "v2 record derives no-hit clear outcome");
     }
 
     private static void CheckCoopCapsule()

@@ -14,6 +14,6 @@
     <Compile Include="../../Assets/Nectorial/RecordCore/**/*.cs" Link="RecordCore/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="Program.cs" />
     <None Include="../../Assets/Nectorial/Resources/CoopRooms/coop-c1.json" Link="CoopRooms/coop-c1.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../../Assets/Nectorial/Resources/RaidArenas/raid-01.json" Link="RaidArenas/raid-01.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../Assets/Nectorial/Resources/RaidArenas/*.json" Link="RaidArenas/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
