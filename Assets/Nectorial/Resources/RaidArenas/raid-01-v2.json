@@ -1,0 +1,110 @@
+{
+  "Id": "raid-01-v2",
+  "Width": 8,
+  "Height": 8,
+  "Rows": [
+    "########",
+    "#......#",
+    "#.#....#",
+    "#......#",
+    "#..#...#",
+    "#......#",
+    "#......#",
+    "########"
+  ],
+  "PlayerStart": {
+    "X": 1,
+    "Y": 1
+  },
+  "SnakeRing": [
+    {
+      "X": 4,
+      "Y": 3
+    },
+    {
+      "X": 5,
+      "Y": 3
+    },
+    {
+      "X": 6,
+      "Y": 3
+    },
+    {
+      "X": 6,
+      "Y": 4
+    },
+    {
+      "X": 6,
+      "Y": 5
+    },
+    {
+      "X": 5,
+      "Y": 5
+    },
+    {
+      "X": 4,
+      "Y": 5
+    },
+    {
+      "X": 4,
+      "Y": 4
+    }
+  ],
+  "SnakeStartHeadIndex": 0,
+  "SnakeBodyLength": 3,
+  "TailFragments": [
+    {
+      "Id": "tail-a",
+      "Position": {
+        "X": 6,
+        "Y": 1
+      }
+    },
+    {
+      "Id": "tail-b",
+      "Position": {
+        "X": 2,
+        "Y": 3
+      }
+    },
+    {
+      "Id": "tail-c",
+      "Position": {
+        "X": 3,
+        "Y": 5
+      }
+    }
+  ],
+  "Items": [
+    {
+      "Id": "shield-1",
+      "Position": {
+      "X": 1,
+      "Y": 2
+      },
+      "Kind": 0
+    },
+    {
+      "Id": "magnet-1",
+      "Position": {
+        "X": 1,
+        "Y": 3
+      },
+      "Kind": 1
+    },
+    {
+      "Id": "slow-1",
+      "Position": {
+      "X": 1,
+      "Y": 4
+      },
+      "Kind": 2
+    }
+  ],
+  "InitialShieldCharges": 1,
+  "MagnetDurationSteps": 4,
+  "MagnetRadius": 2,
+  "SlowDurationSteps": 4,
+  "RulesVersion": "raid-rules-v1",
+  "ContentVersion": "raid-01-v2"
+}
