@@ -142,7 +142,7 @@ assert.match(onlineSerialization, /malformed-pending/);
 assert.match(onlineSerialization, /error-without-state preserve=pass input=locked/);
 assert.match(onlineSerialization, /recovered-auth-state unlock=pass/);
 assert.match(onlineSerialization, /record-empty-guard-and-definition-identity/);
-assert.match(onlineSerialization, /record-mine-shared-active-room-preserved/);
+assert.match(onlineSerialization, /record-mine-shared-request-correlation-active-room-preserved/);
 assert.match(onlineSerialization, /resume-no-session-empty-invite-lobby/);
 assert.match(onlineSerialization, /resume-no-session-invite-preserved/);
 assert.match(onlineSerialization, /resume-invite-then-join/);
