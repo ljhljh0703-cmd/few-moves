@@ -62,6 +62,7 @@ namespace Nectorial.Editor
             if (RecordObservationGuard.SameIdentity(current, selectedOther)) throw new InvalidOperationException("Online record comparison accepted a different selected definition.");
             Debug.Log("COOP_ONLINE_JSON_PROBE case=record-empty-guard-and-definition-identity state=pass");
 
+            CheckNoSessionResumeAndMalformedAuthenticatedPayload(room);
             CheckTransportFailurePreservesConfirmedState(room);
             CheckRecordResultDoesNotReplaceActiveRoom(room);
             Debug.Log("COOP_ONLINE_JSON_PROBE_RESULT pass=true");
@@ -96,6 +97,36 @@ namespace Nectorial.Editor
                 bootstrap.OnOnlineResult(confirmed);
                 if (ReadField<bool>(bootstrap, "_transportLocked")) throw new InvalidOperationException("Recovered authenticated state did not unlock input.");
                 Debug.Log("COOP_ONLINE_JSON_PROBE case=recovered-auth-state unlock=pass");
+            }
+            finally
+            {
+                if (probe != null) UnityEngine.Object.DestroyImmediate(probe);
+            }
+        }
+
+        private static void CheckNoSessionResumeAndMalformedAuthenticatedPayload(CoopRoomDefinition room)
+        {
+            GameObject probe = null;
+            try
+            {
+                probe = new GameObject("CoopOnlineResumeProbe");
+                CoopOnlineBootstrap bootstrap = probe.AddComponent<CoopOnlineBootstrap>();
+                SetField(bootstrap, "_room", CoopRules.CloneRoom(room));
+                SetField(bootstrap, "_initialized", true);
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"resume\",\"inviteCode\":\"\",\"seat\":-1}");
+                if (ReadField<bool>(bootstrap, "_joined") || ReadField<bool>(bootstrap, "_roomReady") || ReadField<CoopState>(bootstrap, "_serverState") != null ||
+                    ReadField<string>(bootstrap, "_message") != "방을 만들거나 초대 코드로 참여하세요")
+                {
+                    throw new InvalidOperationException("Online no-session resume did not return to the create/join lobby.");
+                }
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=resume-no-session-lobby state=pass");
+
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"state\",\"seat\":0,\"room\":{},\"state\":{}}");
+                if (!ReadField<bool>(bootstrap, "_transportLocked") || ReadField<string>(bootstrap, "_error") != "online_authenticated_payload_invalid" || ReadField<CoopState>(bootstrap, "_serverState") != null)
+                {
+                    throw new InvalidOperationException("Malformed authenticated payload did not fail closed.");
+                }
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=malformed-authenticated-payload state=rejected");
             }
             finally
             {

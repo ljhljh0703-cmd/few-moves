@@ -216,9 +216,31 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
 
             _error = string.Empty;
-            if (result.seat == 0 || result.seat == 1) _seatCode = result.seat;
+            bool sessionPresent = result.seat == 0 || result.seat == 1;
+            bool hasRoom = HasRoomPayload(result.room);
+            bool hasState = HasStatePayload(result.state);
+            if (IsNoSessionResume(result, sessionPresent, hasRoom, hasState))
+            {
+                ResetRoomView();
+                _message = string.IsNullOrEmpty(result.inviteCode) ? "방을 만들거나 초대 코드로 참여하세요" : "초대 코드에 연결할 저장된 좌석이 없습니다";
+                PublishState();
+                return;
+            }
+            if (RequiresAuthenticatedState(result.op) && (!sessionPresent || !hasRoom || !hasState))
+            {
+                RejectAuthenticatedPayload();
+                PublishState();
+                return;
+            }
+            if ((result.op == "created" || result.op == "joined") && (!sessionPresent || !hasRoom))
+            {
+                RejectAuthenticatedPayload();
+                PublishState();
+                return;
+            }
+            if (sessionPresent) _seatCode = result.seat;
             if (!string.IsNullOrEmpty(result.inviteCode)) _inviteCode = result.inviteCode;
-            if (result.room != null)
+            if (hasRoom)
             {
                 SetRoom(result.room);
                 if (!_roomReady)
@@ -230,12 +252,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             }
             ApplyAvailability(result.availability);
             bool authenticatedState = ApplyAuthenticatedResult(result);
-            if (result.state != null && !authenticatedState)
+            if (hasState && !authenticatedState)
             {
                 PublishState();
                 return;
             }
-            bool sessionPresent = result.seat == 0 || result.seat == 1;
             if (result.op == "created" || result.op == "joined" || result.op == "resumed" || (result.op == "resume" && sessionPresent))
             {
                 _joined = true;
@@ -267,9 +288,35 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private static bool HasAuthenticatedState(OnlineResult result)
         {
-            return result != null && result.room != null && !string.IsNullOrEmpty(result.room.roomId) &&
-                result.state != null && !string.IsNullOrEmpty(result.state.roomId) &&
+            return result != null && HasRoomPayload(result.room) && HasStatePayload(result.state) &&
                 (result.seat == 0 || result.seat == 1);
+        }
+
+        private static bool HasRoomPayload(OnlineRoomView room)
+        {
+            return room != null && !string.IsNullOrEmpty(room.roomId);
+        }
+
+        private static bool HasStatePayload(OnlineWireState state)
+        {
+            return state != null && !string.IsNullOrEmpty(state.roomId);
+        }
+
+        private static bool IsNoSessionResume(OnlineResult result, bool sessionPresent, bool hasRoom, bool hasState)
+        {
+            return result != null && result.op == "resume" && !sessionPresent && !hasRoom && !hasState;
+        }
+
+        private static bool RequiresAuthenticatedState(string operation)
+        {
+            return operation == "state" || operation == "command";
+        }
+
+        private void RejectAuthenticatedPayload()
+        {
+            LockForTransportFailure("online_authenticated_payload_invalid");
+            _error = "online_authenticated_payload_invalid";
+            _message = "온라인 상태를 안전하게 적용하지 못했습니다";
         }
 
         private void SetRoom(OnlineRoomView room)

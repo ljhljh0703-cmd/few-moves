@@ -101,6 +101,10 @@ assert.match(bootstrap, /CoopSaveSerializationAdapter\.TryNormalizePendingConsen
 assert.match(bootstrap, /CoopRules\.ValidateState/);
 assert.match(bootstrap, /TryDeserializeServerStateForCheck/);
 assert.match(bootstrap, /HasAuthenticatedState/);
+assert.match(bootstrap, /HasRoomPayload/);
+assert.match(bootstrap, /HasStatePayload/);
+assert.match(bootstrap, /IsNoSessionResume/);
+assert.match(bootstrap, /online_authenticated_payload_invalid/);
 assert.match(bootstrap, /_transportLocked = true/);
 assert.match(bootstrap, /inputEnabled = _joined && _roomReady && _serverState != null && !_transportLocked/);
 assert.match(bootstrap, /expressionHighWater/);
@@ -137,6 +141,8 @@ assert.match(onlineSerialization, /error-without-state preserve=pass input=locke
 assert.match(onlineSerialization, /recovered-auth-state unlock=pass/);
 assert.match(onlineSerialization, /record-empty-guard-and-definition-identity/);
 assert.match(onlineSerialization, /record-mine-shared-active-room-preserved/);
+assert.match(onlineSerialization, /resume-no-session-lobby/);
+assert.match(onlineSerialization, /malformed-authenticated-payload/);
 assert.match(onlineSerialization, /COOP_ONLINE_JSON_PROBE_RESULT pass=true/);
 
 const serverStateFixture = {
