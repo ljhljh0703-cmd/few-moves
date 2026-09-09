@@ -197,13 +197,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 return;
             }
             if (arena.SnakeRing == null || arena.SnakeRing.Length == 0) return;
-            int ringLength = arena.SnakeRing.Length;
-            int count = Mathf.Min(_snakeActors.Count, Mathf.Max(1, bodyLength));
+            GridPoint[] body = RaidRules.SnakeBody(arena, headIndex);
+            int count = Mathf.Min(_snakeActors.Count, Mathf.Min(Mathf.Max(1, bodyLength), body.Length));
             for (int index = 0; index < count; index++)
-            {
-                int ringIndex = ((headIndex - index) % ringLength + ringLength) % ringLength;
-                _snakeActors[index].localPosition = ToLocalPosition(arena.SnakeRing[ringIndex]);
-            }
+                _snakeActors[index].localPosition = ToLocalPosition(body[index]);
         }
 
         private void UpdatePickups(string[] collectedTails, string[] collectedItems)
