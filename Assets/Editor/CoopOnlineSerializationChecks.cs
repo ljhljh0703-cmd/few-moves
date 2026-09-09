@@ -64,6 +64,7 @@ namespace Nectorial.Editor
 
             CheckNoSessionResumeAndMalformedAuthenticatedPayload(room);
             CheckTransportFailurePreservesConfirmedState(room);
+            CheckRecordConsentRestartBoundary(room);
             CheckRecordResultDoesNotReplaceActiveRoom(room);
             Debug.Log("COOP_ONLINE_JSON_PROBE_RESULT pass=true");
         }
@@ -134,6 +135,81 @@ namespace Nectorial.Editor
             }
         }
 
+        private static void CheckRecordConsentRestartBoundary(CoopRoomDefinition room)
+        {
+            GameObject probe = null;
+            string bestKey = "nectorial.record.best.v1.coop-v1." + room.Id + "." + CoopRules.RoomFingerprint(room);
+            PreferenceSnapshot priorBest = CapturePreference(bestKey);
+            try
+            {
+                CoopSolverResult solution = CoopSolver.FindSolution(room, 500000, new CoopSolverOptions { AllowPass = false });
+                if (solution.Status != CoopSolverStatus.Solved) throw new InvalidOperationException("Next clear record probe solution was unavailable.");
+                var directions = new char[solution.Commands.Length];
+                for (int index = 0; index < directions.Length; index++) directions[index] = solution.Commands[index].Direction == GameCommand.Up ? 'U' : solution.Commands[index].Direction == GameCommand.Down ? 'D' : solution.Commands[index].Direction == GameCommand.Left ? 'L' : 'R';
+                var capsule = new RecordCapsule
+                {
+                    SchemaVersion = RecordCapsuleRules.SchemaVersion, ModeId = RecordCapsuleRules.CoopModeId, DefinitionId = room.Id,
+                    RulesVersion = room.RulesVersion, ContentVersion = room.ContentVersion, DefinitionFingerprint = CoopRules.RoomFingerprint(room), InputSequence = new string(directions)
+                };
+                string encoded;
+                string encodeError;
+                if (!RecordCapsuleCodec.TryEncode(capsule, out encoded, out encodeError)) throw new InvalidOperationException("Next clear record capsule failed: " + encodeError);
+                PlayerPrefs.SetString(bestKey, encoded);
+                PlayerPrefs.Save();
+                probe = new GameObject("CoopOnlineRecordConsentProbe");
+                CoopOnlineBootstrap bootstrap = probe.AddComponent<CoopOnlineBootstrap>();
+                SetField(bootstrap, "_room", CoopRules.CloneRoom(room));
+                SetField(bootstrap, "_activeDefinitionId", room.Id);
+                SetField(bootstrap, "_selectedDefinitionId", room.Id);
+                SetField(bootstrap, "_initialized", true);
+                SetField(bootstrap, "_joined", true);
+                SetField(bootstrap, "_roomReady", true);
+                SetField(bootstrap, "_roomId", "online-record-consent-probe");
+                SetField(bootstrap, "_pendingRecordRequestId", "record-old");
+                SetField(bootstrap, "_pendingRecordAutomatic", true);
+                SetField(bootstrap, "_pendingAutoRecordFingerprint", "clear-old");
+                SetField(bootstrap, "_recordStatus", "loading");
+                RecordSummaryObservation retained = new RecordSummaryObservation
+                {
+                    modeId = "coop-v1", definitionId = room.Id, rulesVersion = room.RulesVersion, contentVersion = room.ContentVersion,
+                    definitionFingerprint = CoopRules.RoomFingerprint(room), statusCode = "Cleared", effectiveActionCount = 8, logicalActionCount = 8
+                };
+                SetField(bootstrap, "_hasMine", true);
+                SetField(bootstrap, "_mine", retained);
+                SetField(bootstrap, "_hasShared", true);
+                SetField(bootstrap, "_shared", retained);
+
+                bootstrap.OnOnlineResult(AuthenticatedResultJson(room, "online-record-consent-probe", ClearedPendingRestartStateJson(room)));
+                if (ReadField<string>(bootstrap, "_pendingRecordRequestId") != string.Empty || ReadField<string>(bootstrap, "_recordStatus") != "idle" || ReadField<string>(bootstrap, "_recordError") != string.Empty)
+                    throw new InvalidOperationException("Consent-pending clear did not skip the automatic record request.");
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=record-consent-pending-skip state=pass");
+
+                bootstrap.OnOnlineResult(AuthenticatedResultJson(room, "online-record-consent-probe", RestartedStateJson(room)));
+                if (ReadField<CoopState>(bootstrap, "_serverState").LogicalActionCount != 0 || !ReadField<bool>(bootstrap, "_hasMine") || !ReadField<bool>(bootstrap, "_hasShared"))
+                    throw new InvalidOperationException("Approved restart did not preserve records and reset the active run.");
+
+                bootstrap.OnOnlineResult("{\"ok\":false,\"op\":\"record\",\"recordRequestId\":\"record-old\",\"error\":{\"code\":\"record_consent_pending\"}}");
+                if (ReadField<string>(bootstrap, "_recordError") != string.Empty || ReadField<string>(bootstrap, "_recordStatus") != "idle" || !ReadField<bool>(bootstrap, "_hasMine") || !ReadField<bool>(bootstrap, "_hasShared"))
+                    throw new InvalidOperationException("Late old record callback attached to the restarted run.");
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=record-late-callback-ignored state=pass");
+
+                bootstrap.OnOnlineResult(AuthenticatedResultJson(room, "online-record-consent-probe", ClearedStateJson(room)));
+                SetField(bootstrap, "_pendingRecordRequestId", "record-next");
+                SetField(bootstrap, "_pendingRecordAutomatic", true);
+                SetField(bootstrap, "_pendingAutoRecordFingerprint", "clear-next");
+                SetField(bootstrap, "_pendingRecordStateFingerprint", CoopRules.StateFingerprint(room, ReadField<CoopState>(bootstrap, "_serverState")));
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"record\",\"recordRequestId\":\"record-next\",\"capsule\":\"" + encoded + "\"}");
+                if (ReadField<string>(bootstrap, "_lastAutoRecordFingerprint") != "clear-next" || ReadField<string>(bootstrap, "_recordStatus") != "ready" || ReadField<string>(bootstrap, "_pendingRecordRequestId") != string.Empty)
+                    throw new InvalidOperationException("Next clear record capture did not complete after restart.");
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=record-next-clear-capture state=pass");
+            }
+            finally
+            {
+                if (probe != null) UnityEngine.Object.DestroyImmediate(probe);
+                RestorePreference(bestKey, priorBest);
+            }
+        }
+
         private static void CheckRecordResultDoesNotReplaceActiveRoom(CoopRoomDefinition room)
         {
             GameObject probe = null;
@@ -170,7 +246,21 @@ namespace Nectorial.Editor
                 string encoded;
                 string encodeError;
                 if (!RecordCapsuleCodec.TryEncode(capsule, out encoded, out encodeError)) throw new InvalidOperationException("Coop record probe capsule failed: " + encodeError);
-                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"record\",\"capsule\":\"" + encoded + "\"}");
+                CoopState clearedState = new CoopState
+                {
+                    RoomId = room.Id,
+                    CirclePosition = room.CircleGoal,
+                    DiamondPosition = room.DiamondGoal,
+                    ActiveActor = CoopActor.Circle,
+                    AuthorityRevision = 20,
+                    LogicalActionCount = solution.Commands.Length,
+                    Status = CoopRunStatus.Cleared,
+                    PendingConsent = null
+                };
+                SetField(bootstrap, "_serverState", clearedState);
+                SetField(bootstrap, "_pendingRecordRequestId", "record-probe-1");
+                SetField(bootstrap, "_pendingRecordStateFingerprint", CoopRules.StateFingerprint(room, clearedState));
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"record\",\"recordRequestId\":\"record-probe-1\",\"capsule\":\"" + encoded + "\"}");
                 if (!ReadField<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Coop runtime did not accept its verified mine record.");
                 string bestBeforeShared = ReadField<string>(bootstrap, "_mineCapsule");
                 bootstrap.HandleOnlineCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + encoded + "\"}");
@@ -229,7 +319,27 @@ namespace Nectorial.Editor
 
         private static string OnlineResultJson(CoopRoomDefinition room, string onlineRoomId, long revision, int actions)
         {
-            return "{\"ok\":true,\"op\":\"state\",\"seat\":0,\"room\":{\"roomId\":\"" + onlineRoomId + "\",\"rulesVersion\":\"" + room.RulesVersion + "\",\"contentVersion\":\"" + room.ContentVersion + "\",\"roomFingerprint\":\"" + CoopRules.RoomFingerprint(room) + "\"},\"state\":" + StateJson(room, "null", revision, actions) + ",\"availability\":{\"status\":1,\"circleConnected\":true,\"diamondConnected\":true},\"expressions\":{\"expressionSequence\":0,\"events\":[]}}";
+            return AuthenticatedResultJson(room, onlineRoomId, StateJson(room, "null", revision, actions));
+        }
+
+        private static string AuthenticatedResultJson(CoopRoomDefinition room, string onlineRoomId, string state)
+        {
+            return "{\"ok\":true,\"op\":\"state\",\"seat\":0,\"room\":{\"roomId\":\"" + onlineRoomId + "\",\"rulesVersion\":\"" + room.RulesVersion + "\",\"contentVersion\":\"" + room.ContentVersion + "\",\"roomFingerprint\":\"" + CoopRules.RoomFingerprint(room) + "\"},\"state\":" + state + ",\"availability\":{\"status\":1,\"circleConnected\":true,\"diamondConnected\":true},\"expressions\":{\"expressionSequence\":0,\"events\":[]}}";
+        }
+
+        private static string ClearedPendingRestartStateJson(CoopRoomDefinition room)
+        {
+            return "{\"roomId\":\"" + room.Id + "\",\"circlePosition\":{\"x\":" + room.CircleGoal.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.CircleGoal.Y.ToString(CultureInfo.InvariantCulture) + "},\"diamondPosition\":{\"x\":" + room.DiamondGoal.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.DiamondGoal.Y.ToString(CultureInfo.InvariantCulture) + "},\"activeActor\":0,\"authorityRevision\":9,\"logicalActionCount\":8,\"status\":1,\"pendingConsent\":{\"requestId\":\"restart-pending\",\"kind\":1,\"requester\":0,\"requestedAtRevision\":9}}";
+        }
+
+        private static string RestartedStateJson(CoopRoomDefinition room)
+        {
+            return "{\"roomId\":\"" + room.Id + "\",\"circlePosition\":{\"x\":" + room.CircleStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.CircleStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"diamondPosition\":{\"x\":" + room.DiamondStart.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.DiamondStart.Y.ToString(CultureInfo.InvariantCulture) + "},\"activeActor\":0,\"authorityRevision\":10,\"logicalActionCount\":0,\"status\":0,\"pendingConsent\":null}";
+        }
+
+        private static string ClearedStateJson(CoopRoomDefinition room)
+        {
+            return "{\"roomId\":\"" + room.Id + "\",\"circlePosition\":{\"x\":" + room.CircleGoal.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.CircleGoal.Y.ToString(CultureInfo.InvariantCulture) + "},\"diamondPosition\":{\"x\":" + room.DiamondGoal.X.ToString(CultureInfo.InvariantCulture) + ",\"y\":" + room.DiamondGoal.Y.ToString(CultureInfo.InvariantCulture) + "},\"activeActor\":0,\"authorityRevision\":20,\"logicalActionCount\":8,\"status\":1,\"pendingConsent\":null}";
         }
 
         private static string StateJson(CoopRoomDefinition room, string pending, long revision, int actions = 0)

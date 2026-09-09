@@ -283,10 +283,11 @@ mergeInto(LibraryManager.library, {
   },
 
   NectorialOnlineGetRecord__deps: ["$NectorialOnlineBridge"],
-  NectorialOnlineGetRecord: function () {
+  NectorialOnlineGetRecord: function (recordRequestIdPointer) {
     var session = NectorialOnlineBridge.readSession();
+    var recordRequestId = UTF8ToString(recordRequestIdPointer) || "";
     if (!session) {
-      NectorialOnlineBridge.report({ ok: false, op: "record", error: { code: "seat_session_missing" } });
+      NectorialOnlineBridge.report({ ok: false, op: "record", recordRequestId: recordRequestId, error: { code: "seat_session_missing" } });
       return;
     }
     var generation = NectorialOnlineBridge.generation;
@@ -297,6 +298,7 @@ mergeInto(LibraryManager.library, {
       var safe = NectorialOnlineBridge.sanitizedCopy(body);
       safe.op = "record";
       safe.seat = session.seat;
+      safe.recordRequestId = recordRequestId;
       NectorialOnlineBridge.report(safe);
     }, generation);
   },

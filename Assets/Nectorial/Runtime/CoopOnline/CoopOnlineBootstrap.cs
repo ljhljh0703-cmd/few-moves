@@ -61,6 +61,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private string _recordError = string.Empty;
         private string _lastAutoRecordFingerprint = string.Empty;
         private string _pendingAutoRecordFingerprint = string.Empty;
+        private int _recordRequestSequence;
+        private string _pendingRecordRequestId = string.Empty;
+        private string _pendingRecordStateFingerprint = string.Empty;
+        private bool _pendingRecordAutomatic;
+        private bool _recordErrorFromAutomatic;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -461,7 +466,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _serverState = converted;
             if (_board != null && _roomReady) _board.Render(_room, _serverState);
             ApplyExpressions(expressions);
-            if (_serverState.Status == CoopRunStatus.Cleared)
+            if (_serverState.Status == CoopRunStatus.Cleared && _serverState.PendingConsent == null)
             {
                 string fingerprint = CoopRules.StateFingerprint(_room, _serverState);
                 if (!string.Equals(_lastAutoRecordFingerprint, fingerprint, StringComparison.Ordinal)
@@ -471,6 +476,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                     _pendingAutoRecordFingerprint = fingerprint;
                 }
             }
+            else InvalidateAutomaticRecordRequest();
             return true;
         }
 
@@ -624,14 +630,25 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 if (userRequested) SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
                 return false;
             }
+            if (_serverState.PendingConsent != null)
+            {
+                if (userRequested) SetRecordFailure("record_consent_pending", "다시 시작 동의가 끝난 뒤 기록을 확인할 수 있습니다");
+                return false;
+            }
+            string requestId = "record-" + checked(++_recordRequestSequence).ToString();
+            _pendingRecordRequestId = requestId;
+            _pendingRecordStateFingerprint = CoopRules.StateFingerprint(_room, _serverState);
+            _pendingRecordAutomatic = !userRequested;
             _recordStatus = "loading";
             _recordError = string.Empty;
+            _recordErrorFromAutomatic = false;
             if (userRequested) _message = "완주 기록을 확인하는 중입니다";
 #if UNITY_WEBGL && !UNITY_EDITOR
-            NectorialOnlineGetRecord();
+            NectorialOnlineGetRecord(requestId);
             if (userRequested) PublishState();
             return true;
 #else
+            ClearPendingRecordRequest(false);
             if (userRequested) PublishState();
             return false;
 #endif
@@ -639,20 +656,32 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
 
         private void ApplyRecordResult(OnlineResult result)
         {
+            if (result == null || string.IsNullOrEmpty(_pendingRecordRequestId) || !string.Equals(result.recordRequestId, _pendingRecordRequestId, StringComparison.Ordinal)) return;
+            if (!IsPendingRecordStateCurrent())
+            {
+                ClearPendingRecordRequest(false);
+                return;
+            }
+            bool automatic = _pendingRecordAutomatic;
             if (result == null || !result.ok)
             {
                 string code = result == null || result.error == null ? "record_unavailable" : result.error.code;
                 _recordStatus = code == "record_not_cleared" ? "unavailable" : "invalid";
                 _recordError = code;
+                _recordErrorFromAutomatic = automatic;
                 _message = "완주 기록을 준비하지 못했습니다";
-                _pendingAutoRecordFingerprint = string.Empty;
+                ClearPendingRecordRequest(false);
                 return;
             }
             RecordSummaryObservation summary;
             string error;
             if (!TryValidateCoopRecord(result.capsule, out summary, out error) || !string.Equals(summary.definitionId, _activeDefinitionId, StringComparison.Ordinal))
             {
-                SetRecordFailure(string.IsNullOrEmpty(error) ? "record_active_definition_mismatch" : error, "완주 기록이 현재 판과 맞지 않습니다");
+                _recordStatus = "invalid";
+                _recordError = string.IsNullOrEmpty(error) ? "record_active_definition_mismatch" : error;
+                _recordErrorFromAutomatic = automatic;
+                _message = "완주 기록이 현재 판과 맞지 않습니다";
+                ClearPendingRecordRequest(false);
                 return;
             }
             _recordCapsule = result.capsule;
@@ -660,10 +689,37 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _recordStatus = "ready";
             if (string.IsNullOrEmpty(_recordError)) _recordError = string.Empty;
             _message = "완주 기록을 준비했습니다";
-            if (!string.IsNullOrEmpty(_pendingAutoRecordFingerprint))
-            {
+            ClearPendingRecordRequest(true);
+        }
+
+        private void ClearPendingRecordRequest(bool accepted)
+        {
+            if (accepted && _pendingRecordAutomatic && !string.IsNullOrEmpty(_pendingAutoRecordFingerprint))
                 _lastAutoRecordFingerprint = _pendingAutoRecordFingerprint;
-                _pendingAutoRecordFingerprint = string.Empty;
+            _pendingRecordRequestId = string.Empty;
+            _pendingRecordStateFingerprint = string.Empty;
+            _pendingRecordAutomatic = false;
+            _pendingAutoRecordFingerprint = string.Empty;
+        }
+
+        private bool IsPendingRecordStateCurrent()
+        {
+            return _room != null && _serverState != null && _serverState.Status == CoopRunStatus.Cleared && _serverState.PendingConsent == null
+                && !string.IsNullOrEmpty(_pendingRecordStateFingerprint)
+                && string.Equals(_pendingRecordStateFingerprint, CoopRules.StateFingerprint(_room, _serverState), StringComparison.Ordinal);
+        }
+
+        private void InvalidateAutomaticRecordRequest()
+        {
+            bool wasAutomatic = _pendingRecordAutomatic;
+            if (!string.IsNullOrEmpty(_pendingRecordRequestId)) ClearPendingRecordRequest(false);
+            _pendingAutoRecordFingerprint = string.Empty;
+            _lastAutoRecordFingerprint = string.Empty;
+            if (wasAutomatic || _recordErrorFromAutomatic)
+            {
+                _recordStatus = "idle";
+                _recordError = string.Empty;
+                _recordErrorFromAutomatic = false;
             }
         }
 
@@ -878,8 +934,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _diamondConnected = false;
             _transportLocked = true;
             _transitioning = false;
-            _lastAutoRecordFingerprint = string.Empty;
-            _pendingAutoRecordFingerprint = string.Empty;
+            InvalidateAutomaticRecordRequest();
             if (!resetExpressions) return;
             _expressionHighWater = 0;
             _expressionHydrated = false;
@@ -1073,14 +1128,14 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         [DllImport("__Internal")]
         private static extern void NectorialOnlineLeave();
         [DllImport("__Internal")]
-        private static extern void NectorialOnlineGetRecord();
+        private static extern void NectorialOnlineGetRecord(string recordRequestId);
         [DllImport("__Internal")]
         private static extern void NectorialOnlineReportState(string json);
 #endif
 
         [Serializable] private sealed class OnlineInput { public string kind; public string direction; public string expression; public string requestId; public string inviteCode; public string definitionId; public string capsule; public bool approve; public long expectedRevision = -1; }
         [Serializable] private sealed class OnlineCommandRequest { public string commandId; public long expectedRevision; public int kind; public int direction; public string requestId; public bool approve; public int expression; }
-        [Serializable] private sealed class OnlineResult { public bool ok; public string op; public string inviteCode; public int seat = -1; public OnlineRoomView room; public OnlineWireState state; public OnlineAvailability availability; public OnlineExpressions expressions; public bool accepted; public bool idempotent; public string reason; public string capsule; public OnlineRecordVerification verification; public OnlineError error; }
+        [Serializable] private sealed class OnlineResult { public bool ok; public string op; public string inviteCode; public int seat = -1; public OnlineRoomView room; public OnlineWireState state; public OnlineAvailability availability; public OnlineExpressions expressions; public bool accepted; public bool idempotent; public string reason; public string capsule; public string recordRequestId; public OnlineRecordVerification verification; public OnlineError error; }
         [Serializable] private sealed class OnlineRoomView { public string roomId; public string definitionId; public string roomResource; public string rulesVersion; public string contentVersion; public string roomFingerprint; public string expiresAtUtc; }
         [Serializable] private sealed class OnlineDefinitionView { public string definitionId; public string roomResource; public string rulesVersion; public string contentVersion; public string roomFingerprint; }
         [Serializable] private sealed class OnlineRecordVerification { public string modeId; public string definitionId; public string rulesVersion; public string contentVersion; public string definitionFingerprint; public string statusCode; public int effectiveActionCount; public int logicalActionCount; public int hits; public int circleX; public int circleY; public int diamondX; public int diamondY; }

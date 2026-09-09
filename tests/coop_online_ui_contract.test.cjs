@@ -60,6 +60,7 @@ assert.match(bridge, /joinRequestId/);
 assert.match(bridge, /NectorialOnlineCreate/);
 assert.match(bridge, /NectorialOnlineCreateDefinition/);
 assert.match(bridge, /NectorialOnlineGetRecord/);
+assert.match(bridge, /recordRequestId/);
 assert.match(bridge, /NectorialOnlineJoin/);
 assert.match(bridge, /NectorialOnlineCommand/);
 assert.match(bridge, /NectorialOnlineReportState/);
@@ -105,6 +106,7 @@ assert.match(bootstrap, /HasRoomPayload/);
 assert.match(bootstrap, /HasStatePayload/);
 assert.match(bootstrap, /IsNoSessionResume/);
 assert.match(bootstrap, /online_authenticated_payload_invalid/);
+assert.match(bootstrap, /pendingRecordStateFingerprint/);
 assert.match(bootstrap, /_transportLocked = true/);
 assert.match(bootstrap, /inputEnabled = _joined && _roomReady && _serverState != null && !_transportLocked/);
 assert.match(bootstrap, /expressionHighWater/);
@@ -395,7 +397,7 @@ async function runBridgeFixtures() {
     bridgeRuntime.stopPoll();
 
     bridgeRuntime.writeSession(seat("room-c2", 0, "INV-C2", "token-private-c2"));
-    harness.library.NectorialOnlineGetRecord();
+    harness.library.NectorialOnlineGetRecord("record-bridge-1");
     const recordRequest = harness.requests.at(-1);
     assert.match(recordRequest.url, /\/record$/, "record request uses the room record endpoint");
     assert.equal(recordRequest.options.body, "{}", "record request has no claimed score or moves");
@@ -403,6 +405,7 @@ async function runBridgeFixtures() {
     await settle();
     const record = harness.reports.at(-1);
     assert.equal(record.op, "record", "record response is explicitly routed to C#");
+    assert.equal(record.recordRequestId, "record-bridge-1", "record response keeps its request boundary");
     assert.equal(record.capsule, "fm1.public-record", "record capsule reaches C# without bearer data");
     assert.equal(record.seatToken, undefined, "record projection never carries a bearer token");
     bridgeRuntime.stopPoll();
