@@ -44,6 +44,8 @@ jobs:
           node tests/webgl_persistence_contract.test.cjs
           node tests/coop_ui_contract.test.cjs
           node tests/coop_online_ui_contract.test.cjs
+          node tests/raid_ui_contract.test.cjs
+          node tests/content_portal.test.cjs
 
       # actions/setup-dotnet v5.2.0
       - name: Set up .NET SDK
@@ -56,6 +58,9 @@ jobs:
 
       - name: Run co-op core checks
         run: dotnet run --project tools/CoopChecks/CoopChecks.csproj --configuration Release
+
+      - name: Run co-op C2/C3 authoring checks
+        run: dotnet run --project tools/CoopAuthoring/CoopAuthoring.csproj --configuration Release -- --mode verify --room-dir Assets/Nectorial/Resources/CoopRooms
 
       - name: Run raid core checks
         run: dotnet run --project tools/RaidChecks/RaidChecks.csproj --configuration Release

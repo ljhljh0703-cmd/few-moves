@@ -647,7 +647,8 @@ internal static class Program
             string root = Path.Combine(Path.GetTempPath(), "few-moves-coop-serverchecks-" + Guid.NewGuid().ToString("N"));
             string publicRoot = Path.Combine(root, "public");
             string stateRoot = Path.Combine(root, "private-state");
-            string catalogRoot = CreateCatalogRoot(root);
+            string roomPath = FindRoomPath();
+            string catalogRoot = Path.GetDirectoryName(roomPath);
             Directory.CreateDirectory(publicRoot);
             File.WriteAllText(Path.Combine(publicRoot, "index.html"), "<!doctype html><title>few-moves-online-check</title>");
             File.WriteAllBytes(Path.Combine(publicRoot, "game.wasm"), new byte[] { 0, 97, 115, 109 });
@@ -655,7 +656,7 @@ internal static class Program
             {
                 PublicRoot = publicRoot,
                 StateRoot = stateRoot,
-                RoomPath = FindRoomPath(),
+                RoomPath = roomPath,
                 RoomCatalogRoot = catalogRoot,
                 ListenUrl = "http://127.0.0.1:" + FindFreePort().ToString(),
                 BuildId = "server-check"
@@ -733,15 +734,5 @@ internal static class Program
             }
         }
 
-        private static string CreateCatalogRoot(string root)
-        {
-            string catalogRoot = Path.Combine(root, "catalog");
-            Directory.CreateDirectory(catalogRoot);
-            string c1 = File.ReadAllText(FindRoomPath());
-            File.WriteAllText(Path.Combine(catalogRoot, "coop-c1.json"), c1);
-            File.WriteAllText(Path.Combine(catalogRoot, "coop-c2.json"), c1.Replace("\"Id\": \"coop-c1\"", "\"Id\": \"coop-c2\"").Replace("\"ContentVersion\": \"coop-c1-v1\"", "\"ContentVersion\": \"coop-c2-v1\""));
-            File.WriteAllText(Path.Combine(catalogRoot, "coop-c3.json"), c1.Replace("\"Id\": \"coop-c1\"", "\"Id\": \"coop-c3\"").Replace("\"ContentVersion\": \"coop-c1-v1\"", "\"ContentVersion\": \"coop-c3-v1\""));
-            return catalogRoot;
-        }
     }
 }

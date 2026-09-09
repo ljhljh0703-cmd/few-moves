@@ -74,6 +74,7 @@ internal static class Program
         if (!TryProbeC2(room, out C2Diagnostic diagnostic)) return false;
         if (diagnostic.Normal.Status != "Solved" || diagnostic.Normal.Trace.Length == 0) return false;
         if (!diagnostic.NormalStopperWitness.CircleStopped || !diagnostic.NormalStopperWitness.DiamondStopped) return false;
+        if (!IsConclusiveCounterfactual(diagnostic.ForbidCircleStop) || !IsConclusiveCounterfactual(diagnostic.ForbidDiamondStop)) return false;
         if (diagnostic.ForbidCircleStop.Status == "Solved" && diagnostic.ForbidCircleStop.OptimalActionCount <= diagnostic.Normal.OptimalActionCount) return false;
         if (diagnostic.ForbidDiamondStop.Status == "Solved" && diagnostic.ForbidDiamondStop.OptimalActionCount <= diagnostic.Normal.OptimalActionCount) return false;
         if (SameTrace(diagnostic.Normal.Trace, diagnostic.ForbidCircleStop.Trace) || SameTrace(diagnostic.Normal.Trace, diagnostic.ForbidDiamondStop.Trace)) return false;
@@ -89,6 +90,11 @@ internal static class Program
             NormalStopperWitness = diagnostic.NormalStopperWitness
         };
         return true;
+    }
+
+    private static bool IsConclusiveCounterfactual(SolutionSummary result)
+    {
+        return result != null && (result.Status == "Solved" || result.Status == "Unsolvable");
     }
 
     private static bool TryProbeC2(CoopRoomDefinition room, out C2Diagnostic diagnostic)
