@@ -11,6 +11,7 @@ assert.match(template, /data-raid-action="Restart"/);
 assert.match(template, /ResizeObserver/);
 assert.match(template, /window\.__nectorialRaid = \{\s*state:null, receiveState:receiveState\s*\}/);
 assert.match(template, /RaidBootstrap/);
+assert.match(template, /HandleCommand/);
 assert.match(template, /statusCode/);
 assert.match(template, /tailCount/);
 assert.match(template, /shieldCharges/);

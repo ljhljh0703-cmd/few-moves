@@ -139,7 +139,7 @@
         } else closeDialog(resultDialog);
       }
       function receiveState(json) { try { renderState(JSON.parse(json)); } catch (error) { feedback.textContent = "레이드 상태를 확인할 수 없습니다."; } }
-      function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("RaidBootstrap", "HandleRaidCommand", JSON.stringify(command)); return true; }
+      function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("RaidBootstrap", "HandleCommand", JSON.stringify(command)); return true; }
       function action(button) { if (!actionAllowed(button)) return; var kind = button.dataset.raidAction; if (kind === "Restart") closeDialog(resultDialog); send(kind === "Slide" ? { kind:"Slide", direction:button.dataset.direction } : { kind:"Restart" }); }
       Array.from(document.querySelectorAll("button[data-raid-action]")).forEach(function (button) { button.addEventListener("click", function () { action(button); }); });
       document.querySelector("#restart-top").addEventListener("click", function () { if (currentState && actionAllowed({ dataset:{ raidAction:"Restart" } })) { closeDialog(resultDialog); send({ kind:"Restart" }); } });
