@@ -5,9 +5,9 @@
   "Rows": [
     "########",
     "#......#",
-    "#.#....#",
     "#......#",
-    "#..#...#",
+    "#......#",
+    "#......#",
     "#......#",
     "#......#",
     "########"
@@ -57,14 +57,14 @@
       "Id": "tail-a",
       "Position": {
         "X": 6,
-        "Y": 1
+        "Y": 3
       }
     },
     {
       "Id": "tail-b",
       "Position": {
-        "X": 2,
-        "Y": 3
+        "X": 1,
+        "Y": 5
       }
     },
     {
@@ -79,32 +79,32 @@
     {
       "Id": "shield-1",
       "Position": {
-      "X": 1,
-      "Y": 2
+        "X": 1,
+        "Y": 4
       },
       "Kind": 0
     },
     {
       "Id": "magnet-1",
       "Position": {
-        "X": 1,
-        "Y": 3
+        "X": 4,
+        "Y": 6
       },
       "Kind": 1
     },
     {
       "Id": "slow-1",
       "Position": {
-      "X": 1,
-      "Y": 4
+        "X": 6,
+        "Y": 2
       },
       "Kind": 2
     }
   ],
   "InitialShieldCharges": 1,
-  "MagnetDurationSteps": 4,
+  "MagnetDurationSteps": 2,
   "MagnetRadius": 2,
-  "SlowDurationSteps": 4,
+  "SlowDurationSteps": 2,
   "RulesVersion": "raid-rules-v1",
   "ContentVersion": "raid-01-v2"
 }
