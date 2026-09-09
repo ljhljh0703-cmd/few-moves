@@ -62,7 +62,8 @@ namespace Nectorial.SlideEscape.Unity
         private static void CreateRuntime()
         {
             if (string.Equals(Application.productName, "Few Moves Coop Pilot", StringComparison.Ordinal) ||
-                string.Equals(Application.productName, "Few Moves Online Pilot", StringComparison.Ordinal))
+                string.Equals(Application.productName, "Few Moves Online Pilot", StringComparison.Ordinal) ||
+                string.Equals(Application.productName, "Few Moves Raid Pilot", StringComparison.Ordinal))
             {
                 return;
             }
