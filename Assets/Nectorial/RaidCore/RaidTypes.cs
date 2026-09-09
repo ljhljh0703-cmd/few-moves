@@ -156,6 +156,7 @@ namespace Nectorial.SlideEscape.Raid
     {
         public RaidMove[] Moves;
         public RaidAttempt[] Attempts;
+        public int AttemptCount;
     }
 
     [Serializable]

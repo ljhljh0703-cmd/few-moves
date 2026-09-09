@@ -20,6 +20,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 error = "raid_save_attempt_transcript_missing";
                 return false;
             }
+            if (envelope.Replay.AttemptCount != envelope.Replay.Attempts.Length)
+            {
+                error = "raid_save_attempt_count_mismatch";
+                return false;
+            }
             for (int index = 0; index < envelope.Replay.Attempts.Length; index++)
             {
                 RaidAttempt attempt = envelope.Replay.Attempts[index];

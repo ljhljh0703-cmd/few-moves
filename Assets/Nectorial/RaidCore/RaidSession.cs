@@ -82,7 +82,8 @@ namespace Nectorial.SlideEscape.Raid
 
         public RaidReplay ExportReplay()
         {
-            return new RaidReplay { Moves = RaidRules.CloneMoves(_moves.ToArray()), Attempts = CloneAttempts(_attempts.ToArray()) };
+            RaidAttempt[] attempts = CloneAttempts(_attempts.ToArray());
+            return new RaidReplay { Moves = RaidRules.CloneMoves(_moves.ToArray()), Attempts = attempts, AttemptCount = attempts.Length };
         }
 
         private RaidDispatchResult Rejected(string reason)

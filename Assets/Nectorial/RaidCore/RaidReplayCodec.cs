@@ -14,6 +14,7 @@ namespace Nectorial.SlideEscape.Raid
             RaidSession next = RaidSession.Create(arena);
             if (replay.Attempts != null)
             {
+                if (replay.AttemptCount != replay.Attempts.Length) { error = "attempt_count_mismatch"; return false; }
                 if (!ValidateMoveProjection(replay.Moves, replay.Attempts, out error)) return false;
                 for (int index = 0; index < replay.Attempts.Length; index++)
                 {
@@ -49,8 +50,8 @@ namespace Nectorial.SlideEscape.Raid
 
         public static RaidReplay Clone(RaidReplay source)
         {
-            if (source == null) return new RaidReplay { Moves = new RaidMove[0], Attempts = new RaidAttempt[0] };
-            return new RaidReplay { Moves = RaidRules.CloneMoves(source.Moves), Attempts = CloneAttempts(source.Attempts) };
+            if (source == null) return new RaidReplay { Moves = new RaidMove[0], Attempts = new RaidAttempt[0], AttemptCount = 0 };
+            return new RaidReplay { Moves = RaidRules.CloneMoves(source.Moves), Attempts = CloneAttempts(source.Attempts), AttemptCount = source.AttemptCount };
         }
 
         private static bool ValidateMoveProjection(RaidMove[] moves, RaidAttempt[] attempts, out string error)

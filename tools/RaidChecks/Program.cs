@@ -211,6 +211,10 @@ internal static class Program
         RaidSaveEnvelope tamperedProjection = RaidSaveCodec.Capture(session);
         tamperedProjection.Replay.Moves[0] = new RaidMove { CommandId = "accepted-ledger-id", Direction = GameCommand.Left };
         Assert(!RaidSaveCodec.TryRestore(EnsureArena(), tamperedProjection, out restored, out error) && error.StartsWith("accepted_moves_projection_mismatch", StringComparison.Ordinal), "tampered accepted move projection must reject restore");
+
+        RaidSaveEnvelope tamperedAttemptCount = RaidSaveCodec.Capture(session);
+        tamperedAttemptCount.Replay.AttemptCount = 0;
+        Assert(!RaidSaveCodec.TryRestore(EnsureArena(), tamperedAttemptCount, out restored, out error) && error == "attempt_count_mismatch", "attempt count must bind the complete rejected-command ledger");
     }
 
     private static RaidArenaDefinition EnsureArena()

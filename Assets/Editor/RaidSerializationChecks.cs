@@ -55,6 +55,7 @@ namespace Nectorial.Editor
 
             RaidSaveEnvelope malformed = RaidSaveCodec.Capture(RaidSession.Create(arena));
             malformed.Replay.Attempts = new[] { new RaidAttempt { Move = null } };
+            malformed.Replay.AttemptCount = 1;
             string malformedError;
             if (RaidSaveSerializationAdapter.TryNormalize(malformed, out malformedError)) throw new InvalidOperationException("Raid malformed attempt was accepted.");
             Debug.Log("RAID_JSON_PROBE case=malformed-attempt state=rejected error=" + malformedError);
@@ -133,7 +134,6 @@ namespace Nectorial.Editor
 
                 RaidSession corruptSource = RaidSession.Create(arena);
                 corruptSource.Dispatch(new RaidMove { CommandId = "rejected-ledger-id", Direction = Nectorial.SlideEscape.GameCommand.Up });
-                corruptSource.Dispatch(new RaidMove { CommandId = "accepted-ledger-id", Direction = Nectorial.SlideEscape.GameCommand.Right });
                 RaidSaveEnvelope corrupt = RaidSaveCodec.Capture(corruptSource);
                 corrupt.Replay.Attempts = null;
                 string corruptJson = JsonUtility.ToJson(corrupt);
