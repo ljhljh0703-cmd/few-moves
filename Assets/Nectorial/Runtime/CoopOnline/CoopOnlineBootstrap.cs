@@ -60,6 +60,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
         private string _recordStatus = "idle";
         private string _recordError = string.Empty;
         private string _lastAutoRecordFingerprint = string.Empty;
+        private string _pendingAutoRecordFingerprint = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -416,10 +417,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             if (_serverState.Status == CoopRunStatus.Cleared)
             {
                 string fingerprint = CoopRules.StateFingerprint(_room, _serverState);
-                if (!string.Equals(_lastAutoRecordFingerprint, fingerprint, StringComparison.Ordinal))
+                if (!string.Equals(_lastAutoRecordFingerprint, fingerprint, StringComparison.Ordinal)
+                    && !string.Equals(_pendingAutoRecordFingerprint, fingerprint, StringComparison.Ordinal)
+                    && RequestRecord(false))
                 {
-                    _lastAutoRecordFingerprint = fingerprint;
-                    RequestRecord(false);
+                    _pendingAutoRecordFingerprint = fingerprint;
                 }
             }
             return true;
@@ -568,20 +570,24 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             RequestRecord(true);
         }
 
-        private void RequestRecord(bool userRequested)
+        private bool RequestRecord(bool userRequested)
         {
             if (!_joined || !_roomReady || _serverState == null || _serverState.Status != CoopRunStatus.Cleared)
             {
                 if (userRequested) SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
-                return;
+                return false;
             }
             _recordStatus = "loading";
             _recordError = string.Empty;
             if (userRequested) _message = "완주 기록을 확인하는 중입니다";
 #if UNITY_WEBGL && !UNITY_EDITOR
             NectorialOnlineGetRecord();
-#endif
             if (userRequested) PublishState();
+            return true;
+#else
+            if (userRequested) PublishState();
+            return false;
+#endif
         }
 
         private void ApplyRecordResult(OnlineResult result)
@@ -592,6 +598,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
                 _recordStatus = code == "record_not_cleared" ? "unavailable" : "invalid";
                 _recordError = code;
                 _message = "완주 기록을 준비하지 못했습니다";
+                _pendingAutoRecordFingerprint = string.Empty;
                 return;
             }
             RecordSummaryObservation summary;
@@ -606,6 +613,11 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _recordStatus = "ready";
             if (string.IsNullOrEmpty(_recordError)) _recordError = string.Empty;
             _message = "완주 기록을 준비했습니다";
+            if (!string.IsNullOrEmpty(_pendingAutoRecordFingerprint))
+            {
+                _lastAutoRecordFingerprint = _pendingAutoRecordFingerprint;
+                _pendingAutoRecordFingerprint = string.Empty;
+            }
         }
 
         private void LoadSharedRecord(string encoded)
@@ -820,6 +832,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             _transportLocked = true;
             _transitioning = false;
             _lastAutoRecordFingerprint = string.Empty;
+            _pendingAutoRecordFingerprint = string.Empty;
             if (!resetExpressions) return;
             _expressionHighWater = 0;
             _expressionHydrated = false;
