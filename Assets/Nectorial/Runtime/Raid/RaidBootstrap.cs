@@ -228,6 +228,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _lastFrames = new RaidFrame[0];
             RaidDispatchResult restarted = _session.Restart();
             _displayState = _session.State;
+            if (_board != null) _board.Render(_arena, _session.State);
             _message = Translate(restarted.Reason);
             SaveCurrent();
             PublishState();

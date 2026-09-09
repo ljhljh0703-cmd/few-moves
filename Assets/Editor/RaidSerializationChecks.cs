@@ -102,6 +102,12 @@ namespace Nectorial.Editor
                 if (!source.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out first) || !first.Accepted || first.Idempotent)
                     throw new InvalidOperationException("Raid bootstrap source move was not accepted.");
                 source.CompleteActionPresentation();
+                source.RestartRaid();
+                if (source.State.Actions != 0 || ReadBoardPlayerLocalPosition(source) != new Vector3(arena.PlayerStart.X, -arena.PlayerStart.Y, 0f))
+                    throw new InvalidOperationException("Raid bootstrap restart did not render the initial board state.");
+                if (!source.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out first) || !first.Accepted || first.Idempotent)
+                    throw new InvalidOperationException("Raid bootstrap source replay move was not accepted.");
+                source.CompleteActionPresentation();
                 string sourceFingerprint = RaidRules.StateFingerprint(arena, source.State);
                 UnityEngine.Object.DestroyImmediate(sourceObject);
                 sourceObject = null;
@@ -201,6 +207,18 @@ namespace Nectorial.Editor
             FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
             if (field == null) throw new InvalidOperationException("Raid bootstrap message field was unavailable.");
             return field.GetValue(target) as string;
+        }
+
+        private static Vector3 ReadBoardPlayerLocalPosition(RaidBootstrap bootstrap)
+        {
+            FieldInfo boardField = typeof(RaidBootstrap).GetField("_board", BindingFlags.Instance | BindingFlags.NonPublic);
+            object board = boardField == null ? null : boardField.GetValue(bootstrap);
+            if (board == null) throw new InvalidOperationException("Raid board was unavailable.");
+            FieldInfo rootField = board.GetType().GetField("_root", BindingFlags.Instance | BindingFlags.NonPublic);
+            Transform root = rootField == null ? null : rootField.GetValue(board) as Transform;
+            Transform player = root == null ? null : root.Find("Player");
+            if (player == null) throw new InvalidOperationException("Raid board player was unavailable.");
+            return player.localPosition;
         }
 
         private static void RestorePreference(string key, PreferenceSnapshot snapshot)
