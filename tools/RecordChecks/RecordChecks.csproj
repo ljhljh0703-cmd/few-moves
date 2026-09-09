@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Nectorial/SlideCore/**/*.cs" Link="SlideCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/Nectorial/CoopCore/**/*.cs" Link="CoopCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/Nectorial/RaidCore/**/*.cs" Link="RaidCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/Nectorial/RecordCore/**/*.cs" Link="RecordCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="Program.cs" />
+    <None Include="../../Assets/Nectorial/Resources/CoopRooms/coop-c1.json" Link="CoopRooms/coop-c1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../Assets/Nectorial/Resources/RaidArenas/raid-01.json" Link="RaidArenas/raid-01.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

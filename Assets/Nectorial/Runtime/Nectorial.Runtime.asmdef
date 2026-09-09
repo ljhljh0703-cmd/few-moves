@@ -5,7 +5,8 @@
         "AppsInToss.Helpers",
         "AppsInTossSDK",
         "Nectorial.SlideCore",
-        "Nectorial.CoopCore"
+        "Nectorial.CoopCore",
+        "Nectorial.RaidCore"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

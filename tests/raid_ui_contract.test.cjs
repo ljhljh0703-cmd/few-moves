@@ -6,6 +6,7 @@ const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const template = readFileSync(path.join(root, "Assets/WebGLTemplates/Raid/index.html"), "utf8");
 const bridge = readFileSync(path.join(root, "Assets/Plugins/WebGL/RaidState.jslib"), "utf8");
+const build = readFileSync(path.join(root, "Assets/Editor/RaidBuild.cs"), "utf8");
 assert.match(template, /data-raid-action="Slide" data-direction="Up"/);
 assert.match(template, /data-raid-action="Restart"/);
 assert.match(template, /ResizeObserver/);
@@ -19,6 +20,8 @@ assert.match(template, /shieldCharges/);
 assert.doesNotMatch(template, /snake\.advance|enemy\.move|Math\.random/);
 assert.match(bridge, /NectorialRaidReportState/);
 assert.doesNotMatch(bridge, /RaidRules|RaidSession|RaidSolver/);
+assert.match(build, /PlayerSettings\.productName = ProductName/);
+assert.match(build, /RaidSerializationChecks\.Run\(\);/);
 
 function element(id, dataset) {
   return {

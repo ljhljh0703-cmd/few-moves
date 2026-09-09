@@ -14,6 +14,7 @@ namespace Nectorial.Editor
         private const string ArenaPath = "Assets/Nectorial/Resources/RaidArenas/raid-01.json";
         private const string TemplatePath = "Assets/WebGLTemplates/Raid/index.html";
         private const string StateBridgePath = "Assets/Plugins/WebGL/RaidState.jslib";
+        private const string ProductName = "Few Moves Raid Pilot";
 
         public static void Build()
         {
@@ -31,6 +32,7 @@ namespace Nectorial.Editor
             WebGLCompressionFormat previousCompression = PlayerSettings.WebGL.compressionFormat;
             bool previousDecompressionFallback = PlayerSettings.WebGL.decompressionFallback;
             bool previousDataCaching = PlayerSettings.WebGL.dataCaching;
+            EditorBuildSettingsScene[] previousScenes = EditorBuildSettings.scenes;
 
             try
             {
@@ -63,6 +65,7 @@ namespace Nectorial.Editor
                 PlayerSettings.WebGL.compressionFormat = previousCompression;
                 PlayerSettings.WebGL.decompressionFallback = previousDecompressionFallback;
                 PlayerSettings.WebGL.dataCaching = previousDataCaching;
+                EditorBuildSettings.scenes = previousScenes;
             }
         }
 
@@ -80,11 +83,15 @@ namespace Nectorial.Editor
             if (arena == null) throw new InvalidOperationException("Raid arena JSON probe returned null.");
 
             Type rulesType = FindType("Nectorial.SlideEscape.Raid.RaidRules");
-            MethodInfo validate = rulesType == null ? null : rulesType.GetMethod("ValidateArena", BindingFlags.Public | BindingFlags.Static);
-            if (validate == null) return;
+            if (rulesType == null) throw new InvalidOperationException("Raid probe could not find RaidRules.");
+            MethodInfo validate = rulesType.GetMethod("ValidateArena", BindingFlags.Public | BindingFlags.Static);
+            if (validate == null) throw new InvalidOperationException("Raid probe could not find RaidRules.ValidateArena.");
             object result = validate.Invoke(null, new[] { arena });
-            if (result is string[] errors && errors.Length > 0)
+            string[] errors = result as string[];
+            if (errors == null) throw new InvalidOperationException("Raid arena validation returned an unexpected result.");
+            if (errors.Length > 0)
                 throw new InvalidOperationException("Raid arena validation failed: " + errors[0]);
+            RaidSerializationChecks.Run();
         }
 
         private static Type FindType(string fullName)
@@ -118,7 +125,7 @@ namespace Nectorial.Editor
         private static void ConfigurePlayer()
         {
             PlayerSettings.companyName = "Independent";
-            PlayerSettings.productName = "Few Moves Raid";
+            PlayerSettings.productName = ProductName;
             PlayerSettings.bundleVersion = "0.1.0-raid";
             PlayerSettings.runInBackground = true;
             PlayerSettings.stripEngineCode = false;

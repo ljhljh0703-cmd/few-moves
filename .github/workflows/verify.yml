@@ -57,6 +57,9 @@ jobs:
       - name: Run co-op core checks
         run: dotnet run --project tools/CoopChecks/CoopChecks.csproj --configuration Release
 
+      - name: Run raid core checks
+        run: dotnet run --project tools/RaidChecks/RaidChecks.csproj --configuration Release
+
       - name: Run co-op server HTTP checks
         run: dotnet run --project tools/CoopServerChecks/CoopServerChecks.csproj --configuration Release
 
