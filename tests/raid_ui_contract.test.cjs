@@ -6,18 +6,22 @@ const vm = require("node:vm");
 const root = path.resolve(__dirname, "..");
 const template = readFileSync(path.join(root, "Assets/WebGLTemplates/Raid/index.html"), "utf8");
 const bridge = readFileSync(path.join(root, "Assets/Plugins/WebGL/RaidState.jslib"), "utf8");
+const build = readFileSync(path.join(root, "Assets/Editor/RaidBuild.cs"), "utf8");
 assert.match(template, /data-raid-action="Slide" data-direction="Up"/);
 assert.match(template, /data-raid-action="Restart"/);
 assert.match(template, /ResizeObserver/);
 assert.match(template, /window\.__nectorialRaid = \{\s*state:null, receiveState:receiveState\s*\}/);
 assert.match(template, /RaidBootstrap/);
 assert.match(template, /HandleCommand/);
+assert.match(template, /productName:"Few Moves Raid Pilot"/);
 assert.match(template, /statusCode/);
 assert.match(template, /tailCount/);
 assert.match(template, /shieldCharges/);
 assert.doesNotMatch(template, /snake\.advance|enemy\.move|Math\.random/);
 assert.match(bridge, /NectorialRaidReportState/);
 assert.doesNotMatch(bridge, /RaidRules|RaidSession|RaidSolver/);
+assert.match(build, /PlayerSettings\.productName = ProductName/);
+assert.match(build, /RaidSerializationChecks\.Run\(\);/);
 
 function element(id, dataset) {
   return {
@@ -118,6 +122,10 @@ assert.equal(actions.slice(0, 4).every(button => button.disabled), true, "failed
 assert.equal(elements["result-dialog"].open, true, "failed opens the small result dialog");
 assert.equal(elements["restart-top"].disabled, false, "failed enables immediate restart");
 assert.equal(elements["result-restart"].disabled, false, "failed result action is available");
+
+windowObject.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { inputEnabled: false, saveStatus: "failed", saveError: "saved_state_mismatch" })));
+assert.equal(actions.slice(0, 4).every(button => button.disabled), true, "blocked restore keeps movement locked");
+assert.equal(elements["restart-top"].disabled, false, "blocked restore keeps restart available");
 
 windowObject.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { inputEnabled: false })));
 assert.equal(elements["result-title"].textContent, "뱀을 피하고 격파");

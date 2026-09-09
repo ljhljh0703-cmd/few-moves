@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Runtime.InteropServices;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Raid;
 using UnityEngine;
@@ -13,12 +15,14 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private RaidArenaDefinition _arena;
         private RaidSession _session;
+        private RaidBoardView _board;
         private RaidFrame[] _lastFrames = new RaidFrame[0];
         private RaidDispatchResult _pendingAction;
         private bool _initialized;
         private bool _restoreBlocked;
         private bool _transitioning;
         private int _nextCommandId;
+        private Coroutine _transitionRoutine;
         private string _message = "초기화 중";
         private string _saveStatus = "idle";
         private string _saveError = string.Empty;
@@ -40,7 +44,14 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private void Awake()
         {
+            ConfigureCamera();
             InitializeRaid();
+        }
+
+        private void OnDestroy()
+        {
+            CancelActionPresentation();
+            if (_board != null) _board.Dispose();
         }
 
         private void Update()
@@ -78,7 +89,34 @@ namespace Nectorial.SlideEscape.Unity.Raid
             }
             RaidDispatchResult result;
             if (!TryStartMove(direction, out result)) return;
-            CompleteActionPresentation();
+            BeginActionPresentation();
+        }
+
+        public void HandleCommand(string json)
+        {
+            if (!_initialized || string.IsNullOrEmpty(json)) return;
+            RaidInput input;
+            try { input = JsonUtility.FromJson<RaidInput>(json); }
+            catch (Exception exception)
+            {
+                _message = "레이드 입력을 읽을 수 없습니다";
+                _saveError = "raid_input_json:" + exception.GetType().Name;
+                PublishState();
+                return;
+            }
+            if (input == null || string.IsNullOrEmpty(input.kind)) return;
+            if (string.Equals(input.kind, "Restart", StringComparison.Ordinal))
+            {
+                RestartRaid();
+                return;
+            }
+            if (string.Equals(input.kind, "Slide", StringComparison.Ordinal))
+            {
+                HandleRaidInput(input.direction);
+                return;
+            }
+            _message = "알 수 없는 레이드 입력입니다";
+            PublishState();
         }
 
         public bool TryStartMove(GameCommand direction, out RaidDispatchResult result)
@@ -104,12 +142,39 @@ namespace Nectorial.SlideEscape.Unity.Raid
             return true;
         }
 
+        private void BeginActionPresentation()
+        {
+            if (_pendingAction == null) return;
+            if (_board == null || !_board.BeginAction(_arena, _pendingAction.Frames))
+            {
+                CompleteActionPresentation();
+                return;
+            }
+            float duration = Mathf.Clamp(0.08f * _pendingAction.Frames.Length, 0.16f, 0.72f);
+            _transitionRoutine = StartCoroutine(CompleteActionAfter(duration));
+        }
+
+        private IEnumerator CompleteActionAfter(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                if (_board != null) _board.AdvanceAction(Mathf.Clamp01(elapsed / duration));
+                yield return null;
+            }
+            if (_board != null) _board.AdvanceAction(1f);
+            _transitionRoutine = null;
+            CompleteActionPresentation();
+        }
+
         public void CompleteActionPresentation()
         {
             if (_pendingAction == null) return;
             RaidDispatchResult completed = _pendingAction;
             _pendingAction = null;
             _transitioning = false;
+            if (_board != null) _board.CompleteAction(_arena, _session.State);
             _message = Describe(completed);
             SaveCurrent();
             PublishState();
@@ -118,8 +183,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
         public void RestartRaid()
         {
             if (!_initialized || _session == null) return;
-            _pendingAction = null;
-            _transitioning = false;
+            CancelActionPresentation();
+            _restoreBlocked = false;
+            _saveStatus = "idle";
+            _saveError = string.Empty;
             _lastFrames = new RaidFrame[0];
             RaidDispatchResult restarted = _session.Restart();
             _message = Translate(restarted.Reason);
@@ -145,8 +212,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     return;
                 }
                 _session = RaidSession.Create(_arena);
+                _board = new RaidBoardView();
                 _initialized = true;
                 RestoreIfPresent();
+                if (_board != null) _board.Render(_arena, _session.State);
                 if (!_restoreBlocked && string.IsNullOrEmpty(_message)) _message = "레이드를 시작하세요";
                 PublishState();
             }
@@ -215,6 +284,18 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _message = "저장된 레이드를 불러오지 못했습니다";
         }
 
+        private void CancelActionPresentation()
+        {
+            if (_transitionRoutine != null)
+            {
+                StopCoroutine(_transitionRoutine);
+                _transitionRoutine = null;
+            }
+            if (_board != null) _board.CancelAction();
+            _pendingAction = null;
+            _transitioning = false;
+        }
+
         private void Fail(string message, string error)
         {
             _initialized = false;
@@ -249,6 +330,25 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 stateFingerprint = state == null || _arena == null ? string.Empty : RaidRules.StateFingerprint(_arena, state)
             };
             Debug.Log("RAID_STATE_OBSERVATION " + JsonUtility.ToJson(observation));
+#if UNITY_WEBGL && !UNITY_EDITOR
+            NectorialRaidReportState(JsonUtility.ToJson(observation));
+#endif
+        }
+
+        private static void ConfigureCamera()
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                var cameraObject = new GameObject("Main Camera");
+                cameraObject.tag = "MainCamera";
+                camera = cameraObject.AddComponent<Camera>();
+            }
+            camera.orthographic = true;
+            camera.orthographicSize = 4.65f;
+            camera.transform.position = new Vector3(0f, 0f, -10f);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color32(0xf0, 0xec, 0xe2, 0xff);
         }
 
         private string NextCommandId()
@@ -285,6 +385,13 @@ namespace Nectorial.SlideEscape.Unity.Raid
             return Translate(result.Reason);
         }
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [DllImport("__Internal")]
+        private static extern void NectorialRaidReportState(string json);
+#endif
+
+        [Serializable]
+        private sealed class RaidInput { public string kind; public string direction; }
         [Serializable]
         private sealed class RaidObservation
         {
