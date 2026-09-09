@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Coop;
+using Nectorial.SlideEscape.Record;
 
 namespace FewMoves.Coop.Server
 {
@@ -13,8 +14,7 @@ namespace FewMoves.Coop.Server
     {
         private readonly object _gate = new object();
         private readonly ServerOptions _options;
-        private readonly CoopRoomDefinition _template;
-        private readonly string _templateFingerprint;
+        private readonly CoopDefinitionCatalog _catalog;
         private readonly string _statePath;
         private readonly Dictionary<string, RoomRuntime> _runtimes = new Dictionary<string, RoomRuntime>(StringComparer.Ordinal);
         private PersistedServerState _persisted;
@@ -25,8 +25,7 @@ namespace FewMoves.Coop.Server
             if (options == null) throw new ArgumentNullException("options");
             _options = options;
             _options.Validate();
-            _template = LoadTemplate(_options.RoomPath);
-            _templateFingerprint = CoopRules.RoomFingerprint(_template);
+            _catalog = CoopDefinitionCatalog.Load(_options);
             _statePath = Path.Combine(_options.StateRoot, "rooms.v1.json");
             EnsurePrivateStateRoot();
             LoadOrCreate();
@@ -34,16 +33,24 @@ namespace FewMoves.Coop.Server
 
         public string StateFilePath { get { return _statePath; } }
 
+        public DefinitionView[] Definitions() { return _catalog.Views(); }
+
         public StoreResult Create(CreateRoomRequest request, DateTimeOffset now)
         {
             if (request == null || !IsOpaqueSecret(request.CreateRequestId)) return Failure(400, "create_request_id_invalid", null);
+            string definitionId = string.IsNullOrEmpty(request.DefinitionId) ? CoopDefinitionCatalog.LegacyDefinitionId : request.DefinitionId;
+            CoopRoomDefinition definition;
+            string definitionFingerprint;
+            if (!_catalog.TryGet(definitionId, out definition, out definitionFingerprint)) return Failure(400, "definition_not_allowed", null);
             string requestHash = Hash("create", request.CreateRequestId);
+            string createPayloadHash = Hash("create-payload", request.CreateRequestId + "|" + definitionId);
 
             lock (_gate)
             {
                 PersistedRoom prior = FindCircleRecoveryLocked(requestHash);
                 if (prior != null)
                 {
+                    if (!MatchesCreatePayload(prior, definitionId, createPayloadHash)) return Failure(409, "create_request_payload_conflict", null);
                     RoomRuntime recovered = _runtimes[prior.RoomId];
                     if (IsExpired(prior, now)) return Failure(410, "room_expired", null);
                     string retryToken = DeriveToken("circle", request.CreateRequestId);
@@ -68,7 +75,7 @@ namespace FewMoves.Coop.Server
                 string roomId = Guid.NewGuid().ToString("N");
                 string inviteCode = DeriveToken("invite", request.CreateRequestId);
                 string circleToken = DeriveToken("circle", request.CreateRequestId);
-                CoopSession session = CoopSession.Create(_template);
+                CoopSession session = CoopSession.Create(definition);
                 var record = new PersistedRoom
                 {
                     RoomId = roomId,
@@ -78,14 +85,16 @@ namespace FewMoves.Coop.Server
                     CreatedAtUtc = now,
                     UpdatedAtUtc = now,
                     ExpiresAtUtc = now.Add(_options.RoomTtl),
-                    RulesVersion = _template.RulesVersion,
-                    ContentVersion = _template.ContentVersion,
-                    RoomFingerprint = _templateFingerprint,
+                    DefinitionId = definitionId,
+                    CreatePayloadHash = createPayloadHash,
+                    RulesVersion = definition.RulesVersion,
+                    ContentVersion = definition.ContentVersion,
+                    RoomFingerprint = definitionFingerprint,
                     Envelope = CoopSaveCodec.Capture(session, roomId)
                 };
                 AddAudit(record, now, "room_created", CoopActor.Circle, "created");
                 _persisted.Rooms.Add(record);
-                var runtime = new RoomRuntime { Record = record, Session = session, CircleLastSeen = now };
+                var runtime = new RoomRuntime { Record = record, Session = session, Definition = CoopRules.CloneRoom(definition), CircleLastSeen = now };
                 _runtimes.Add(roomId, runtime);
                 if (!PersistLocked())
                 {
@@ -178,6 +187,31 @@ namespace FewMoves.Coop.Server
         public StoreResult Heartbeat(string roomId, string bearer, DateTimeOffset now)
         {
             return GetState(roomId, bearer, now);
+        }
+
+        public StoreResult CreateRecord(string roomId, string bearer, DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                RoomRuntime runtime;
+                CoopActor seat;
+                StoreResult denied;
+                if (!TryAuthorizeLocked(roomId, bearer, now, out runtime, out seat, out denied)) return denied;
+
+                CoopReplay replay = runtime.Session.ExportReplay();
+                CoopState liveState = runtime.Session.State;
+                RecordCapsule capsule;
+                RecordVerification verification;
+                string error;
+                if (!CoopEffectiveStack.TryCreateCompletedCapsule(runtime.Definition, replay, liveState, out capsule, out verification, out error))
+                {
+                    return new StoreResult { Ok = false, StatusCode = error == "record_pass_not_representable" ? 422 : 409, ErrorCode = error, RoomId = roomId, Seat = seat, Verification = verification };
+                }
+                string encoded;
+                if (!RecordCapsuleCodec.TryEncode(capsule, out encoded, out error))
+                    return new StoreResult { Ok = false, StatusCode = 409, ErrorCode = error, RoomId = roomId, Seat = seat, Verification = verification };
+                return new StoreResult { Ok = true, StatusCode = 200, RoomId = roomId, Seat = seat, Capsule = encoded, Verification = verification };
+            }
         }
 
         public StoreResult Dispatch(string roomId, string bearer, CommandRequest request, DateTimeOffset now)
@@ -335,6 +369,13 @@ namespace FewMoves.Coop.Server
             return new StoreResult { Ok = false, StatusCode = statusCode, ErrorCode = code, Snapshot = snapshot };
         }
 
+        private bool MatchesCreatePayload(PersistedRoom record, string definitionId, string payloadHash)
+        {
+            if (!string.IsNullOrEmpty(record.CreatePayloadHash)) return ConstantEquals(record.CreatePayloadHash, payloadHash);
+            return string.Equals(record.DefinitionId, CoopDefinitionCatalog.LegacyDefinitionId, StringComparison.Ordinal)
+                && string.Equals(definitionId, CoopDefinitionCatalog.LegacyDefinitionId, StringComparison.Ordinal);
+        }
+
         private bool TryAuthorizeLocked(string roomId, string bearer, DateTimeOffset now, out RoomRuntime runtime, out CoopActor seat, out StoreResult denied)
         {
             runtime = null;
@@ -395,6 +436,8 @@ namespace FewMoves.Coop.Server
                 Room = new PublicRoomView
                 {
                     RoomId = record.RoomId,
+                    DefinitionId = record.DefinitionId,
+                    RoomResource = "CoopRooms/" + record.DefinitionId,
                     RulesVersion = record.RulesVersion,
                     ContentVersion = record.ContentVersion,
                     RoomFingerprint = record.RoomFingerprint,
@@ -551,8 +594,14 @@ namespace FewMoves.Coop.Server
                     throw new ServerStateCorruptException("Private room record is invalid.");
                 if (record.Diamond != null && (string.IsNullOrEmpty(record.Diamond.TokenHash) || string.IsNullOrEmpty(record.Diamond.RecoveryRequestHash)))
                     throw new ServerStateCorruptException("Private diamond seat is invalid.");
-                if (!string.Equals(record.RulesVersion, _template.RulesVersion, StringComparison.Ordinal) || !string.Equals(record.ContentVersion, _template.ContentVersion, StringComparison.Ordinal) || !string.Equals(record.RoomFingerprint, _templateFingerprint, StringComparison.Ordinal))
-                    throw new ServerStateCorruptException("Persisted room no longer matches configured C1.");
+                if (string.IsNullOrEmpty(record.DefinitionId)) record.DefinitionId = CoopDefinitionCatalog.LegacyDefinitionId;
+                CoopRoomDefinition definition;
+                string fingerprint;
+                if (!_catalog.TryGet(record.DefinitionId, out definition, out fingerprint)
+                    || !string.Equals(record.RulesVersion, definition.RulesVersion, StringComparison.Ordinal)
+                    || !string.Equals(record.ContentVersion, definition.ContentVersion, StringComparison.Ordinal)
+                    || !string.Equals(record.RoomFingerprint, fingerprint, StringComparison.Ordinal))
+                    throw new ServerStateCorruptException("Persisted room no longer matches its configured definition.");
                 if (record.Envelope == null || record.CommandLedger == null || record.ExpressionEvents == null || record.AuditEvents == null || record.CommandLedger.Count > _options.MaxCommandLedgerRecords || record.ExpressionEvents.Count > _options.MaxExpressionEvents || record.AuditEvents.Count > _options.MaxAuditEvents)
                     throw new ServerStateCorruptException("Private room bounded state is invalid.");
                 ValidateCommandLedger(record);
@@ -562,30 +611,13 @@ namespace FewMoves.Coop.Server
 
         private RoomRuntime BuildRuntime(PersistedRoom record)
         {
+            CoopRoomDefinition definition;
+            string fingerprint;
+            if (!_catalog.TryGet(record.DefinitionId, out definition, out fingerprint)) throw new ServerStateCorruptException("Persisted co-op definition is unavailable.");
             CoopSession session;
             string error;
-            if (!CoopSaveCodec.TryRestore(_template, record.Envelope, out session, out error)) throw new ServerStateCorruptException("Persisted co-op replay is invalid.");
-            return new RoomRuntime { Record = record, Session = session };
-        }
-
-        private CoopRoomDefinition LoadTemplate(string path)
-        {
-            try
-            {
-                CoopRoomDefinition room = JsonSerializer.Deserialize<CoopRoomDefinition>(File.ReadAllText(path), CoreJsonOptions());
-                if (room == null || CoopRules.ValidateRoom(room).Length != 0) throw new ServerStateCorruptException("Configured C1 is invalid.");
-                return CoopRules.CloneRoom(room);
-            }
-            catch (ServerStateCorruptException) { throw; }
-            catch (Exception exception) when (exception is IOException || exception is JsonException || exception is NotSupportedException)
-            {
-                throw new ServerStateCorruptException("Configured C1 cannot be read.");
-            }
-        }
-
-        private static JsonSerializerOptions CoreJsonOptions()
-        {
-            return new JsonSerializerOptions { IncludeFields = true, PropertyNameCaseInsensitive = true };
+            if (!CoopSaveCodec.TryRestore(definition, record.Envelope, out session, out error)) throw new ServerStateCorruptException("Persisted co-op replay is invalid.");
+            return new RoomRuntime { Record = record, Session = session, Definition = definition };
         }
 
         private bool PersistLocked()

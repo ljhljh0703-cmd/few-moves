@@ -10,6 +10,7 @@ namespace FewMoves.Coop.Server
         public string PublicRoot;
         public string StateRoot;
         public string RoomPath;
+        public string RoomCatalogRoot;
         public string ListenUrl;
         public string BuildId;
         public string Version = "coop-http-v1";
@@ -39,6 +40,8 @@ namespace FewMoves.Coop.Server
             options.StateRoot = RequiredPath("FEW_MOVES_STATE_ROOT");
             options.RoomPath = Environment.GetEnvironmentVariable("FEW_MOVES_ROOM_PATH");
             if (string.IsNullOrEmpty(options.RoomPath)) options.RoomPath = Path.Combine(AppContext.BaseDirectory, "CoopRooms", "coop-c1.json");
+            options.RoomCatalogRoot = Environment.GetEnvironmentVariable("FEW_MOVES_ROOM_CATALOG_ROOT");
+            if (string.IsNullOrEmpty(options.RoomCatalogRoot)) options.RoomCatalogRoot = Path.GetDirectoryName(options.RoomPath);
             options.ListenUrl = Environment.GetEnvironmentVariable("FEW_MOVES_LISTEN_URL");
             if (string.IsNullOrEmpty(options.ListenUrl)) options.ListenUrl = "http://127.0.0.1:5088";
             options.BuildId = BoundedEnvironment("FEW_MOVES_SERVER_BUILD_ID", 128);
@@ -51,15 +54,18 @@ namespace FewMoves.Coop.Server
             if (string.IsNullOrWhiteSpace(PublicRoot)) throw new InvalidOperationException("FEW_MOVES_WEB_ROOT is required.");
             if (string.IsNullOrWhiteSpace(StateRoot)) throw new InvalidOperationException("FEW_MOVES_STATE_ROOT is required.");
             if (string.IsNullOrWhiteSpace(RoomPath)) throw new InvalidOperationException("Room path is required.");
+            if (string.IsNullOrWhiteSpace(RoomCatalogRoot)) throw new InvalidOperationException("Room catalog root is required.");
             if (string.IsNullOrWhiteSpace(ListenUrl)) throw new InvalidOperationException("Listen URL is required.");
 
             PublicRoot = Path.GetFullPath(PublicRoot);
             StateRoot = Path.GetFullPath(StateRoot);
             RoomPath = Path.GetFullPath(RoomPath);
+            RoomCatalogRoot = Path.GetFullPath(RoomCatalogRoot);
             if (!Directory.Exists(PublicRoot)) throw new DirectoryNotFoundException("Configured public root is unavailable.");
             if (!File.Exists(Path.Combine(PublicRoot, "index.html"))) throw new FileNotFoundException("Configured public root has no index.html.");
             if (!ContainsWasm(PublicRoot)) throw new FileNotFoundException("Configured public root has no uncompressed wasm asset.");
             if (!File.Exists(RoomPath)) throw new FileNotFoundException("Configured co-op room is unavailable.");
+            if (!Directory.Exists(RoomCatalogRoot)) throw new DirectoryNotFoundException("Configured co-op room catalog is unavailable.");
             if (PathsOverlap(PublicRoot, StateRoot)) throw new InvalidOperationException("Public and private state roots must not overlap.");
             if (RoomTtl <= TimeSpan.Zero || HeartbeatTimeout <= TimeSpan.Zero || RequestWindow <= TimeSpan.Zero || CommandWindow <= TimeSpan.Zero || ExpressionWindow <= TimeSpan.Zero || ExpressionCooldown <= TimeSpan.Zero)
                 throw new InvalidOperationException("Server durations must be positive.");

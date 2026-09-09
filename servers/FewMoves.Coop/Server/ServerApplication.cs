@@ -18,7 +18,7 @@ namespace FewMoves.Coop.Server
 {
     public static class ServerApplication
     {
-        private static readonly string[] CreateFields = { "createRequestId" };
+        private static readonly string[] CreateFields = { "createRequestId", "definitionId" };
         private static readonly string[] JoinFields = { "inviteCode", "joinRequestId" };
         private static readonly string[] HeartbeatFields = new string[0];
         private static readonly string[] CommandFields = { "commandId", "expectedRevision", "kind", "direction", "requestId", "approve", "expression" };
@@ -61,6 +61,11 @@ namespace FewMoves.Coop.Server
                 context.Response.Headers["Cache-Control"] = "no-store";
                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
                 await Execute(context, Results.File(Path.Combine(options.PublicRoot, "index.html"), "text/html; charset=utf-8", enableRangeProcessing: false));
+            });
+            app.MapGet("/api/coop/v1/definitions", async context =>
+            {
+                RoomStore roomStore = context.RequestServices.GetRequiredService<RoomStore>();
+                await Execute(context, Json(200, new DefinitionsView { Definitions = roomStore.Definitions() }));
             });
 
             app.MapPost("/api/coop/v1/rooms", async (HttpContext context) =>
@@ -154,6 +159,20 @@ namespace FewMoves.Coop.Server
                 await Execute(context, ToCommandOrError(result));
             });
 
+            app.MapPost("/api/coop/v1/rooms/{roomId}/record", async (HttpContext context) =>
+            {
+                string roomId = Convert.ToString(context.Request.RouteValues["roomId"]);
+                ParsedRequest<object> parsed = await ReadJsonAsync<object>(context.Request, HeartbeatFields, options.MaxRequestBodyBytes);
+                if (!parsed.Ok)
+                {
+                    await Execute(context, Json(parsed.StatusCode, new RecordView { Ok = false, Error = new ApiError { Code = parsed.ErrorCode } }));
+                    return;
+                }
+                RoomStore roomStore = context.RequestServices.GetRequiredService<RoomStore>();
+                StoreResult result = roomStore.CreateRecord(roomId, ReadBearer(context.Request), DateTimeOffset.UtcNow);
+                await Execute(context, ToRecord(result));
+            });
+
             return app;
         }
 
@@ -208,6 +227,17 @@ namespace FewMoves.Coop.Server
                 Reason = result.Reason ?? result.ErrorCode,
                 Events = result.Events ?? new CoopEvent[0],
                 Error = result.Accepted ? null : new ApiError { Code = code }
+            });
+        }
+
+        private static IResult ToRecord(StoreResult result)
+        {
+            return Json(result.StatusCode, new RecordView
+            {
+                Ok = result.Ok,
+                Capsule = result.Ok ? result.Capsule : null,
+                Verification = result.Verification,
+                Error = result.Ok ? null : new ApiError { Code = result.ErrorCode }
             });
         }
 
