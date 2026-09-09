@@ -18,7 +18,11 @@ main { width:min(680px,100%); min-height:100svh; margin:0 auto; padding:max(10px
 .intro h2 { margin:0; font-size:24px; line-height:1.2; }
 .intro p { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
 .mode-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-.mode-card { min-height:170px; display:grid; align-content:space-between; gap:12px; padding:14px; border:1px solid var(--grid); border-radius:14px; background:#fffdf7; box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 12%,transparent); }
+.mode-card { min-height:178px; display:grid; align-content:space-between; gap:12px; padding:14px; border:1px solid var(--grid); border-radius:14px; background:#fffdf7; box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 12%,transparent); }
+.mode-card.solo { border-top:5px solid var(--player); }
+.mode-card.coop { border-top:5px solid var(--focus); }
+.mode-card.raid { border-top:5px solid var(--tail); }
+.mode-mark { display:block; min-height:24px; margin-bottom:7px; color:var(--muted); font-size:18px; font-weight:850; letter-spacing:4px; }
 .mode-card h3 { margin:0; font-size:16px; }
 .mode-card p { margin:5px 0 0; color:var(--muted); font-size:12px; line-height:1.45; }
 .mode-card a { width:100%; color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
@@ -40,4 +44,4 @@ main { width:min(680px,100%); min-height:100svh; margin:0 auto; padding:max(10px
 .mode-links .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
 .record-badge { display:none; padding:6px 9px; border:1px solid var(--grid); border-radius:999px; background:#fffdf7; color:var(--muted); font-size:11px; }
 .record-badge.visible { display:inline-flex; }
-@media (max-width:560px) { .mode-grid { grid-template-columns:1fr; } .mode-card { min-height:132px; } .intro h2 { font-size:21px; } .top-actions a, .top-actions button { padding:0 9px; } }
+@media (max-width:560px) { .page { gap:12px; padding-top:12px; } .mode-grid { grid-template-columns:1fr; gap:8px; } .mode-card { min-height:126px; grid-template-columns:1fr 96px; align-items:center; } .mode-card a { align-self:center; } .mode-mark { display:inline; margin-right:7px; } .mode-card h3 { display:inline; } .intro h2 { font-size:21px; } .top-actions a, .top-actions button { padding:0 9px; } }
