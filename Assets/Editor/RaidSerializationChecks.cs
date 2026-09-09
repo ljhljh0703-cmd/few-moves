@@ -59,7 +59,16 @@ namespace Nectorial.Editor
             string malformedError;
             if (RaidSaveSerializationAdapter.TryNormalize(malformed, out malformedError)) throw new InvalidOperationException("Raid malformed attempt was accepted.");
             Debug.Log("RAID_JSON_PROBE case=malformed-attempt state=rejected error=" + malformedError);
+            bool hasMine;
+            bool hasShared;
+            string recordEnvelopeError;
+            if (!RaidBootstrap.TryDeserializeRecordEnvelopeForCheck("{\"hasMine\":false,\"hasShared\":false,\"mine\":null,\"shared\":null}", out hasMine, out hasShared, out recordEnvelopeError) || hasMine || hasShared)
+                throw new InvalidOperationException("Raid empty record observation did not remain absent: " + recordEnvelopeError);
+            if (RaidBootstrap.TryDeserializeRecordEnvelopeForCheck("{\"hasMine\":true,\"hasShared\":false,\"mine\":null,\"shared\":null}", out hasMine, out hasShared, out recordEnvelopeError) || recordEnvelopeError != "mine_record_invalid")
+                throw new InvalidOperationException("Raid empty mine observation was accepted: " + recordEnvelopeError);
+            Debug.Log("RAID_JSON_PROBE case=record-empty-guard state=pass");
             CheckBootstrapRestoreAndRecovery(arena);
+            CheckRaidRecordRuntime(arena);
             Debug.Log("RAID_JSON_PROBE_RESULT pass=true");
         }
 
@@ -197,6 +206,47 @@ namespace Nectorial.Editor
             return bootstrap;
         }
 
+        private static void CheckRaidRecordRuntime(RaidArenaDefinition arena)
+        {
+            PreferenceSnapshot priorSave = CapturePreference(SaveKey);
+            PreferenceSnapshot priorFailedSave = CapturePreference(FailedSaveKey);
+            GameObject host = null;
+            try
+            {
+                PlayerPrefs.DeleteKey(SaveKey);
+                PlayerPrefs.DeleteKey(FailedSaveKey);
+                PlayerPrefs.Save();
+                RaidBootstrap bootstrap = CreateBootstrap("Raid record probe", out host);
+                RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
+                if (solution.Status != RaidSolverStatus.Solved) throw new InvalidOperationException("Raid record probe solver did not solve.");
+                for (int index = 0; index < solution.Moves.Length; index++)
+                {
+                    RaidDispatchResult result;
+                    if (!bootstrap.TryStartMove(solution.Moves[index].Direction, out result) || !result.Accepted) throw new InvalidOperationException("Raid record probe move rejected: " + index.ToString());
+                    bootstrap.CompleteActionPresentation();
+                }
+                if (bootstrap.State.Status != RaidRunStatus.Cleared) throw new InvalidOperationException("Raid record probe did not clear.");
+                string beforeChallenge = RaidRules.StateFingerprint(arena, bootstrap.State);
+                bootstrap.HandleCommand("{\"kind\":\"GetRecord\"}");
+                if (!ReadPrivate<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Raid runtime did not create mine record.");
+                string capsule = ReadPrivateString(bootstrap, "_recordCapsule");
+                if (string.IsNullOrEmpty(capsule)) throw new InvalidOperationException("Raid runtime did not encode record capsule.");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"" + capsule + "\"}");
+                if (!ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime did not validate shared record.");
+                bootstrap.HandleCommand("{\"kind\":\"Challenge\"}");
+                if (!string.Equals(beforeChallenge, RaidRules.StateFingerprint(arena, bootstrap.State), StringComparison.Ordinal)) throw new InvalidOperationException("Raid challenge mutated the active save state.");
+                bootstrap.HandleCommand("{\"kind\":\"LoadSharedRecord\",\"capsule\":\"fm1.invalid\"}");
+                if (ReadPrivate<bool>(bootstrap, "_hasShared")) throw new InvalidOperationException("Raid runtime retained invalid shared record as valid.");
+                Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge state=pass");
+            }
+            finally
+            {
+                if (host != null) UnityEngine.Object.DestroyImmediate(host);
+                RestorePreference(SaveKey, priorSave);
+                RestorePreference(FailedSaveKey, priorFailedSave);
+            }
+        }
+
         private static PreferenceSnapshot CapturePreference(string key)
         {
             return new PreferenceSnapshot { Exists = PlayerPrefs.HasKey(key), Value = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null };
@@ -204,9 +254,14 @@ namespace Nectorial.Editor
 
         private static string ReadPrivateString(object target, string fieldName)
         {
+            return ReadPrivate<string>(target, fieldName);
+        }
+
+        private static T ReadPrivate<T>(object target, string fieldName)
+        {
             FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            if (field == null) throw new InvalidOperationException("Raid bootstrap message field was unavailable.");
-            return field.GetValue(target) as string;
+            if (field == null) throw new InvalidOperationException("Raid bootstrap field was unavailable: " + fieldName);
+            return (T)field.GetValue(target);
         }
 
         private static Vector3 ReadBoardPlayerLocalPosition(RaidBootstrap bootstrap)

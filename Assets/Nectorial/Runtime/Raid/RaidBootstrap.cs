@@ -3,6 +3,8 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Raid;
+using Nectorial.SlideEscape.Record;
+using Nectorial.SlideEscape.Unity.Record;
 using UnityEngine;
 
 namespace Nectorial.SlideEscape.Unity.Raid
@@ -29,6 +31,14 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private string _message = "초기화 중";
         private string _saveStatus = "idle";
         private string _saveError = string.Empty;
+        private bool _hasMine;
+        private bool _hasShared;
+        private RecordSummaryObservation _mine;
+        private RecordSummaryObservation _shared;
+        private string _recordCapsule = string.Empty;
+        private string _sharedCapsule = string.Empty;
+        private string _recordStatus = "idle";
+        private string _recordError = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void CreateRuntime()
@@ -125,6 +135,21 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (string.Equals(input.kind, "Save", StringComparison.Ordinal))
             {
                 HandleRaidInput("Save");
+                return;
+            }
+            if (string.Equals(input.kind, "GetRecord", StringComparison.Ordinal))
+            {
+                GetRecord();
+                return;
+            }
+            if (string.Equals(input.kind, "LoadSharedRecord", StringComparison.Ordinal))
+            {
+                LoadSharedRecord(input.capsule);
+                return;
+            }
+            if (string.Equals(input.kind, "Challenge", StringComparison.Ordinal))
+            {
+                ChallengeSharedRecord();
                 return;
             }
             if (string.Equals(input.kind, "Slide", StringComparison.Ordinal))
@@ -318,6 +343,131 @@ namespace Nectorial.SlideEscape.Unity.Raid
             }
         }
 
+        private void GetRecord()
+        {
+            if (!_initialized || _arena == null || _session == null || _session.State.Status != RaidRunStatus.Cleared)
+            {
+                SetRecordFailure("record_not_cleared", "완주한 뒤 기록을 준비할 수 있습니다");
+                return;
+            }
+            string inputSequence;
+            string error;
+            if (!TryRecordInputSequence(_session.ExportReplay().Moves, out inputSequence, out error))
+            {
+                SetRecordFailure(error, "기록 입력을 확인하지 못했습니다");
+                return;
+            }
+            var capsule = new RecordCapsule
+            {
+                SchemaVersion = RecordCapsuleRules.SchemaVersion,
+                ModeId = RecordCapsuleRules.RaidModeId,
+                DefinitionId = _arena.Id,
+                RulesVersion = _arena.RulesVersion,
+                ContentVersion = _arena.ContentVersion,
+                DefinitionFingerprint = RaidRules.ArenaFingerprint(_arena),
+                InputSequence = inputSequence
+            };
+            RecordVerification verification;
+            if (!RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification) || !RecordCapsuleCodec.TryEncode(capsule, out _recordCapsule, out error))
+            {
+                SetRecordFailure(string.IsNullOrEmpty(error) ? verification.ErrorCode : error, "기록을 검증하지 못했습니다");
+                return;
+            }
+            RecordSummaryObservation summary = RecordSummaryObservation.From(verification);
+            if (!RecordObservationGuard.IsUsable(true, summary))
+            {
+                SetRecordFailure("record_summary_invalid", "기록 요약을 확인하지 못했습니다");
+                return;
+            }
+            _mine = summary;
+            _hasMine = true;
+            _recordStatus = "ready";
+            _recordError = string.Empty;
+            _message = "완주 기록을 준비했습니다";
+            PublishState();
+        }
+
+        private void LoadSharedRecord(string encoded)
+        {
+            _hasShared = false;
+            _shared = null;
+            _sharedCapsule = string.Empty;
+            RecordCapsule capsule;
+            string error;
+            if (!RecordCapsuleCodec.TryDecode(encoded, out capsule, out error))
+            {
+                SetRecordFailure(error, "공유 기록을 읽지 못했습니다");
+                return;
+            }
+            RecordVerification verification = null;
+            if (!_initialized || _arena == null || !RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification))
+            {
+                SetRecordFailure(verification == null ? "record_definition_unavailable" : verification.ErrorCode, "공유 기록이 현재 레이드와 맞지 않습니다");
+                return;
+            }
+            RecordSummaryObservation summary = RecordSummaryObservation.From(verification);
+            if (!RecordObservationGuard.IsUsable(true, summary))
+            {
+                SetRecordFailure("shared_summary_invalid", "공유 기록 요약을 확인하지 못했습니다");
+                return;
+            }
+            _shared = summary;
+            _hasShared = true;
+            _sharedCapsule = encoded;
+            _recordStatus = "ready";
+            _recordError = string.Empty;
+            _message = "공유 기록을 확인했습니다";
+            PublishState();
+        }
+
+        private void ChallengeSharedRecord()
+        {
+            if (!_hasShared || !RecordObservationGuard.IsUsable(true, _shared))
+            {
+                SetRecordFailure("shared_record_missing", "먼저 검증된 공유 기록을 불러오세요");
+                return;
+            }
+            _recordStatus = "ready";
+            _recordError = string.Empty;
+            _message = "공유 기록에 도전할 준비가 되었습니다. 다시 시작을 선택하세요";
+            PublishState();
+        }
+
+        private void SetRecordFailure(string code, string message)
+        {
+            _recordStatus = "invalid";
+            _recordError = string.IsNullOrEmpty(code) ? "record_invalid" : code;
+            _message = message;
+            PublishState();
+        }
+
+        private static bool TryRecordInputSequence(RaidMove[] moves, out string sequence, out string error)
+        {
+            sequence = string.Empty;
+            error = null;
+            if (moves == null || moves.Length == 0) { error = "record_moves_missing"; return false; }
+            if (moves.Length > RecordCapsuleRules.MaximumInputCharacters) { error = "record_input_too_long"; return false; }
+            var characters = new char[moves.Length];
+            for (int index = 0; index < moves.Length; index++)
+            {
+                RaidMove move = moves[index];
+                if (move == null) { error = "record_move_missing:" + index.ToString(); return false; }
+                if (!TryDirectionCharacter(move.Direction, out characters[index])) { error = "record_direction_invalid:" + index.ToString(); return false; }
+            }
+            sequence = new string(characters);
+            return true;
+        }
+
+        private static bool TryDirectionCharacter(GameCommand direction, out char value)
+        {
+            value = 'U';
+            if (direction == GameCommand.Up) return true;
+            if (direction == GameCommand.Down) { value = 'D'; return true; }
+            if (direction == GameCommand.Left) { value = 'L'; return true; }
+            if (direction == GameCommand.Right) { value = 'R'; return true; }
+            return false;
+        }
+
         private void BlockRestore(string error)
         {
             _restoreBlocked = true;
@@ -388,6 +538,15 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 playerX = state == null ? 0 : state.PlayerPosition.X,
                 playerY = state == null ? 0 : state.PlayerPosition.Y,
                 snakeHeadIndex = state == null ? -1 : state.SnakeHeadIndex,
+                activeDefinitionId = _arena == null ? string.Empty : _arena.Id,
+                selectedDefinitionId = _arena == null ? string.Empty : _arena.Id,
+                recordStatus = _recordStatus,
+                recordCapsule = _recordCapsule,
+                hasMine = _hasMine && RecordObservationGuard.IsUsable(true, _mine),
+                mine = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mine : null,
+                hasShared = _hasShared && RecordObservationGuard.IsUsable(true, _shared),
+                shared = _hasShared && RecordObservationGuard.IsUsable(true, _shared) ? _shared : null,
+                recordError = _recordError,
                 message = _message,
                 saveStatus = _saveStatus,
                 saveError = _saveError,
@@ -449,19 +608,39 @@ namespace Nectorial.SlideEscape.Unity.Raid
             return Translate(result.Reason);
         }
 
+#if UNITY_EDITOR
+        public static bool TryDeserializeRecordEnvelopeForCheck(string json, out bool hasMine, out bool hasShared, out string error)
+        {
+            hasMine = false;
+            hasShared = false;
+            error = null;
+            RecordObservationEnvelope envelope;
+            try { envelope = JsonUtility.FromJson<RecordObservationEnvelope>(json); }
+            catch (Exception exception) { error = "record_observation_json:" + exception.GetType().Name; return false; }
+            if (envelope == null) { error = "record_observation_missing"; return false; }
+            hasMine = RecordObservationGuard.IsUsable(envelope.hasMine, envelope.mine);
+            hasShared = RecordObservationGuard.IsUsable(envelope.hasShared, envelope.shared);
+            if (envelope.hasMine && !hasMine) { error = "mine_record_invalid"; return false; }
+            if (envelope.hasShared && !hasShared) { error = "shared_record_invalid"; return false; }
+            return true;
+        }
+#endif
+
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
         private static extern void NectorialRaidReportState(string json);
 #endif
 
         [Serializable]
-        private sealed class RaidInput { public string kind; public string direction; }
+        private sealed class RaidInput { public string kind; public string direction; public string capsule; }
         [Serializable]
         private sealed class RaidObservation
         {
             public bool initialized; public bool inputEnabled; public bool transitioning; public string statusCode;
             public int actions; public int hits; public int shieldCharges; public int magnetStepsRemaining; public int slowStepsRemaining;
             public int tailCount; public int tailTarget; public int playerX; public int playerY; public int snakeHeadIndex;
+            public string activeDefinitionId; public string selectedDefinitionId; public string recordStatus; public string recordCapsule;
+            public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string recordError;
             public string message; public string saveStatus; public string saveError; public string stateFingerprint;
         }
     }
