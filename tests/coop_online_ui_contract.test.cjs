@@ -323,6 +323,18 @@ async function runUiFixtures() {
   h.elements["record-share"].listeners.click();h.clipboardCalls[1].item.reject(new Error("denied"));await settle();
   assert.equal(h.elements["record-fallback"].hidden,false);
   assert.equal(h.elements["record-fallback"].value,"https://game.test/content/coop/index.html#record=fm1.new");
+  assert.match(h.elements["record-note"].textContent,/자동 복사가 되지 않았습니다/);
+  h.elements["record-share"].listeners.click();h.clipboardCalls[2].item.resolve();await settle();
+  assert.equal(h.elements["record-fallback"].hidden,false,"clipboard success also leaves a selectable link");
+  assert.equal(h.elements["record-fallback"].value,"https://game.test/content/coop/index.html#record=fm1.new");
+  assert.equal(h.elements["record-note"].textContent,"기록 링크를 복사했습니다.");
+  const sameRecord=Object.assign({},joined,{recordCapsule:"fm1.new",authorityRevision:joined.authorityRevision+1});
+  h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(sameRecord));
+  assert.equal(h.elements["record-note"].textContent,"기록 링크를 복사했습니다.","same-record polling preserves share feedback");
+  assert.equal(h.elements["record-fallback"].hidden,false);
+  h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},sameRecord,{recordCapsule:"fm1.changed",authorityRevision:sameRecord.authorityRevision+1})));
+  assert.equal(h.elements["record-fallback"].hidden,true,"a changed record context clears the old selectable link");
+  assert.notEqual(h.elements["record-note"].textContent,"기록 링크를 복사했습니다.");
   const beforeKey=h.sent.length;h.documentObject.listeners.keydown({key:"ArrowUp",repeat:false,ctrlKey:false,metaKey:false,altKey:false,preventDefault(){}});assert.equal(h.sent.length,beforeKey,"modal blocks keyboard gameplay");
 
   h.elements["record-close"].listeners.click(); h.elements["leave-button"].listeners.click();

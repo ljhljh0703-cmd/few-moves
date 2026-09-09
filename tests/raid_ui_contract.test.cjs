@@ -115,6 +115,11 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.elements["record-share"].listeners.click(); h.clipboardCalls[1].item.reject(new Error("denied")); await settle();
   assert.equal(h.elements["record-fallback"].hidden, false);
   assert.equal(h.elements["record-fallback"].value, "https://game.test/content/raid/index.html#record=fm1.new");
+  assert.match(h.elements["record-note"].textContent, /자동 복사가 되지 않았습니다/);
+  h.elements["record-share"].listeners.click(); h.clipboardCalls[2].item.resolve(); await settle();
+  assert.equal(h.elements["record-fallback"].hidden, false, "clipboard success also leaves a selectable link");
+  assert.equal(h.elements["record-fallback"].value, "https://game.test/content/raid/index.html#record=fm1.new");
+  assert.equal(h.elements["record-note"].textContent, "기록 링크를 복사했습니다.");
 
   const beforeKey = h.sent.length;
   h.documentObject.listeners.keydown({ key:"ArrowUp", repeat:false, ctrlKey:false, metaKey:false, altKey:false, preventDefault(){} });
