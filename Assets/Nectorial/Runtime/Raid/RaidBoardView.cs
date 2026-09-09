@@ -186,6 +186,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 GridPoint after = frame.SnakeAfter != null && index < frame.SnakeAfter.Length ? frame.SnakeAfter[index] : before;
                 _snakeActors[index].localPosition = Vector3.Lerp(ToLocalPosition(before), ToLocalPosition(after), Mathf.Clamp01(progress));
             }
+            HidePickups(frame.CollectedTailIds);
+            HidePickups(frame.CollectedItemIds);
+            HidePickups(frame.MagnetCollectedTailIds);
             SetRootPosition(arena);
         }
 
@@ -210,6 +213,14 @@ namespace Nectorial.SlideEscape.Unity.Raid
             AddAll(collected, collectedItems);
             foreach (KeyValuePair<string, GameObject> pair in _pickupActors)
                 if (pair.Value != null) pair.Value.SetActive(!collected.Contains(pair.Key));
+        }
+
+        private void HidePickups(string[] ids)
+        {
+            if (ids == null) return;
+            for (int index = 0; index < ids.Length; index++)
+                if (!string.IsNullOrEmpty(ids[index]) && _pickupActors.TryGetValue(ids[index], out GameObject actor) && actor != null)
+                    actor.SetActive(false);
         }
 
         private static void AddAll(HashSet<string> values, string[] items)
