@@ -227,6 +227,7 @@ namespace Nectorial.SlideEscape.Unity.CoopOnline
             if (IsNoSessionResume(result, sessionPresent, hasRoom, hasState))
             {
                 ResetRoomView();
+                _inviteCode = result.inviteCode ?? string.Empty;
                 _message = string.IsNullOrEmpty(result.inviteCode) ? "방을 만들거나 초대 코드로 참여하세요" : "초대 코드에 연결할 저장된 좌석이 없습니다";
                 PublishState();
                 return;

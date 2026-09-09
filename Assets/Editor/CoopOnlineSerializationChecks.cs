@@ -116,11 +116,26 @@ namespace Nectorial.Editor
                 SetField(bootstrap, "_initialized", true);
                 bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"resume\",\"inviteCode\":\"\",\"seat\":-1}");
                 if (ReadField<bool>(bootstrap, "_joined") || ReadField<bool>(bootstrap, "_roomReady") || ReadField<CoopState>(bootstrap, "_serverState") != null ||
-                    ReadField<string>(bootstrap, "_message") != "방을 만들거나 초대 코드로 참여하세요")
+                    ReadField<string>(bootstrap, "_message") != "방을 만들거나 초대 코드로 참여하세요" || ReadField<string>(bootstrap, "_inviteCode") != string.Empty)
                 {
                     throw new InvalidOperationException("Online no-session resume did not return to the create/join lobby.");
                 }
-                Debug.Log("COOP_ONLINE_JSON_PROBE case=resume-no-session-lobby state=pass");
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=resume-no-session-empty-invite-lobby state=pass");
+
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"resume\",\"inviteCode\":\"INV-URL-PROBE\",\"seat\":-1}");
+                if (ReadField<bool>(bootstrap, "_joined") || ReadField<bool>(bootstrap, "_roomReady") || ReadField<CoopState>(bootstrap, "_serverState") != null ||
+                    ReadField<string>(bootstrap, "_inviteCode") != "INV-URL-PROBE" || ReadField<string>(bootstrap, "_message") != "초대 코드에 연결할 저장된 좌석이 없습니다")
+                {
+                    throw new InvalidOperationException("Online no-session invite resume did not retain the invitation for joining.");
+                }
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=resume-no-session-invite-preserved state=pass");
+
+                bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"joined\",\"seat\":1,\"room\":{\"roomId\":\"join-probe-room\",\"rulesVersion\":\"" + room.RulesVersion + "\",\"contentVersion\":\"" + room.ContentVersion + "\",\"roomFingerprint\":\"" + CoopRules.RoomFingerprint(room) + "\"}}");
+                if (!ReadField<bool>(bootstrap, "_joined") || !ReadField<bool>(bootstrap, "_roomReady") || ReadField<int>(bootstrap, "_seatCode") != 1)
+                {
+                    throw new InvalidOperationException("Online join after preserved invite did not enter the authenticated room path.");
+                }
+                Debug.Log("COOP_ONLINE_JSON_PROBE case=resume-invite-then-join state=pass");
 
                 bootstrap.OnOnlineResult("{\"ok\":true,\"op\":\"state\",\"seat\":0,\"room\":{},\"state\":{}}");
                 if (!ReadField<bool>(bootstrap, "_transportLocked") || ReadField<string>(bootstrap, "_error") != "online_authenticated_payload_invalid" || ReadField<CoopState>(bootstrap, "_serverState") != null)

@@ -143,7 +143,9 @@ assert.match(onlineSerialization, /error-without-state preserve=pass input=locke
 assert.match(onlineSerialization, /recovered-auth-state unlock=pass/);
 assert.match(onlineSerialization, /record-empty-guard-and-definition-identity/);
 assert.match(onlineSerialization, /record-mine-shared-active-room-preserved/);
-assert.match(onlineSerialization, /resume-no-session-lobby/);
+assert.match(onlineSerialization, /resume-no-session-empty-invite-lobby/);
+assert.match(onlineSerialization, /resume-no-session-invite-preserved/);
+assert.match(onlineSerialization, /resume-invite-then-join/);
 assert.match(onlineSerialization, /malformed-authenticated-payload/);
 assert.match(onlineSerialization, /COOP_ONLINE_JSON_PROBE_RESULT pass=true/);
 
