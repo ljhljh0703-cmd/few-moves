@@ -33,15 +33,21 @@ internal static class Program
         CoopRoomDefinition c3 = null;
         C2Measurement c2Measurement = null;
         C3Measurement c3Measurement = null;
+        int c2Score = -1;
 
         foreach (CoopRoomDefinition candidate in Candidates())
         {
             if (c2Diagnostics.Count < 12 && TryProbeC2(candidate, out C2Diagnostic diagnostic) && diagnostic.Normal.Status == "Solved" && diagnostic.NormalStopperWitness.CircleStopped && diagnostic.NormalStopperWitness.DiamondStopped)
                 c2Diagnostics.Add(diagnostic);
-            if (c2 == null && TryMeasureC2(candidate, out C2Measurement measurement))
+            if (TryMeasureC2(candidate, out C2Measurement measurement))
             {
-                c2 = candidate;
-                c2Measurement = measurement;
+                int score = ScoreC2(candidate, measurement);
+                if (c2 == null || score > c2Score || score == c2Score && measurement.Normal.OptimalActionCount < c2Measurement.Normal.OptimalActionCount)
+                {
+                    c2 = candidate;
+                    c2Measurement = measurement;
+                    c2Score = score;
+                }
             }
             if (TryMeasureC3(candidate, out C3Measurement c3Result) && (c3 == null || c3Result.Normal.OptimalActionCount < c3Measurement.Normal.OptimalActionCount))
             {
@@ -68,7 +74,8 @@ internal static class Program
         if (!TryProbeC2(room, out C2Diagnostic diagnostic)) return false;
         if (diagnostic.Normal.Status != "Solved" || diagnostic.Normal.Trace.Length == 0) return false;
         if (!diagnostic.NormalStopperWitness.CircleStopped || !diagnostic.NormalStopperWitness.DiamondStopped) return false;
-        if (diagnostic.ForbidCircleStop.Status != "Solved" || diagnostic.ForbidDiamondStop.Status != "Solved") return false;
+        if (diagnostic.ForbidCircleStop.Status == "Solved" && diagnostic.ForbidCircleStop.OptimalActionCount <= diagnostic.Normal.OptimalActionCount) return false;
+        if (diagnostic.ForbidDiamondStop.Status == "Solved" && diagnostic.ForbidDiamondStop.OptimalActionCount <= diagnostic.Normal.OptimalActionCount) return false;
         if (SameTrace(diagnostic.Normal.Trace, diagnostic.ForbidCircleStop.Trace) || SameTrace(diagnostic.Normal.Trace, diagnostic.ForbidDiamondStop.Trace)) return false;
         if (diagnostic.ForbidCircleStop.OptimalActionCount == diagnostic.Normal.OptimalActionCount && diagnostic.ForbidDiamondStop.OptimalActionCount == diagnostic.Normal.OptimalActionCount &&
             diagnostic.ForbidCircleStop.VisitedCount == diagnostic.Normal.VisitedCount && diagnostic.ForbidDiamondStop.VisitedCount == diagnostic.Normal.VisitedCount) return false;
@@ -136,6 +143,17 @@ internal static class Program
         return true;
     }
 
+    private static int ScoreC2(CoopRoomDefinition room, C2Measurement measurement)
+    {
+        bool circleSolved = measurement.ForbidCircleStop.Status == "Solved";
+        bool diamondSolved = measurement.ForbidDiamondStop.Status == "Solved";
+        bool circleWorsened = circleSolved && measurement.ForbidCircleStop.OptimalActionCount > measurement.Normal.OptimalActionCount;
+        bool diamondWorsened = diamondSolved && measurement.ForbidDiamondStop.OptimalActionCount > measurement.Normal.OptimalActionCount;
+        int score = circleWorsened && diamondWorsened ? 30 : circleWorsened || diamondWorsened ? 20 : 10;
+        for (int y = 1; y < room.Height - 1; y++) for (int x = 1; x < room.Width - 1; x++) if (room.Rows[y][x] == '#') return score + 5;
+        return score;
+    }
+
     private static string Verify(string roomDir)
     {
         if (string.IsNullOrEmpty(roomDir)) throw new ArgumentException("--room-dir is required for verify mode");
@@ -199,8 +217,8 @@ internal static class Program
         int leaveIndex = -1;
         int helpIndex = -1;
         int helpStartIndex = -1;
+        int partnerStopIndex = -1;
         int returnIndex = -1;
-        bool returnWasPartnerStopped = false;
         CoopState prior = session.State;
         for (int index = 0; index < commands.Length; index++)
         {
@@ -217,24 +235,23 @@ internal static class Program
             {
                 leaveIndex = index;
             }
-            else if (leaveIndex >= 0 && helpIndex < 0 && command.Seat != firstGoalActor.Value && command.Kind == CoopCommandKind.Slide)
+            else if (leaveIndex >= 0 && helpIndex < 0 && command.Seat == firstGoalActor.Value && command.Kind == CoopCommandKind.Slide)
             {
                 helpStartIndex = index;
                 helpIndex = index;
             }
-            else if (leaveIndex >= 0 && helpIndex >= 0 && command.Seat != firstGoalActor.Value && command.Kind == CoopCommandKind.Slide)
-            {
-                helpIndex = index;
-            }
-            else if (helpIndex >= 0 && returnIndex < 0 && command.Seat == firstGoalActor.Value && AtGoal(room, after, firstGoalActor.Value))
+            else if (helpIndex >= 0 && partnerStopIndex < 0 && command.Seat != firstGoalActor.Value && command.Kind == CoopCommandKind.Slide)
             {
                 for (int eventIndex = 0; eventIndex < result.Events.Length; eventIndex++)
-                    if (result.Events[eventIndex].Type == "stopped_by_partner" && result.Events[eventIndex].Actor == firstGoalActor.Value) returnWasPartnerStopped = true;
-                if (returnWasPartnerStopped) returnIndex = index;
+                    if (result.Events[eventIndex].Type == "stopped_by_partner" && result.Events[eventIndex].Actor != firstGoalActor.Value && result.Events[eventIndex].Detail == firstGoalActor.Value.ToString()) partnerStopIndex = index;
+            }
+            else if (partnerStopIndex >= 0 && returnIndex < 0 && command.Seat == firstGoalActor.Value && AtGoal(room, after, firstGoalActor.Value))
+            {
+                returnIndex = index;
             }
             prior = after;
         }
-        if (!firstGoalActor.HasValue || leaveIndex < 0 || helpIndex < 0 || returnIndex < 0 || !returnWasPartnerStopped) return null;
+        if (!firstGoalActor.HasValue || leaveIndex < 0 || helpIndex < 0 || partnerStopIndex < 0 || returnIndex < 0) return null;
         return new C3Witness
         {
             FirstGoalActor = firstGoalActor.Value.ToString(),
@@ -242,6 +259,7 @@ internal static class Program
             LeaveAction = leaveIndex,
             HelpStartAction = helpStartIndex,
             HelpAction = helpIndex,
+            PartnerStopAction = partnerStopIndex,
             ReturnGoalAction = returnIndex,
             HelpActor = commands[helpIndex].Seat.ToString()
         };
@@ -381,7 +399,7 @@ internal static class Program
             GridPoint diamondStart = floor[(seed * 7 + 9) % floor.Count];
             GridPoint circleGoal = floor[(seed * 11 + 17) % floor.Count];
             GridPoint diamondGoal = floor[(seed * 13 + 23) % floor.Count];
-            if (Same(circleStart, diamondStart) || Same(circleGoal, diamondGoal) || Same(circleStart, circleGoal) && Same(diamondStart, diamondGoal)) continue;
+            if (Same(circleStart, diamondStart) || Same(circleGoal, diamondGoal) || Same(circleStart, circleGoal) || Same(diamondStart, diamondGoal)) continue;
             int id = idStart + seed;
             yield return new CoopRoomDefinition
             {
@@ -421,7 +439,7 @@ internal static class Program
     private sealed class C3Measurement { public bool AllowPass; public SolutionSummary Normal; public C3Witness GoalLeaveHelpGoal; public string[] Trace; public TraceStep[] StateTrace; }
     private sealed class SolutionSummary { public string Status; public int OptimalActionCount; public int VisitedCount; public string[] Trace; public TraceStep[] TraceSteps; }
     private sealed class StopperWitness { public bool CircleStopped; public int CircleAction = -1; public bool DiamondStopped; public int DiamondAction = -1; }
-    private sealed class C3Witness { public string FirstGoalActor; public int FirstGoalAction; public int LeaveAction; public int HelpStartAction; public int HelpAction; public int ReturnGoalAction; public string HelpActor; }
+    private sealed class C3Witness { public string FirstGoalActor; public int FirstGoalAction; public int LeaveAction; public int HelpStartAction; public int HelpAction; public int PartnerStopAction; public int ReturnGoalAction; public string HelpActor; }
     private sealed class TraceStep
     {
         public int Index;
