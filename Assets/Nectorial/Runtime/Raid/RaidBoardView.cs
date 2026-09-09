@@ -29,7 +29,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private readonly Sprite _whiteSprite;
         private readonly Transform _root;
         private readonly List<Transform> _snakeActors = new List<Transform>();
+        private readonly List<Transform> _snakeLinks = new List<Transform>();
         private Transform _playerActor;
+        private Transform _playerArmedOutline;
         private RaidArenaDefinition _staticArena;
         private RaidFrame[] _activeFrames;
         private bool _transitionActive;
@@ -50,6 +52,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             EnsureStaticArena(arena);
             EnsureActors(arena.SnakeBodyLength);
             _playerActor.localPosition = ToLocalPosition(state.PlayerPosition);
+            if (_playerArmedOutline != null) _playerArmedOutline.gameObject.SetActive(state.Status == RaidRunStatus.Armed);
             RenderSnake(arena, state.SnakeHeadIndex, arena.SnakeBodyLength, null);
             UpdatePickups(state.CollectedTailIds, state.CollectedItemIds);
             SetRootPosition(arena);
@@ -101,6 +104,8 @@ namespace Nectorial.SlideEscape.Unity.Raid
             Clear(_staticTiles);
             _pickupActors.Clear();
             _snakeActors.Clear();
+            _snakeLinks.Clear();
+            _playerArmedOutline = null;
             if (_root != null) Object.Destroy(_root.gameObject);
             if (_whiteSprite != null) Object.Destroy(_whiteSprite);
         }
@@ -161,16 +166,30 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private void EnsureActors(int bodyLength)
         {
-            if (_playerActor != null && _snakeActors.Count == Mathf.Max(1, bodyLength)) return;
+            if (_playerActor != null && _snakeActors.Count == Mathf.Max(1, bodyLength) && _snakeLinks.Count == Mathf.Max(0, bodyLength - 1)) return;
             Clear(_dynamicTiles);
             _snakeActors.Clear();
+            _snakeLinks.Clear();
             _playerActor = AddActor("Player", Player, new Vector2(0.62f, 0.62f), 8, 0f);
+            _playerArmedOutline = AddActorPrimitive(_playerActor, "Player Armed Outline", Tail, new Vector2(0.78f, 0.78f), 7, 0f);
+            _playerArmedOutline.gameObject.SetActive(false);
             int count = Mathf.Max(1, bodyLength);
             for (int index = 0; index < count; index++)
             {
                 Transform actor = AddActor("Snake " + index, index == 0 ? SnakeHead : Snake,
                     new Vector2(index == 0 ? 0.72f : 0.58f, index == 0 ? 0.72f : 0.58f), 8, index == 0 ? 45f : 0f);
                 _snakeActors.Add(actor);
+            }
+            for (int index = 1; index < count; index++)
+            {
+                var link = new GameObject("Snake Link " + index);
+                link.transform.SetParent(_root, false);
+                _dynamicTiles.Add(link);
+                var renderer = link.AddComponent<SpriteRenderer>();
+                renderer.sprite = _whiteSprite;
+                renderer.color = Snake;
+                renderer.sortingOrder = 7;
+                _snakeLinks.Add(link.transform);
             }
         }
 
@@ -186,6 +205,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 GridPoint after = frame.SnakeAfter != null && index < frame.SnakeAfter.Length ? frame.SnakeAfter[index] : before;
                 _snakeActors[index].localPosition = Vector3.Lerp(ToLocalPosition(before), ToLocalPosition(after), Mathf.Clamp01(progress));
             }
+            UpdateSnakeLinks();
             HidePickups(frame.CollectedTailIds);
             HidePickups(frame.CollectedItemIds);
             HidePickups(frame.MagnetCollectedTailIds);
@@ -204,6 +224,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             int count = Mathf.Min(_snakeActors.Count, Mathf.Min(Mathf.Max(1, bodyLength), body.Length));
             for (int index = 0; index < count; index++)
                 _snakeActors[index].localPosition = ToLocalPosition(body[index]);
+            UpdateSnakeLinks();
         }
 
         private void UpdatePickups(string[] collectedTails, string[] collectedItems)
@@ -239,7 +260,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             return actor.transform;
         }
 
-        private void AddActorPrimitive(Transform parent, string name, Color color, Vector2 scale, int order, float rotation)
+        private Transform AddActorPrimitive(Transform parent, string name, Color color, Vector2 scale, int order, float rotation)
         {
             var visual = new GameObject(name);
             visual.transform.SetParent(parent, false);
@@ -249,6 +270,21 @@ namespace Nectorial.SlideEscape.Unity.Raid
             renderer.sprite = _whiteSprite;
             renderer.color = color;
             renderer.sortingOrder = order;
+            return visual.transform;
+        }
+
+        private void UpdateSnakeLinks()
+        {
+            for (int index = 0; index < _snakeLinks.Count; index++)
+            {
+                Vector3 from = _snakeActors[index].localPosition;
+                Vector3 to = _snakeActors[index + 1].localPosition;
+                Vector3 delta = to - from;
+                Transform link = _snakeLinks[index];
+                link.localPosition = (from + to) * 0.5f;
+                link.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+                link.localScale = new Vector3(Mathf.Max(0.18f, delta.magnitude * 0.7f), 0.18f, 1f);
+            }
         }
 
         private GameObject AddPrimitive(List<GameObject> owner, string name, Color color, GridPoint point, Vector2 scale, Vector2 offset, int order, float rotation = 0f)
