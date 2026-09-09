@@ -88,6 +88,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (string.Equals(input, "Save", StringComparison.Ordinal))
             {
                 SaveCurrent();
+                _message = _saveStatus == "saved" ? "저장했습니다" : "저장하지 못했습니다";
                 PublishState();
                 return;
             }

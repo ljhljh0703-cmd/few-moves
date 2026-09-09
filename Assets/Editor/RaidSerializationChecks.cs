@@ -97,6 +97,7 @@ namespace Nectorial.Editor
                 RaidBootstrap source = CreateBootstrap("Raid serialization source", out sourceObject);
                 source.HandleCommand("{\"kind\":\"Save\"}");
                 if (!PlayerPrefs.HasKey(SaveKey)) throw new InvalidOperationException("Raid bootstrap did not persist a command save.");
+                if (ReadPrivateString(source, "_message") != "저장했습니다") throw new InvalidOperationException("Raid bootstrap did not report an explicit save success.");
                 RaidDispatchResult first;
                 if (!source.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out first) || !first.Accepted || first.Idempotent)
                     throw new InvalidOperationException("Raid bootstrap source move was not accepted.");
@@ -143,6 +144,8 @@ namespace Nectorial.Editor
                 RaidDispatchResult blockedMove;
                 if (blocked.TryStartMove(Nectorial.SlideEscape.GameCommand.Right, out blockedMove))
                     throw new InvalidOperationException("Raid bootstrap accepted input after a failed restore.");
+                blocked.HandleCommand("{\"kind\":\"Save\"}");
+                if (ReadPrivateString(blocked, "_message") != "저장하지 못했습니다") throw new InvalidOperationException("Raid bootstrap did not report an explicit save failure.");
                 blocked.RestartRaid();
                 if (!PlayerPrefs.HasKey(FailedSaveKey) || !string.Equals(PlayerPrefs.GetString(FailedSaveKey), corruptJson, StringComparison.Ordinal))
                     throw new InvalidOperationException("Raid bootstrap did not preserve the failed save before restart.");
@@ -191,6 +194,13 @@ namespace Nectorial.Editor
         private static PreferenceSnapshot CapturePreference(string key)
         {
             return new PreferenceSnapshot { Exists = PlayerPrefs.HasKey(key), Value = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null };
+        }
+
+        private static string ReadPrivateString(object target, string fieldName)
+        {
+            FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null) throw new InvalidOperationException("Raid bootstrap message field was unavailable.");
+            return field.GetValue(target) as string;
         }
 
         private static void RestorePreference(string key, PreferenceSnapshot snapshot)
