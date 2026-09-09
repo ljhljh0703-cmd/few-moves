@@ -46,7 +46,7 @@ function observation(status = "Playing", overrides = {}) {
   return Object.assign({
     initialized: true, inputEnabled: status === "Playing" || status === "Armed", transitioning: false, statusCode: status,
     actions: 2, hits: 0, shieldCharges: 1, magnetStepsRemaining: 0, slowStepsRemaining: 0, tailCount: 0, tailTarget: 3,
-    activeDefinitionId: "raid-01", selectedDefinitionId: "raid-01", recordStatus: "idle", recordCapsule: "", hasMine: false, mine: {}, hasShared: false, shared: {}, recordError: "", message: "실제 상태", stateFingerprint: "state-1"
+    activeDefinitionId: "raid-01", selectedDefinitionId: "raid-01", recordStatus: "idle", recordCapsule: "", hasMine: false, mine: {}, hasShared: false, shared: {}, sharedRecordRequestId: "", recordError: "", message: "실제 상태", stateFingerprint: "state-1"
   }, overrides);
 }
 
@@ -84,14 +84,16 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.sandbox.progress(0.5);
   assert.equal(h.elements.feedback.textContent, "실제 상태", "loading progress cannot overwrite an observed game message");
   h.unityReady.resolve(h.instance); await settle();
-  assert.deepEqual(h.sent.at(-1).payload, { kind:"LoadSharedRecord", capsule:"fm1.shared" }, "hash reaches C# only after instance and initialized observation");
-  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation()));
+  const firstRequestId = h.sent.at(-1).payload.requestId;
+  assert.deepEqual(h.sent.at(-1).payload, { kind:"LoadSharedRecord", capsule:"fm1.shared", requestId:firstRequestId }, "hash reaches C# with a bounded correlation ID after instance and initialized observation");
+  assert.match(firstRequestId,/^record-hash-\d+$/); assert.ok(firstRequestId.length<=96);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{sharedRecordRequestId:firstRequestId})));
   assert.equal(h.sent.filter(item => item.payload.kind === "LoadSharedRecord").length, 1, "one hash is imported exactly once");
 
   h.elements["record-top"].listeners.click();
   assert.equal(h.elements["record-dialog"].open, true, "record opens in its own dialog");
   assert.equal(h.elements["mine-value"].textContent, "기록 없음", "default objects are not shown as zero records");
-  const exact = observation("Cleared", { actions:14, hits:3, recordStatus:"ready", recordCapsule:"fm1.mine", hasMine:true, mine:summary(11,2), hasShared:true, shared:summary(13,4), stateFingerprint:"clear-1" });
+  const exact = observation("Cleared", { actions:14, hits:3, recordStatus:"ready", recordCapsule:"fm1.mine", hasMine:true, mine:summary(11,2), hasShared:true, shared:summary(13,4), sharedRecordRequestId:firstRequestId, stateFingerprint:"clear-1" });
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(exact));
   assert.equal(h.elements["mine-value"].textContent, "11수");
   assert.equal(h.elements["shared-value"].textContent, "13수");
@@ -137,25 +139,36 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   const reverse = createHarness("#record=fm1.reverse"); reverse.documentObject.loader.onload(); reverse.unityReady.resolve(reverse.instance); await settle();
   assert.equal(reverse.sent.length, 0, "instance alone cannot import before an initialized observation");
   reverse.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation()));
-  assert.deepEqual(reverse.sent.at(-1).payload, {kind:"LoadSharedRecord",capsule:"fm1.reverse"}, "receive path flushes when Unity becomes ready first");
+  assert.equal(reverse.sent.at(-1).payload.kind,"LoadSharedRecord"); assert.equal(reverse.sent.at(-1).payload.capsule,"fm1.reverse"); assert.match(reverse.sent.at(-1).payload.requestId,/^record-hash-\d+$/);
 
   const route = createHarness("#record=fm1.A");
   route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation())); route.documentObject.loader.onload(); route.unityReady.resolve(route.instance); await settle();
-  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(13,2)})));
+  const requestA=route.sent.at(-1).payload.requestId;
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(13,2),sharedRecordRequestId:requestA})));
   route.elements["record-top"].listeners.click();
   assert.equal(route.elements["shared-value"].textContent,"13수");
   route.sandbox.location.hash="#record=fm1.B"; route.sandbox.window.listeners.hashchange();
   assert.equal(route.elements["shared-value"].textContent,"확인 중","new hash immediately hides the previous shared result");
   assert.equal(route.elements["record-compare"].textContent,"새 링크의 기록을 확인하고 있습니다.");
-  assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B"});
-  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(9,1)})));
+  const requestB=route.sent.at(-1).payload.requestId;assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B",requestId:requestB});assert.notEqual(requestB,requestA);
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {actions:3,recordStatus:"ready",hasMine:true,mine:summary(7,0),hasShared:true,shared:summary(13,2),sharedRecordRequestId:requestA})));
+  assert.equal(route.elements["shared-value"].textContent,"확인 중","late A success cannot release B");assert.equal(route.elements["mine-value"].textContent,"7수","late record observation still preserves current mine");assert.match(route.elements["turn-label"].innerHTML,/행동 3/);
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {actions:4,recordStatus:"ready",hasShared:true,shared:summary(13,2),sharedRecordRequestId:""})));
+  assert.equal(route.elements["shared-value"].textContent,"확인 중","ordinary observation cannot release B");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(9,1),sharedRecordRequestId:requestB})));
   assert.equal(route.elements["shared-value"].textContent,"9수","the next C# observation replaces the pending state");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{recordStatus:"invalid",recordError:"late_A",hasShared:false,shared:{},sharedRecordRequestId:requestA})));assert.equal(route.elements["shared-value"].textContent,"9수","late A error cannot replace accepted B");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{recordStatus:"ready",hasShared:true,shared:summary(13,2),sharedRecordRequestId:""})));assert.equal(route.elements["shared-value"].textContent,"9수","empty legacy ID cannot replace accepted B");
   route.sandbox.window.listeners.hashchange();
   assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"the same hash is not imported twice");
+  route.sandbox.location.hash="";route.sandbox.window.listeners.hashchange();assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"removing hash sends no command");assert.equal(route.elements["shared-value"].textContent,"9수");
+  route.sandbox.location.hash="#record=fm1.A";route.sandbox.window.listeners.hashchange();const requestA2=route.sent.at(-1).payload.requestId;assert.notEqual(requestA2,requestA,"A after B receives a fresh request ID");route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{recordStatus:"ready",hasShared:true,shared:summary(13,2),sharedRecordRequestId:requestA2})));assert.equal(route.elements["shared-value"].textContent,"13수");
   route.sandbox.location.hash="#record=malformed"; route.sandbox.window.listeners.hashchange();
   assert.equal(route.elements["shared-value"].textContent,"확인 중","malformed candidate cannot inherit the previous valid record");
-  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"invalid",recordError:"record_invalid",hasShared:false,shared:{}})));
+  const requestC=route.sent.at(-1).payload.requestId;route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"invalid",recordError:"stale_error",hasShared:false,shared:{},sharedRecordRequestId:requestA2})));assert.equal(route.elements["shared-value"].textContent,"확인 중","stale error cannot release C");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"invalid",recordError:"record_invalid",hasShared:false,shared:{},sharedRecordRequestId:requestC})));
   assert.equal(route.elements["shared-value"].textContent,"기록 없음");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{recordStatus:"ready",hasShared:true,shared:summary(9,1),sharedRecordRequestId:requestB})));assert.equal(route.elements["shared-value"].textContent,"기록 없음","stale success cannot replace the accepted latest failure");
   assert.equal(route.sent.every(item=>item.payload.kind==="LoadSharedRecord"),true,"record navigation never sends save or restart commands");
   console.log("Raid UI contract checks passed");
 })().catch(error => { console.error(error); process.exitCode=1; });
