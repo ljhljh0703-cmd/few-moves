@@ -53,12 +53,16 @@ assert.match(bridge, /return true;/);
 assert.match(bridge, /createRequestId/);
 assert.match(bridge, /joinRequestId/);
 assert.match(bridge, /NectorialOnlineCreate/);
+assert.match(bridge, /NectorialOnlineCreateDefinition/);
+assert.match(bridge, /NectorialOnlineGetRecord/);
 assert.match(bridge, /NectorialOnlineJoin/);
 assert.match(bridge, /NectorialOnlineCommand/);
 assert.match(bridge, /NectorialOnlineReportState/);
 assert.match(bridge, /NectorialOnlineResume__deps/);
 assert.match(bridge, /NectorialOnlineResumeInvite__deps/);
 assert.match(bridge, /NectorialOnlineCreate__deps/);
+assert.match(bridge, /NectorialOnlineCreateDefinition__deps/);
+assert.match(bridge, /NectorialOnlineGetRecord__deps/);
 assert.match(bridge, /NectorialOnlineJoin__deps/);
 assert.match(bridge, /NectorialOnlineCommand__deps/);
 assert.match(bridge, /NectorialOnlineLeave__deps/);
@@ -69,6 +73,15 @@ assert.doesNotMatch(bridge, /delete records\[/);
 assert.doesNotMatch(bridge, /console\.log\(.*seatToken|console\.log\(.*bearer/);
 
 assert.match(bootstrap, /NectorialOnlineCreate/);
+assert.match(bootstrap, /NectorialOnlineCreateDefinition/);
+assert.match(bootstrap, /NectorialOnlineGetRecord/);
+assert.match(bootstrap, /SelectDefinition/);
+assert.match(bootstrap, /LoadSharedRecord/);
+assert.match(bootstrap, /ChallengeSharedRecord/);
+assert.match(bootstrap, /activeDefinitionId/);
+assert.match(bootstrap, /selectedDefinitionId/);
+assert.match(bootstrap, /hasMine/);
+assert.match(bootstrap, /hasShared/);
 assert.match(bootstrap, /NectorialOnlineJoin/);
 assert.match(bootstrap, /NectorialOnlineCommand/);
 assert.match(bootstrap, /bearer_derived/);
@@ -117,6 +130,8 @@ assert.match(onlineSerialization, /active-pending/);
 assert.match(onlineSerialization, /malformed-pending/);
 assert.match(onlineSerialization, /error-without-state preserve=pass input=locked/);
 assert.match(onlineSerialization, /recovered-auth-state unlock=pass/);
+assert.match(onlineSerialization, /record-empty-guard-and-definition-identity/);
+assert.match(onlineSerialization, /record-mine-shared-active-room-preserved/);
 assert.match(onlineSerialization, /COOP_ONLINE_JSON_PROBE_RESULT pass=true/);
 
 const serverStateFixture = {
@@ -232,6 +247,32 @@ async function runBridgeFixtures() {
     assert.equal(harness.reports.at(-1).inviteCode, "INV-1", "stored host invite is projected on a no-query resume");
     assert.equal(harness.reports.at(-1).seatToken, undefined, "resume report never carries a bearer token");
     assert.equal(harness.requests.length, 1, "resume starts a fresh authoritative poll");
+    bridgeRuntime.stopPoll();
+  }
+
+  {
+    const harness = fixture();
+    const bridgeRuntime = harness.sandbox.NectorialOnlineBridge;
+    harness.library.NectorialOnlineCreateDefinition("coop-c2");
+    assert.equal(harness.requests.length, 1, "definition create submits one request");
+    assert.equal(JSON.parse(harness.requests[0].options.body).definitionId, "coop-c2", "definition create carries only the selected definition ID");
+    harness.requests[0].item.resolve(response({ ok: true, room: { roomId: "room-c2" }, seat: 0, inviteCode: "INV-C2", seatToken: "token-private-c2" }));
+    await settle();
+    const created = harness.reports.find(item => item.op === "created");
+    assert.equal(created.seatToken, undefined, "definition create projection never carries a bearer token");
+    bridgeRuntime.stopPoll();
+
+    bridgeRuntime.writeSession(seat("room-c2", 0, "INV-C2", "token-private-c2"));
+    harness.library.NectorialOnlineGetRecord();
+    const recordRequest = harness.requests.at(-1);
+    assert.match(recordRequest.url, /\/record$/, "record request uses the room record endpoint");
+    assert.equal(recordRequest.options.body, "{}", "record request has no claimed score or moves");
+    recordRequest.item.resolve(response({ ok: true, capsule: "fm1.public-record", verification: { statusCode: "Cleared" } }));
+    await settle();
+    const record = harness.reports.at(-1);
+    assert.equal(record.op, "record", "record response is explicitly routed to C#");
+    assert.equal(record.capsule, "fm1.public-record", "record capsule reaches C# without bearer data");
+    assert.equal(record.seatToken, undefined, "record projection never carries a bearer token");
     bridgeRuntime.stopPoll();
   }
 

@@ -60,6 +60,9 @@ jobs:
       - name: Run raid core checks
         run: dotnet run --project tools/RaidChecks/RaidChecks.csproj --configuration Release
 
+      - name: Run replay record checks
+        run: dotnet run --project tools/RecordChecks/RecordChecks.csproj --configuration Release
+
       - name: Run co-op server HTTP checks
         run: dotnet run --project tools/CoopServerChecks/CoopServerChecks.csproj --configuration Release
 
