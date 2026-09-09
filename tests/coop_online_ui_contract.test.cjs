@@ -274,7 +274,8 @@ function uiHarness(hash="#record=fm1.shared") {
   documentObject.createElement=()=>uiElement(documentObject,"dynamic");
   documentObject.addEventListener=(name,handler)=>{documentObject.listeners[name]=handler;};
   const sent=[],unityReady=deferred(),clipboardCalls=[];
-  const sandbox={window:{addEventListener(){}},document:documentObject,ResizeObserver:undefined,location:{origin:"https://game.test",pathname:"/content/coop/index.html",search:"?invite=DROP",hash},navigator:{clipboard:{writeText(value){const item=deferred();clipboardCalls.push({value,item});return item.promise;}}},setTimeout(){return 1;},clearTimeout(){},Date,console,JSON,Math,Number,String,createUnityInstance(_canvas,_config,onProgress){sandbox.progress=onProgress;return unityReady.promise;}};
+  const windowObject={listeners:{},addEventListener(name,handler){this.listeners[name]=handler;}};
+  const sandbox={window:windowObject,document:documentObject,ResizeObserver:undefined,location:{origin:"https://game.test",pathname:"/content/coop/index.html",search:"?invite=DROP",hash},navigator:{clipboard:{writeText(value){const item=deferred();clipboardCalls.push({value,item});return item.promise;}}},setTimeout(){return 1;},clearTimeout(){},Date,console,JSON,Math,Number,String,createUnityInstance(_canvas,_config,onProgress){sandbox.progress=onProgress;return unityReady.promise;}};
   const script=template.slice(template.indexOf("<script>")+8,template.lastIndexOf("</script>"));
   vm.runInNewContext(script,sandbox,{filename:"CoopOnline/index.html"});
   const instance={SendMessage(name,method,payload){sent.push({name,method,payload:JSON.parse(payload)});}};
@@ -318,6 +319,8 @@ async function runUiFixtures() {
   assert.equal(h.sent.length,beforeClose,"closing records never requests restart");
   h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(joined));
   assert.equal(h.elements["clear-dialog"].open,false,"same result is not reopened after record close");
+  assert.equal(h.actions.slice(0,4).every(button=>button.disabled),true,"terminal state keeps direction buttons disabled after record close");
+  const terminalKeyCount=h.sent.length;h.documentObject.activeElement=null;h.documentObject.listeners.keydown({key:"ArrowUp",repeat:false,ctrlKey:false,metaKey:false,altKey:false,preventDefault(){}});assert.equal(h.sent.length,terminalKeyCount,"terminal state blocks keyboard Slide after record close");
 
   h.elements["record-top"].listeners.click(); h.elements["record-share"].listeners.click();
   assert.equal(h.clipboardCalls[0].value,"https://game.test/content/coop/index.html#record=fm1.mine","record share drops the invitation query");
@@ -357,6 +360,12 @@ async function runUiFixtures() {
   assert.equal(oversized.sent.some(item=>item.payload.kind==="LoadSharedRecord"),false,"oversized hash is discarded without calling it verified");
   assert.equal(oversized.elements["definition-picker"].hidden,false,"oversized hash does not stall the game UI");
   const reverse=uiHarness("#record=fm1.reverse");reverse.documentObject.loader.onload();reverse.unityReady.resolve(reverse.instance);await settle();assert.equal(reverse.sent.length,0,"instance alone waits for observation");reverse.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation()));assert.deepEqual(reverse.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.reverse"},"receive path flushes when Unity is ready first");
+
+  const route=uiHarness("#record=fm1.A"),roomA=onlineObservation({joined:true,roomId:"room-stays",seatCode:0,availabilityCode:1,inputEnabled:true,statusCode:"Playing",activeDefinitionId:"coop-c2",selectedDefinitionId:"coop-c2",recordStatus:"ready",hasShared:true,shared:recordSummary(14)});
+  route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(roomA));route.documentObject.loader.onload();route.unityReady.resolve(route.instance);await settle();route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(roomA));route.elements["record-top"].listeners.click();assert.equal(route.elements["shared-value"].textContent,"14수");
+  route.sandbox.location.hash="#record=fm1.B";route.sandbox.window.listeners.hashchange();assert.equal(route.elements["shared-value"].textContent,"확인 중","new hash hides the previous coop record before C# replies");assert.equal(route.elements["record-compare"].textContent,"새 링크의 기록을 확인하고 있습니다.");assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B"});
+  const roomB=Object.assign({},roomA,{authorityRevision:1,hasShared:true,shared:recordSummary(9)});route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(roomB));assert.equal(route.elements["shared-value"].textContent,"9수");route.sandbox.window.listeners.hashchange();assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"same coop hash is imported once");
+  route.sandbox.location.hash="#record=malformed";route.sandbox.window.listeners.hashchange();assert.equal(route.elements["shared-value"].textContent,"확인 중","malformed candidate cannot look like record B");route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomB,{authorityRevision:2,recordStatus:"invalid",recordError:"record_invalid",hasShared:false,shared:{}})));assert.equal(route.elements["shared-value"].textContent,"기록 없음");assert.equal(route.sandbox.window.__nectorialOnline.state.roomId,"room-stays");assert.equal(route.sent.every(item=>item.payload.kind==="LoadSharedRecord"),true,"record hash changes never leave, create, restart, or mutate the room");
 }
 
 async function runBridgeFixtures() {

@@ -64,7 +64,8 @@ function createHarness(hash = "#record=fm1.shared") {
   documentObject.createElement = () => makeElement(documentObject, "loader");
   documentObject.addEventListener = (name, handler) => { documentObject.listeners[name] = handler; };
   const sent = [], unityReady = deferred(), clipboardCalls = [];
-  const sandbox = { window:{ addEventListener(){} }, document:documentObject, ResizeObserver:undefined, location:{ origin:"https://game.test", pathname:"/content/raid/index.html", search:"?invite=DROP", hash }, navigator:{ clipboard:{ writeText(value){ const item=deferred(); clipboardCalls.push({value,item}); return item.promise; } } }, setTimeout(){return 1;}, clearTimeout(){}, console, JSON, Math, Number, String,
+  const windowObject = { listeners:{}, addEventListener(name,handler){ this.listeners[name]=handler; } };
+  const sandbox = { window:windowObject, document:documentObject, ResizeObserver:undefined, location:{ origin:"https://game.test", pathname:"/content/raid/index.html", search:"?invite=DROP", hash }, navigator:{ clipboard:{ writeText(value){ const item=deferred(); clipboardCalls.push({value,item}); return item.promise; } } }, setTimeout(){return 1;}, clearTimeout(){}, console, JSON, Math, Number, String,
     createUnityInstance(_canvas,_config,onProgress){ sandbox.progress=onProgress; return unityReady.promise; }
   };
   const script = template.slice(template.indexOf("<script>")+8, template.lastIndexOf("</script>"));
@@ -137,5 +138,24 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(reverse.sent.length, 0, "instance alone cannot import before an initialized observation");
   reverse.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation()));
   assert.deepEqual(reverse.sent.at(-1).payload, {kind:"LoadSharedRecord",capsule:"fm1.reverse"}, "receive path flushes when Unity becomes ready first");
+
+  const route = createHarness("#record=fm1.A");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation())); route.documentObject.loader.onload(); route.unityReady.resolve(route.instance); await settle();
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(13,2)})));
+  route.elements["record-top"].listeners.click();
+  assert.equal(route.elements["shared-value"].textContent,"13수");
+  route.sandbox.location.hash="#record=fm1.B"; route.sandbox.window.listeners.hashchange();
+  assert.equal(route.elements["shared-value"].textContent,"확인 중","new hash immediately hides the previous shared result");
+  assert.equal(route.elements["record-compare"].textContent,"새 링크의 기록을 확인하고 있습니다.");
+  assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B"});
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(9,1)})));
+  assert.equal(route.elements["shared-value"].textContent,"9수","the next C# observation replaces the pending state");
+  route.sandbox.window.listeners.hashchange();
+  assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"the same hash is not imported twice");
+  route.sandbox.location.hash="#record=malformed"; route.sandbox.window.listeners.hashchange();
+  assert.equal(route.elements["shared-value"].textContent,"확인 중","malformed candidate cannot inherit the previous valid record");
+  route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"invalid",recordError:"record_invalid",hasShared:false,shared:{}})));
+  assert.equal(route.elements["shared-value"].textContent,"기록 없음");
+  assert.equal(route.sent.every(item=>item.payload.kind==="LoadSharedRecord"),true,"record navigation never sends save or restart commands");
   console.log("Raid UI contract checks passed");
 })().catch(error => { console.error(error); process.exitCode=1; });
