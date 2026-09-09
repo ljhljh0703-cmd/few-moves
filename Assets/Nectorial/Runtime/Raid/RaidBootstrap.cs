@@ -12,9 +12,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private const string ProductName = "Few Moves Raid Pilot";
         private const string ArenaResource = "RaidArenas/raid-01";
         private const string SaveKey = "nectorial-raid.save.v1";
+        private const string FailedSaveKey = "nectorial-raid.save.v1.restore-failed";
 
         private RaidArenaDefinition _arena;
         private RaidSession _session;
+        private RaidState _displayState;
         private RaidBoardView _board;
         private RaidFrame[] _lastFrames = new RaidFrame[0];
         private RaidDispatchResult _pendingAction;
@@ -22,6 +24,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private bool _restoreBlocked;
         private bool _transitioning;
         private int _nextCommandId;
+        private readonly string _commandPrefix = "raid-runtime-" + Guid.NewGuid().ToString("N");
         private Coroutine _transitionRoutine;
         private string _message = "초기화 중";
         private string _saveStatus = "idle";
@@ -39,6 +42,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         public RaidArenaDefinition Arena { get { return RaidRules.CloneArena(_arena); } }
         public RaidState State { get { return _session == null ? null : _session.State; } }
+        public RaidState DisplayState { get { return _displayState == null ? null : RaidRules.CloneState(_displayState); } }
         public RaidFrame[] LastActionFrames { get { return RaidRules.CloneFrames(_lastFrames); } }
         public bool Transitioning { get { return _transitioning; } }
 
@@ -70,6 +74,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
         public void HandleRaidInput(string input)
         {
             if (!_initialized) return;
+            if (_transitioning)
+            {
+                _message = "이동이 끝난 뒤 다시 입력하세요";
+                PublishState();
+                return;
+            }
             if (string.Equals(input, "Restart", StringComparison.Ordinal))
             {
                 RestartRaid();
@@ -78,6 +88,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (string.Equals(input, "Save", StringComparison.Ordinal))
             {
                 SaveCurrent();
+                PublishState();
                 return;
             }
             GameCommand direction;
@@ -107,7 +118,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (input == null || string.IsNullOrEmpty(input.kind)) return;
             if (string.Equals(input.kind, "Restart", StringComparison.Ordinal))
             {
-                RestartRaid();
+                HandleRaidInput("Restart");
+                return;
+            }
+            if (string.Equals(input.kind, "Save", StringComparison.Ordinal))
+            {
+                HandleRaidInput("Save");
                 return;
             }
             if (string.Equals(input.kind, "Slide", StringComparison.Ordinal))
@@ -127,6 +143,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 PublishState();
                 return false;
             }
+            RaidState beforeAction = _session.State;
             result = _session.Dispatch(new RaidMove { CommandId = NextCommandId(), Direction = direction });
             _lastFrames = RaidRules.CloneFrames(result.Frames);
             if (!result.Accepted)
@@ -136,6 +153,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 return false;
             }
             _pendingAction = result;
+            _displayState = beforeAction;
             _transitioning = true;
             _message = "이동 중";
             PublishState();
@@ -174,6 +192,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             RaidDispatchResult completed = _pendingAction;
             _pendingAction = null;
             _transitioning = false;
+            _displayState = _session.State;
             if (_board != null) _board.CompleteAction(_arena, _session.State);
             _message = Describe(completed);
             SaveCurrent();
@@ -183,12 +202,31 @@ namespace Nectorial.SlideEscape.Unity.Raid
         public void RestartRaid()
         {
             if (!_initialized || _session == null) return;
+            if (_transitioning)
+            {
+                _message = "이동이 끝난 뒤 다시 입력하세요";
+                PublishState();
+                return;
+            }
+            if (_restoreBlocked)
+            {
+                string preservationError;
+                if (!TryPreserveFailedSave(out preservationError))
+                {
+                    _saveStatus = "failed";
+                    _saveError = preservationError;
+                    _message = "저장된 레이드를 보존하지 못했습니다";
+                    PublishState();
+                    return;
+                }
+            }
             CancelActionPresentation();
             _restoreBlocked = false;
             _saveStatus = "idle";
             _saveError = string.Empty;
             _lastFrames = new RaidFrame[0];
             RaidDispatchResult restarted = _session.Restart();
+            _displayState = _session.State;
             _message = Translate(restarted.Reason);
             SaveCurrent();
             PublishState();
@@ -212,6 +250,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     return;
                 }
                 _session = RaidSession.Create(_arena);
+                _displayState = _session.State;
                 _board = new RaidBoardView();
                 _initialized = true;
                 RestoreIfPresent();
@@ -249,6 +288,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     return;
                 }
                 _session = restored;
+                _displayState = _session.State;
                 _message = "저장된 레이드를 불러왔습니다";
                 _saveStatus = "saved";
             }
@@ -284,6 +324,27 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _message = "저장된 레이드를 불러오지 못했습니다";
         }
 
+        private static bool TryPreserveFailedSave(out string error)
+        {
+            error = null;
+            try
+            {
+                if (!PlayerPrefs.HasKey(SaveKey))
+                {
+                    error = "raid_save_backup_missing";
+                    return false;
+                }
+                PlayerPrefs.SetString(FailedSaveKey, PlayerPrefs.GetString(SaveKey));
+                PlayerPrefs.Save();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "raid_save_backup:" + exception.GetType().Name;
+                return false;
+            }
+        }
+
         private void CancelActionPresentation()
         {
             if (_transitionRoutine != null)
@@ -294,6 +355,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (_board != null) _board.CancelAction();
             _pendingAction = null;
             _transitioning = false;
+            _displayState = _session == null ? null : _session.State;
         }
 
         private void Fail(string message, string error)
@@ -307,7 +369,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private void PublishState()
         {
-            RaidState state = _session == null ? null : _session.State;
+            RaidState state = _session == null ? null : (_transitioning && _displayState != null ? _displayState : _session.State);
             var observation = new RaidObservation
             {
                 initialized = _initialized,
@@ -354,7 +416,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private string NextCommandId()
         {
             _nextCommandId = checked(_nextCommandId + 1);
-            return "raid-" + _nextCommandId.ToString();
+            return _commandPrefix + "-" + _nextCommandId.ToString();
         }
 
         private static bool TryParseDirection(string input, out GameCommand direction)

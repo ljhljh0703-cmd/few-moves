@@ -40,6 +40,7 @@ namespace Nectorial.SlideEscape.Raid
             if (!string.Equals(envelope.ContentVersion, arena.ContentVersion, StringComparison.Ordinal)) { error = "content_version_mismatch"; return false; }
             if (!string.Equals(envelope.ArenaFingerprint, RaidRules.ArenaFingerprint(arena), StringComparison.Ordinal)) { error = "arena_fingerprint_mismatch"; return false; }
             if (envelope.State == null || envelope.Replay == null) { error = "save_payload_missing"; return false; }
+            if (envelope.Replay.Moves == null || envelope.Replay.Attempts == null) { error = "attempt_transcript_missing"; return false; }
             RaidSession restored;
             string replayError;
             if (!RaidReplayCodec.TryReplay(arena, envelope.Replay, out restored, out replayError)) { error = replayError; return false; }

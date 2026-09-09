@@ -15,8 +15,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 if (envelope.State.CollectedItemIds == null) envelope.State.CollectedItemIds = new string[0];
             }
             if (envelope.Replay == null) return true;
-            if (envelope.Replay.Moves == null) envelope.Replay.Moves = new RaidMove[0];
-            if (envelope.Replay.Attempts == null) envelope.Replay.Attempts = new RaidAttempt[0];
+            if (envelope.Replay.Moves == null || envelope.Replay.Attempts == null)
+            {
+                error = "raid_save_attempt_transcript_missing";
+                return false;
+            }
             for (int index = 0; index < envelope.Replay.Attempts.Length; index++)
             {
                 RaidAttempt attempt = envelope.Replay.Attempts[index];

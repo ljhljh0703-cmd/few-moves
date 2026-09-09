@@ -21,6 +21,7 @@ internal static class Program
         Run("armed_only_after_alive_action_and_later_contact", CheckArmedTiming);
         Run("zero_move_clone_restart_and_alias_isolation", CheckStateIsolationAndRestart);
         Run("duplicate_id_replay_and_save_round_trip", CheckDuplicateReplayAndSave);
+        Run("save_requires_complete_attempt_transcript", CheckSaveTranscriptIntegrity);
 
         int passed = 0;
         for (int index = 0; index < Records.Count; index++) if (Records[index].Passed) passed++;
@@ -191,6 +192,25 @@ internal static class Program
         Assert(RaidSaveCodec.TryRestore(EnsureArena(), parsed, out restored, out restoreError), "save restore succeeds: " + restoreError);
         Assert(RaidRules.StatesEqual(session.State, restored.State), "save restore reaches identical state");
         Assert(!object.ReferenceEquals(parsed.State.CollectedTailIds, restored.State.CollectedTailIds), "restored state owns arrays");
+        RaidDispatchResult restoredConflict = restored.Dispatch(new RaidMove { CommandId = "replay-blocked", Direction = GameCommand.Right });
+        Assert(!restoredConflict.Accepted && restoredConflict.Reason == "command_id_payload_conflict", "restored rejected command ID remains a payload conflict");
+    }
+
+    private static void CheckSaveTranscriptIntegrity()
+    {
+        RaidSession session = RaidSession.Create(EnsureArena());
+        Assert(!session.Dispatch(new RaidMove { CommandId = "rejected-ledger-id", Direction = GameCommand.Up }).Accepted, "rejected ledger setup must reject");
+        Assert(session.Dispatch(new RaidMove { CommandId = "accepted-ledger-id", Direction = GameCommand.Right }).Accepted, "accepted ledger setup must accept");
+
+        RaidSaveEnvelope missingAttempts = RaidSaveCodec.Capture(session);
+        missingAttempts.Replay.Attempts = null;
+        RaidSession restored;
+        string error;
+        Assert(!RaidSaveCodec.TryRestore(EnsureArena(), missingAttempts, out restored, out error) && error == "attempt_transcript_missing", "missing attempt transcript must reject current save schema");
+
+        RaidSaveEnvelope tamperedProjection = RaidSaveCodec.Capture(session);
+        tamperedProjection.Replay.Moves[0] = new RaidMove { CommandId = "accepted-ledger-id", Direction = GameCommand.Left };
+        Assert(!RaidSaveCodec.TryRestore(EnsureArena(), tamperedProjection, out restored, out error) && error.StartsWith("accepted_moves_projection_mismatch", StringComparison.Ordinal), "tampered accepted move projection must reject restore");
     }
 
     private static RaidArenaDefinition EnsureArena()
