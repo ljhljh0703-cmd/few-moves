@@ -607,7 +607,14 @@ namespace Nectorial.SlideEscape.Raid
         private static void Append(StringBuilder builder, object value) { builder.Append(value == null ? "<null>" : Convert.ToString(value, CultureInfo.InvariantCulture)); builder.Append('|'); }
         private static void AppendPoint(StringBuilder builder, GridPoint point) { Append(builder, point.X); Append(builder, point.Y); }
         private static void AppendSorted(StringBuilder builder, string[] values) { string[] clone = CloneStrings(values) ?? new string[0]; Array.Sort(clone, StringComparer.Ordinal); for (int i = 0; i < clone.Length; i++) Append(builder, clone[i]); }
-        private static string Hash(string value) { byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value)); var builder = new StringBuilder(bytes.Length * 2); for (int i = 0; i < bytes.Length; i++) builder.Append(bytes[i].ToString("x2", CultureInfo.InvariantCulture)); return builder.ToString(); }
+        private static string Hash(string value)
+        {
+            byte[] bytes;
+            using (SHA256 hash = SHA256.Create()) bytes = hash.ComputeHash(Encoding.UTF8.GetBytes(value));
+            var builder = new StringBuilder(bytes.Length * 2);
+            for (int index = 0; index < bytes.Length; index++) builder.Append(bytes[index].ToString("x2", CultureInfo.InvariantCulture));
+            return builder.ToString();
+        }
         private static void EnsureValidArena(RaidArenaDefinition arena) { string[] errors = ValidateArena(arena); if (errors.Length > 0) throw new ArgumentException("Raid arena invalid: " + string.Join(",", errors), "arena"); }
         private static void EnsureValidState(RaidArenaDefinition arena, RaidState state) { string[] errors = ValidateState(arena, state); if (errors.Length > 0) throw new ArgumentException("Raid state invalid: " + string.Join(",", errors), "state"); }
     }
