@@ -11,7 +11,7 @@ namespace Nectorial.Editor
     public static class RaidBuild
     {
         private const string ScenePath = "Assets/Scenes/Bootstrap.unity";
-        private const string ArenaPath = "Assets/Nectorial/Resources/RaidRooms/raid-01.json";
+        private const string ArenaPath = "Assets/Nectorial/Resources/RaidArenas/raid-01.json";
         private const string TemplatePath = "Assets/WebGLTemplates/Raid/index.html";
         private const string StateBridgePath = "Assets/Plugins/WebGL/RaidState.jslib";
 
