@@ -22,7 +22,7 @@
     .top-action { border:1px solid var(--grid); background:#fffdf7; }
     .raid-layout { min-height:0; display:grid; grid-template-rows:minmax(150px,1fr) auto; gap:6px; justify-items:center; }
     .board-stage { position:relative; width:100%; min-height:0; display:grid; place-items:center; }
-    #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:1px solid var(--grid); border-radius:6px; background:var(--floor); box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 16%,transparent); image-rendering:pixelated; }
+    #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:2px solid color-mix(in srgb,var(--charcoal) 32%,var(--grid)); border-radius:7px; background:var(--floor); box-shadow:0 6px 0 color-mix(in srgb,var(--charcoal) 16%,transparent),0 0 0 1px color-mix(in srgb,var(--grid) 78%,transparent); image-rendering:pixelated; }
     .controls { width:min(100%,360px); display:grid; align-content:start; gap:3px; }
     .status-row { min-height:38px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:4px; }
     .status-chip { display:inline-flex; align-items:center; justify-content:center; gap:4px; color:var(--muted); font-size:10px; font-weight:700; white-space:nowrap; }
@@ -74,7 +74,7 @@
       <div class="top-actions"><button id="save-button" class="top-action" type="button" data-raid-action="Save" disabled>저장</button><button id="record-top" class="top-action" type="button" disabled>기록</button><a class="top-action" href="../index.html">모드</a></div>
     </header>
     <section class="raid-layout" aria-label="Few Moves 레이드">
-      <section class="board-stage" aria-label="레이드 보드"><canvas id="unity-canvas" tabindex="0" aria-label="플레이어와 뱀이 있는 레이드 보드"></canvas></section>
+      <section class="board-stage" aria-label="16×16 레이드 보드"><canvas id="unity-canvas" tabindex="0" aria-label="16×16 보드에서 플레이어와 뱀이 움직이는 레이드 보드"></canvas></section>
       <section class="controls" aria-label="레이드 조작">
         <div class="status-row"><span class="status-chip"><span class="status-dot" aria-hidden="true"></span><strong>플레이어</strong><span id="player-state">준비</span></span><span id="turn-label" class="turn-label">레이드 대기<small>행동 0</small></span><span class="status-chip"><span class="status-dot snake" aria-hidden="true"></span><strong>뱀</strong><span id="snake-state">순찰</span></span></div>
         <div class="item-row" aria-label="레이드 강화 상태"><span class="item-badge"><strong>◆</strong> 꼬리 <span id="tail-count">0 / 3</span></span><span class="item-badge shield"><strong>▣</strong> 보호막 <span id="shield-count">0</span></span><span class="item-badge magnet"><strong>✦</strong> 자석 <span id="magnet-count">0</span></span><span class="item-badge slow"><strong>◌</strong> 감속 <span id="slow-count">0</span></span></div>

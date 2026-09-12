@@ -5,6 +5,7 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const template = readFileSync(path.join(root, "Assets/WebGLTemplates/Raid/index.html"), "utf8");
+const boardView = readFileSync(path.join(root, "Assets/Nectorial/Runtime/Raid/RaidBoardView.cs"), "utf8");
 const bridge = readFileSync(path.join(root, "Assets/Plugins/WebGL/RaidState.jslib"), "utf8");
 const build = readFileSync(path.join(root, "Assets/Editor/RaidBuild.cs"), "utf8");
 
@@ -13,6 +14,11 @@ assert.match(template, /id="record-dialog"/);
 assert.match(template, /id="record-close"/);
 assert.match(template, /min-height:48px/);
 assert.match(template, /width:56px; height:56px/);
+assert.match(template, /16×16 레이드 보드/);
+assert.match(boardView, /DrawFineGrid\(arena\)/);
+assert.match(boardView, /DrawRingTrack\(arena\.SnakeRing\)/);
+assert.match(boardView, /Snake Head Mark/);
+assert.match(boardView, /UpdateSnakeHeadOrientation\(\)/);
 assert.match(template, /href="\.\.\/index\.html"/);
 assert.doesNotMatch(template, /snake\.advance|enemy\.move|Math\.random|leaderboard|랭킹/);
 assert.match(bridge, /NectorialRaidReportState/);
@@ -38,7 +44,7 @@ function makeElement(documentObject, id, dataset = {}) {
   };
 }
 
-function summary(actions, hits, definitionId = "raid-01", fingerprint = "raid-fp") {
+function summary(actions, hits, definitionId = "raid-01-v3", fingerprint = "raid-fp") {
   return { modeId: "raid-v1", definitionId, rulesVersion: "raid-rules-v1", contentVersion: "raid-content-v1", definitionFingerprint: fingerprint, statusCode: "Cleared", effectiveActionCount: actions, logicalActionCount: actions, hits };
 }
 
@@ -46,7 +52,7 @@ function observation(status = "Playing", overrides = {}) {
   return Object.assign({
     initialized: true, inputEnabled: status === "Playing" || status === "Armed", transitioning: false, statusCode: status,
     actions: 2, hits: 0, shieldCharges: 1, magnetStepsRemaining: 0, slowStepsRemaining: 0, tailCount: 0, tailTarget: 3,
-    activeDefinitionId: "raid-01", selectedDefinitionId: "raid-01", recordStatus: "idle", recordCapsule: "", hasMine: false, mine: {}, hasShared: false, shared: {}, sharedRecordRequestId: "", recordError: "", message: "실제 상태", stateFingerprint: "state-1"
+    activeDefinitionId: "raid-01-v3", selectedDefinitionId: "raid-01-v3", recordStatus: "idle", recordCapsule: "", hasMine: false, mine: {}, hasShared: false, shared: {}, sharedRecordRequestId: "", recordError: "", message: "실제 상태", stateFingerprint: "state-1"
   }, overrides);
 }
 

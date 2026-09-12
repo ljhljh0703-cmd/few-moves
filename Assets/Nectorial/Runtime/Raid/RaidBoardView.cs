@@ -11,13 +11,18 @@ namespace Nectorial.SlideEscape.Unity.Raid
     {
         private static readonly Color Floor = new Color32(229, 224, 211, 255);
         private static readonly Color Grid = new Color32(210, 203, 187, 150);
+        private static readonly Color SectionGrid = new Color32(74, 85, 88, 150);
+        private static readonly Color Perimeter = new Color32(74, 85, 88, 190);
+        private static readonly Color PerimeterShadow = new Color32(27, 35, 40, 105);
         private static readonly Color Wall = new Color32(41, 50, 56, 255);
         private static readonly Color WallRim = new Color32(74, 85, 88, 255);
         private static readonly Color WallShadow = new Color32(27, 35, 40, 255);
         private static readonly Color Ring = new Color32(90, 98, 96, 95);
+        private static readonly Color RingTrack = new Color32(90, 98, 96, 75);
         private static readonly Color Player = new Color32(67, 116, 183, 255);
         private static readonly Color Snake = new Color32(73, 83, 87, 255);
         private static readonly Color SnakeHead = new Color32(49, 58, 59, 255);
+        private static readonly Color SnakeHeadMark = new Color32(208, 151, 67, 235);
         private static readonly Color Tail = new Color32(208, 151, 67, 255);
         private static readonly Color Shield = new Color32(93, 137, 96, 255);
         private static readonly Color Magnet = new Color32(155, 106, 154, 255);
@@ -127,17 +132,19 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 {
                     GridPoint point = new GridPoint(x, y);
                     AddPrimitive(_staticTiles, "Floor", Floor, point, new Vector2(1f, 1f), Vector2.zero, 0);
-                    AddPrimitive(_staticTiles, "Grid Right", Grid, point, new Vector2(0.025f, 1f), new Vector2(0.4875f, 0f), 1);
-                    AddPrimitive(_staticTiles, "Grid Bottom", Grid, point, new Vector2(1f, 0.025f), new Vector2(0f, -0.4875f), 1);
                     if (arena.Rows != null && y < arena.Rows.Length && arena.Rows[y] != null && x < arena.Rows[y].Length && arena.Rows[y][x] == '#')
                         DrawWall(point);
                 }
             }
 
+            DrawFineGrid(arena);
+            DrawPerimeter(arena);
+
             if (arena.SnakeRing != null)
             {
+                DrawRingTrack(arena.SnakeRing);
                 for (int index = 0; index < arena.SnakeRing.Length; index++)
-                    AddPrimitive(_staticTiles, "Snake Ring", Ring, arena.SnakeRing[index], new Vector2(0.18f, 0.18f), Vector2.zero, 2);
+                    AddPrimitive(_staticTiles, "Snake Ring", Ring, arena.SnakeRing[index], new Vector2(0.24f, 0.24f), Vector2.zero, 2);
             }
 
             if (arena.TailFragments != null)
@@ -147,7 +154,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     RaidTailDefinition tail = arena.TailFragments[index];
                     if (tail == null || string.IsNullOrEmpty(tail.Id)) continue;
                     _pickupActors[tail.Id] = AddPrimitive(_staticTiles, "Tail " + tail.Id, Tail, tail.Position,
-                        new Vector2(0.42f, 0.42f), Vector2.zero, 5, 45f);
+                        new Vector2(0.52f, 0.52f), Vector2.zero, 5, 45f);
                 }
             }
 
@@ -159,7 +166,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     if (item == null || string.IsNullOrEmpty(item.Id)) continue;
                     Color color = item.Kind == RaidItemKind.Shield ? Shield : item.Kind == RaidItemKind.Magnet ? Magnet : Slow;
                     _pickupActors[item.Id] = AddPrimitive(_staticTiles, "Item " + item.Kind, color, item.Position,
-                        new Vector2(0.34f, 0.34f), Vector2.zero, 5, item.Kind == RaidItemKind.Magnet ? 45f : 0f);
+                        new Vector2(0.46f, 0.46f), Vector2.zero, 5, item.Kind == RaidItemKind.Magnet ? 45f : 0f);
                 }
             }
         }
@@ -170,14 +177,23 @@ namespace Nectorial.SlideEscape.Unity.Raid
             Clear(_dynamicTiles);
             _snakeActors.Clear();
             _snakeLinks.Clear();
-            _playerActor = AddActor("Player", Player, new Vector2(0.62f, 0.62f), 8, 0f);
-            _playerArmedOutline = AddActorPrimitive(_playerActor, "Player Armed Outline", Tail, new Vector2(0.78f, 0.78f), 7, 0f);
+            _playerActor = AddActor("Player", Player, new Vector2(0.68f, 0.68f), 8, 0f);
+            AddActorPrimitive(_playerActor, "Player Shadow", WallShadow, new Vector2(0.78f, 0.78f), 7, 0f);
+            _playerArmedOutline = AddActorPrimitive(_playerActor, "Player Armed Outline", Tail, new Vector2(0.84f, 0.84f), 7, 0f);
             _playerArmedOutline.gameObject.SetActive(false);
             int count = Mathf.Max(1, bodyLength);
             for (int index = 0; index < count; index++)
             {
                 Transform actor = AddActor("Snake " + index, index == 0 ? SnakeHead : Snake,
-                    new Vector2(index == 0 ? 0.72f : 0.58f, index == 0 ? 0.72f : 0.58f), 8, index == 0 ? 45f : 0f);
+                    new Vector2(index == 0 ? 0.92f : 0.72f, index == 0 ? 0.92f : 0.72f), 8, index == 0 ? 45f : 0f);
+                if (index == 0)
+                {
+                    AddActorPrimitive(actor, "Snake Head Outline", WallRim, new Vector2(1.01f, 1.01f), 7, 45f);
+                    Transform snakeHeadMark = AddActorPrimitive(actor, "Snake Head Mark", SnakeHeadMark, new Vector2(0.25f, 0.12f), 9, 0f);
+                    snakeHeadMark.localPosition = new Vector3(0.24f, 0f, 0f);
+                }
+                else
+                    AddActorPrimitive(actor, "Snake Body Shadow", WallShadow, new Vector2(0.82f, 0.82f), 7, 0f);
                 _snakeActors.Add(actor);
             }
             for (int index = 1; index < count; index++)
@@ -206,6 +222,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _snakeActors[index].localPosition = Vector3.Lerp(ToLocalPosition(before), ToLocalPosition(after), Mathf.Clamp01(progress));
             }
             UpdateSnakeLinks();
+            UpdateSnakeHeadOrientation();
             HidePickups(frame.CollectedTailIds);
             HidePickups(frame.CollectedItemIds);
             HidePickups(frame.MagnetCollectedTailIds);
@@ -225,6 +242,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             for (int index = 0; index < count; index++)
                 _snakeActors[index].localPosition = ToLocalPosition(body[index]);
             UpdateSnakeLinks();
+            UpdateSnakeHeadOrientation();
         }
 
         private void UpdatePickups(string[] collectedTails, string[] collectedItems)
@@ -283,8 +301,18 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 Transform link = _snakeLinks[index];
                 link.localPosition = (from + to) * 0.5f;
                 link.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
-                link.localScale = new Vector3(Mathf.Max(0.18f, delta.magnitude * 0.7f), 0.18f, 1f);
+                link.localScale = new Vector3(Mathf.Max(0.2f, delta.magnitude * 0.7f), 0.22f, 1f);
             }
+        }
+
+        private void UpdateSnakeHeadOrientation()
+        {
+            if (_snakeActors.Count < 2) return;
+            Vector3 head = _snakeActors[0].localPosition;
+            Vector3 neck = _snakeActors[1].localPosition;
+            Vector3 forward = head - neck;
+            if (forward.sqrMagnitude < 0.0001f) return;
+            _snakeActors[0].localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(forward.y, forward.x) * Mathf.Rad2Deg);
         }
 
         private GameObject AddPrimitive(List<GameObject> owner, string name, Color color, GridPoint point, Vector2 scale, Vector2 offset, int order, float rotation = 0f)
@@ -308,6 +336,71 @@ namespace Nectorial.SlideEscape.Unity.Raid
             AddPrimitive(_staticTiles, "Wall", Wall, point, new Vector2(0.92f, 0.92f), Vector2.zero, 3);
             AddPrimitive(_staticTiles, "Wall Top Rim", WallRim, point, new Vector2(0.84f, 0.035f), new Vector2(0f, 0.4225f), 4);
             AddPrimitive(_staticTiles, "Wall Left Rim", WallRim, point, new Vector2(0.035f, 0.84f), new Vector2(-0.4225f, 0f), 4);
+        }
+
+        private void DrawFineGrid(RaidArenaDefinition arena)
+        {
+            if (arena.Width < 2 || arena.Height < 2) return;
+            float right = arena.Width - 1f;
+            float bottom = -(arena.Height - 1f);
+            for (int x = 1; x < arena.Width; x++)
+            {
+                bool section = x % 4 == 0;
+                AddLine(_staticTiles, section ? "Section Grid Vertical" : "Grid Vertical",
+                    section ? SectionGrid : Grid,
+                    new Vector3(x - 0.5f, 0.5f, 0f), new Vector3(x - 0.5f, bottom - 0.5f, 0f),
+                    section ? 0.055f : 0.025f, section ? 2 : 1);
+            }
+            for (int y = 1; y < arena.Height; y++)
+            {
+                bool section = y % 4 == 0;
+                float boundary = 0.5f - y;
+                AddLine(_staticTiles, section ? "Section Grid Horizontal" : "Grid Horizontal",
+                    section ? SectionGrid : Grid,
+                    new Vector3(-0.5f, boundary, 0f), new Vector3(right + 0.5f, boundary, 0f),
+                    section ? 0.055f : 0.025f, section ? 2 : 1);
+            }
+        }
+
+        private void DrawPerimeter(RaidArenaDefinition arena)
+        {
+            if (arena.Width < 1 || arena.Height < 1) return;
+            float right = arena.Width - 1f;
+            float bottom = -(arena.Height - 1f);
+            AddLine(_staticTiles, "Perimeter Shadow Top", PerimeterShadow, new Vector3(-0.5f, 0.48f, 0f), new Vector3(right + 0.5f, 0.48f, 0f), 0.08f, 2);
+            AddLine(_staticTiles, "Perimeter Shadow Left", PerimeterShadow, new Vector3(-0.48f, 0.5f, 0f), new Vector3(-0.48f, bottom - 0.5f, 0f), 0.08f, 2);
+            AddLine(_staticTiles, "Perimeter Top", Perimeter, new Vector3(-0.5f, 0.5f, 0f), new Vector3(right + 0.5f, 0.5f, 0f), 0.045f, 2);
+            AddLine(_staticTiles, "Perimeter Right", Perimeter, new Vector3(right + 0.5f, 0.5f, 0f), new Vector3(right + 0.5f, bottom - 0.5f, 0f), 0.045f, 2);
+            AddLine(_staticTiles, "Perimeter Bottom", Perimeter, new Vector3(right + 0.5f, bottom - 0.5f, 0f), new Vector3(-0.5f, bottom - 0.5f, 0f), 0.045f, 2);
+            AddLine(_staticTiles, "Perimeter Left", Perimeter, new Vector3(-0.5f, bottom - 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f), 0.045f, 2);
+        }
+
+        private void DrawRingTrack(GridPoint[] ring)
+        {
+            if (ring == null || ring.Length < 2) return;
+            for (int index = 0; index < ring.Length; index++)
+            {
+                GridPoint from = ring[index];
+                GridPoint to = ring[(index + 1) % ring.Length];
+                AddLine(_staticTiles, "Snake Ring Track", RingTrack, ToLocalPosition(from), ToLocalPosition(to), 0.07f, 2);
+            }
+        }
+
+        private void AddLine(List<GameObject> owner, string name, Color color, Vector3 from, Vector3 to, float width, int order)
+        {
+            Vector3 delta = to - from;
+            float length = delta.magnitude;
+            if (length < 0.001f) return;
+            var line = new GameObject(name);
+            line.transform.SetParent(_root, false);
+            line.transform.localPosition = (from + to) * 0.5f;
+            line.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+            line.transform.localScale = new Vector3(length, width, 1f);
+            var renderer = line.AddComponent<SpriteRenderer>();
+            renderer.sprite = _whiteSprite;
+            renderer.color = color;
+            renderer.sortingOrder = order;
+            owner.Add(line);
         }
 
         private void SetRootPosition(RaidArenaDefinition arena)
