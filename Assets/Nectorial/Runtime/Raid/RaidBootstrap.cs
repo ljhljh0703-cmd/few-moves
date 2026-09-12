@@ -682,16 +682,75 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (reason == "restarted") return "처음 상태로 돌아왔습니다";
             if (reason == "cleared") return "뱀을 격파했습니다";
             if (reason == "failed") return "충돌했습니다. 다시 시작하세요";
-            if (reason == "accepted") return "레이드 이동을 적용했습니다";
+            if (reason == "accepted") return "이동했습니다";
             return reason ?? string.Empty;
         }
 
         private static string Describe(RaidDispatchResult result)
         {
             if (result == null) return string.Empty;
-            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "다음 몸통 접촉으로 격파하세요";
-            if (result.Frames != null && result.Frames.Length > 0 && result.Frames[result.Frames.Length - 1].Outcome == RaidFrameOutcome.Shielded) return "보호막으로 안전 위치에 복구했습니다";
+            if (result.State != null && result.State.Status == RaidRunStatus.Cleared) return Translate("cleared");
+            if (result.State != null && result.State.Status == RaidRunStatus.Failed) return Translate("failed");
+            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "꼬리 조각 3개 완성 · 이제 뱀 몸통에 돌진";
+            if (HasShieldedFrame(result)) return "보호막으로 충돌을 막았습니다";
+
+            bool shield = false;
+            bool magnet = false;
+            bool slow = false;
+            int directTailCount = 0;
+            int magnetTailCount = 0;
+            if (result.Events != null)
+            {
+                for (int index = 0; index < result.Events.Length; index++)
+                {
+                    RaidEvent item = result.Events[index];
+                    if (item == null) continue;
+                    if (item.Type == "item_collected")
+                    {
+                        if (item.Detail != null && item.Detail.StartsWith("Shield:", StringComparison.Ordinal)) shield = true;
+                        else if (item.Detail != null && item.Detail.StartsWith("Magnet:", StringComparison.Ordinal)) magnet = true;
+                        else if (item.Detail != null && item.Detail.StartsWith("Slow:", StringComparison.Ordinal)) slow = true;
+                    }
+                    else if (item.Type == "tail_collected") directTailCount++;
+                    else if (item.Type == "tail_magnet_collected") magnetTailCount++;
+                }
+            }
+
+            int tailCount = directTailCount + magnetTailCount;
+            string itemName = ItemName(shield, magnet, slow);
+            if (!string.IsNullOrEmpty(itemName) && tailCount > 0)
+                return itemName + " 획득 · 꼬리 조각 " + tailCount.ToString() + "개 수집";
+            if (shield && !magnet && !slow) return "보호막 획득 · 충돌을 막아줍니다";
+            if (magnet && !shield && !slow) return "자석 획득 · 주변 조각 수집";
+            if (slow && !shield && !magnet) return "감속 획득 · 뱀 이동 늦추기";
+            if (!string.IsNullOrEmpty(itemName)) return itemName + " 획득";
+            if (tailCount > 0)
+            {
+                if (magnetTailCount > 0 && directTailCount == 0 && tailCount == 1) return "자석으로 꼬리 조각을 모았습니다";
+                if (tailCount == 1) return "꼬리 조각을 모았습니다";
+                return "꼬리 조각 " + tailCount.ToString() + "개 수집";
+            }
             return Translate(result.Reason);
+        }
+
+        private static bool HasShieldedFrame(RaidDispatchResult result)
+        {
+            if (result == null || result.Frames == null) return false;
+            for (int index = 0; index < result.Frames.Length; index++)
+                if (result.Frames[index] != null && result.Frames[index].Outcome == RaidFrameOutcome.Shielded) return true;
+            return false;
+        }
+
+        private static string ItemName(bool shield, bool magnet, bool slow)
+        {
+            if (shield && !magnet && !slow) return "보호막";
+            if (magnet && !shield && !slow) return "자석";
+            if (slow && !shield && !magnet) return "감속";
+            if (shield && magnet && slow) return "보호막·자석·감속";
+            if (shield && magnet) return "보호막·자석";
+            if (shield && slow) return "보호막·감속";
+            if (magnet && slow) return "자석·감속";
+            return string.Empty;
         }
 
 #if UNITY_EDITOR

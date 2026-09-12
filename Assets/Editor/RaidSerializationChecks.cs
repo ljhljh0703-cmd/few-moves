@@ -73,6 +73,7 @@ namespace Nectorial.Editor
             if (RaidBootstrap.TryDeserializeRecordEnvelopeForCheck("{\"hasMine\":true,\"hasShared\":false,\"mine\":null,\"shared\":null}", out hasMine, out hasShared, out recordEnvelopeError) || recordEnvelopeError != "mine_record_invalid")
                 throw new InvalidOperationException("Raid empty mine observation was accepted: " + recordEnvelopeError);
             Debug.Log("RAID_JSON_PROBE case=record-empty-guard state=pass");
+            CheckActionFeedback(arena);
             CheckBootstrapRestoreAndRecovery(arena);
             CheckRaidRecordRuntime(arena);
             Debug.Log("RAID_JSON_PROBE_RESULT pass=true");
@@ -137,6 +138,112 @@ namespace Nectorial.Editor
             var values = new char[moves.Length];
             for (int index = 0; index < moves.Length; index++) values[index] = moves[index].Direction == GameCommand.Up ? 'U' : moves[index].Direction == GameCommand.Down ? 'D' : moves[index].Direction == GameCommand.Left ? 'L' : 'R';
             return new string(values);
+        }
+
+        private static void CheckActionFeedback(RaidArenaDefinition arena)
+        {
+            RaidState initial = RaidRules.CreateInitialState(arena);
+            RaidDispatchResult shieldPickup = RaidRules.Step(arena, initial, GameCommand.Right);
+            if (!HasEvent(shieldPickup, "item_collected", "Shield:")) throw new InvalidOperationException("Raid feedback probe did not reach the Shield pickup.");
+            AssertFeedback(shieldPickup, "보호막 획득 · 충돌을 막아줍니다", "Shield pickup feedback");
+
+            RaidDispatchResult ordinaryMove = RaidRules.Step(arena, initial, GameCommand.Down);
+            if (ordinaryMove.Events == null || ordinaryMove.Events.Length != 0) throw new InvalidOperationException("Raid feedback probe ordinary move unexpectedly collected an event.");
+            AssertFeedback(ordinaryMove, "이동했습니다", "ordinary movement feedback");
+
+            RaidDispatchResult directTail = ReplayResult(arena, "RLDR", "feedback-tail");
+            if (!HasEvent(directTail, "tail_collected", null)) throw new InvalidOperationException("Raid feedback probe did not reach a direct tail pickup.");
+            AssertFeedback(directTail, "꼬리 조각을 모았습니다", "direct tail feedback");
+
+            RaidDispatchResult magnetTail = FindResultWithEvent(arena, "RLDRURLULDR", "tail_magnet_collected", null, "feedback-magnet");
+            AssertFeedback(magnetTail, "자석 획득 · 꼬리 조각 1개 수집", "magnet pickup and tail feedback");
+
+            RaidDispatchResult slowPickup = FindResultWithEvent(arena, "RLDRURLULDR", "item_collected", "Slow:", "feedback-slow");
+            AssertFeedback(slowPickup, "감속 획득 · 뱀 이동 늦추기", "Slow pickup feedback");
+
+            RaidDispatchResult shielded = ReplayResult(arena, "RLDRURLU", "feedback-shielded");
+            if (!HasFrameOutcome(shielded, RaidFrameOutcome.Shielded)) throw new InvalidOperationException("Raid feedback probe did not reach a shielded collision.");
+            AssertFeedback(shielded, "보호막으로 충돌을 막았습니다", "shielded collision feedback");
+
+            RaidDispatchResult armed = ReplayResult(arena, "RLDRURLUL", "feedback-armed");
+            if (armed.State.Status != RaidRunStatus.Armed) throw new InvalidOperationException("Raid feedback probe Armed state did not persist.");
+            AssertFeedback(armed, "꼬리 조각 3개 완성 · 이제 뱀 몸통에 돌진", "Armed feedback");
+
+            RaidDispatchResult cleared = ReplayResult(arena, "RLDRURLULDR", "feedback-cleared");
+            if (cleared.State.Status != RaidRunStatus.Cleared) throw new InvalidOperationException("Raid feedback probe did not clear.");
+            AssertFeedback(cleared, "뱀을 격파했습니다", "cleared feedback");
+
+            RaidDispatchResult failed = ReplayResult(arena, "DRULRLUU", "feedback-failed");
+            if (failed.State.Status != RaidRunStatus.Failed) throw new InvalidOperationException("Raid feedback probe did not fail.");
+            AssertFeedback(failed, "충돌했습니다. 다시 시작하세요", "failed feedback");
+            Debug.Log("RAID_JSON_PROBE case=action-feedback-authoritative-events state=pass");
+        }
+
+        private static RaidDispatchResult ReplayResult(RaidArenaDefinition arena, string trace, string commandPrefix)
+        {
+            RaidSession session = RaidSession.Create(arena);
+            RaidDispatchResult result = null;
+            for (int index = 0; index < trace.Length; index++)
+            {
+                result = session.Dispatch(new RaidMove { CommandId = commandPrefix + "-" + index.ToString(), Direction = DirectionFromTrace(trace[index]) });
+                if (!result.Accepted) throw new InvalidOperationException("Raid feedback replay rejected: " + commandPrefix + ":" + index.ToString());
+            }
+            return result;
+        }
+
+        private static RaidDispatchResult FindResultWithEvent(RaidArenaDefinition arena, string trace, string type, string detailPrefix, string commandPrefix)
+        {
+            RaidSession session = RaidSession.Create(arena);
+            for (int index = 0; index < trace.Length; index++)
+            {
+                RaidDispatchResult result = session.Dispatch(new RaidMove { CommandId = commandPrefix + "-" + index.ToString(), Direction = DirectionFromTrace(trace[index]) });
+                if (!result.Accepted) throw new InvalidOperationException("Raid feedback event replay rejected: " + commandPrefix + ":" + index.ToString());
+                if (HasEvent(result, type, detailPrefix)) return result;
+            }
+            throw new InvalidOperationException("Raid feedback event was not found: " + type);
+        }
+
+        private static GameCommand DirectionFromTrace(char value)
+        {
+            if (value == 'U') return GameCommand.Up;
+            if (value == 'D') return GameCommand.Down;
+            if (value == 'L') return GameCommand.Left;
+            if (value == 'R') return GameCommand.Right;
+            throw new ArgumentException("Raid feedback trace direction invalid: " + value.ToString());
+        }
+
+        private static bool HasEvent(RaidDispatchResult result, string type, string detailPrefix)
+        {
+            if (result == null || result.Events == null) return false;
+            for (int index = 0; index < result.Events.Length; index++)
+            {
+                RaidEvent item = result.Events[index];
+                if (item == null || item.Type != type) continue;
+                if (detailPrefix == null || (item.Detail != null && item.Detail.StartsWith(detailPrefix, StringComparison.Ordinal))) return true;
+            }
+            return false;
+        }
+
+        private static bool HasFrameOutcome(RaidDispatchResult result, RaidFrameOutcome outcome)
+        {
+            if (result == null || result.Frames == null) return false;
+            for (int index = 0; index < result.Frames.Length; index++) if (result.Frames[index] != null && result.Frames[index].Outcome == outcome) return true;
+            return false;
+        }
+
+        private static void AssertFeedback(RaidDispatchResult result, string expected, string label)
+        {
+            string actual = DescribeFeedback(result);
+            if (!string.Equals(expected, actual, StringComparison.Ordinal)) throw new InvalidOperationException(label + " expected=" + expected + " actual=" + actual);
+        }
+
+        private static string DescribeFeedback(RaidDispatchResult result)
+        {
+            MethodInfo method = typeof(RaidBootstrap).GetMethod("Describe", BindingFlags.Static | BindingFlags.NonPublic);
+            if (method == null) throw new InvalidOperationException("Raid feedback formatter was unavailable.");
+            string feedback = method.Invoke(null, new object[] { result }) as string;
+            if (feedback == null) throw new InvalidOperationException("Raid feedback formatter did not return text.");
+            return feedback;
         }
 
         private static void CheckRoundTrip(RaidArenaDefinition arena, string label, RaidSession source)
