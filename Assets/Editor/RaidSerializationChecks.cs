@@ -145,7 +145,8 @@ namespace Nectorial.Editor
             RaidState initial = RaidRules.CreateInitialState(arena);
             RaidDispatchResult shieldPickup = RaidRules.Step(arena, initial, GameCommand.Right);
             if (!HasEvent(shieldPickup, "item_collected", "Shield:")) throw new InvalidOperationException("Raid feedback probe did not reach the Shield pickup.");
-            AssertFeedback(shieldPickup, "보호막 획득 · 충돌을 막아줍니다", "Shield pickup feedback");
+            if (shieldPickup.State == null || shieldPickup.State.ShieldCharges != 1) throw new InvalidOperationException("Raid feedback probe Shield charge did not remain at its actual cap.");
+            AssertFeedback(shieldPickup, "보호막 준비 · 충돌 1회 방어", "Shield pickup feedback");
 
             RaidDispatchResult ordinaryMove = RaidRules.Step(arena, initial, GameCommand.Down);
             if (ordinaryMove.Events == null || ordinaryMove.Events.Length != 0) throw new InvalidOperationException("Raid feedback probe ordinary move unexpectedly collected an event.");

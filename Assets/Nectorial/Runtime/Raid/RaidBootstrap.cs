@@ -720,7 +720,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             string itemName = ItemName(shield, magnet, slow);
             if (!string.IsNullOrEmpty(itemName) && tailCount > 0)
                 return itemName + " 획득 · 꼬리 조각 " + tailCount.ToString() + "개 수집";
-            if (shield && !magnet && !slow) return "보호막 획득 · 충돌을 막아줍니다";
+            if (shield && !magnet && !slow && result.State != null) return "보호막 준비 · 충돌 " + result.State.ShieldCharges.ToString() + "회 방어";
             if (magnet && !shield && !slow) return "자석 획득 · 주변 조각 수집";
             if (slow && !shield && !magnet) return "감속 획득 · 뱀 이동 늦추기";
             if (!string.IsNullOrEmpty(itemName)) return itemName + " 획득";
