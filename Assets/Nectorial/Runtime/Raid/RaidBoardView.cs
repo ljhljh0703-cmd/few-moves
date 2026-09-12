@@ -22,8 +22,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private static readonly Color Player = new Color32(67, 116, 183, 255);
         private static readonly Color Snake = new Color32(73, 83, 87, 255);
         private static readonly Color SnakeHead = new Color32(49, 58, 59, 255);
-        private static readonly Color SnakeHeadMark = new Color32(208, 151, 67, 235);
+        private static readonly Color SnakeHeadEye = new Color32(229, 224, 211, 235);
         private static readonly Color Tail = new Color32(208, 151, 67, 255);
+        private static readonly Color ChargeEmpty = new Color32(74, 85, 88, 210);
+        private static readonly Color GlyphBacking = new Color32(27, 35, 40, 235);
         private static readonly Color Shield = new Color32(93, 137, 96, 255);
         private static readonly Color Magnet = new Color32(155, 106, 154, 255);
         private static readonly Color Slow = new Color32(82, 125, 141, 255);
@@ -35,8 +37,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private readonly Transform _root;
         private readonly List<Transform> _snakeActors = new List<Transform>();
         private readonly List<Transform> _snakeLinks = new List<Transform>();
+        private readonly List<Transform> _playerChargePips = new List<Transform>();
         private Transform _playerActor;
         private Transform _playerArmedOutline;
+        private Transform _playerChargeGlyph;
         private RaidArenaDefinition _staticArena;
         private RaidFrame[] _activeFrames;
         private bool _transitionActive;
@@ -57,7 +61,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             EnsureStaticArena(arena);
             EnsureActors(arena.SnakeBodyLength);
             _playerActor.localPosition = ToLocalPosition(state.PlayerPosition);
-            if (_playerArmedOutline != null) _playerArmedOutline.gameObject.SetActive(state.Status == RaidRunStatus.Armed);
+            UpdatePlayerCharge(state);
             RenderSnake(arena, state.SnakeHeadIndex, arena.SnakeBodyLength, null);
             UpdatePickups(state.CollectedTailIds, state.CollectedItemIds);
             SetRootPosition(arena);
@@ -110,7 +114,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _pickupActors.Clear();
             _snakeActors.Clear();
             _snakeLinks.Clear();
+            _playerChargePips.Clear();
             _playerArmedOutline = null;
+            _playerChargeGlyph = null;
             if (_root != null) Object.Destroy(_root.gameObject);
             if (_whiteSprite != null) Object.Destroy(_whiteSprite);
         }
@@ -153,8 +159,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 {
                     RaidTailDefinition tail = arena.TailFragments[index];
                     if (tail == null || string.IsNullOrEmpty(tail.Id)) continue;
-                    _pickupActors[tail.Id] = AddPrimitive(_staticTiles, "Tail " + tail.Id, Tail, tail.Position,
-                        new Vector2(0.52f, 0.52f), Vector2.zero, 5, 45f);
+                    _pickupActors[tail.Id] = AddTailGlyph(_staticTiles, "Tail " + tail.Id, tail.Position);
                 }
             }
 
@@ -164,9 +169,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 {
                     RaidItemDefinition item = arena.Items[index];
                     if (item == null || string.IsNullOrEmpty(item.Id)) continue;
-                    Color color = item.Kind == RaidItemKind.Shield ? Shield : item.Kind == RaidItemKind.Magnet ? Magnet : Slow;
-                    _pickupActors[item.Id] = AddPrimitive(_staticTiles, "Item " + item.Kind, color, item.Position,
-                        new Vector2(0.46f, 0.46f), Vector2.zero, 5, item.Kind == RaidItemKind.Magnet ? 45f : 0f);
+                    _pickupActors[item.Id] = AddItemGlyph(_staticTiles, "Item " + item.Kind, item.Position, item.Kind);
                 }
             }
         }
@@ -177,10 +180,20 @@ namespace Nectorial.SlideEscape.Unity.Raid
             Clear(_dynamicTiles);
             _snakeActors.Clear();
             _snakeLinks.Clear();
+            _playerChargePips.Clear();
             _playerActor = AddActor("Player", Player, new Vector2(0.68f, 0.68f), 8, 0f);
             AddActorPrimitive(_playerActor, "Player Shadow", WallShadow, new Vector2(0.78f, 0.78f), 7, 0f);
             _playerArmedOutline = AddActorPrimitive(_playerActor, "Player Armed Outline", Tail, new Vector2(0.84f, 0.84f), 7, 0f);
             _playerArmedOutline.gameObject.SetActive(false);
+            for (int index = 0; index < 3; index++)
+            {
+                Transform pip = AddActorPrimitive(_playerActor, "Player Charge Pip " + index, ChargeEmpty,
+                    new Vector2(0.12f, 0.12f), 9, 0f);
+                pip.localPosition = new Vector3(-0.18f + index * 0.18f, -0.18f, 0f);
+                _playerChargePips.Add(pip);
+            }
+            _playerChargeGlyph = AddActorPrimitive(_playerActor, "Player Charge Glyph", Tail, new Vector2(0.16f, 0.16f), 9, 45f);
+            _playerChargeGlyph.gameObject.SetActive(false);
             int count = Mathf.Max(1, bodyLength);
             for (int index = 0; index < count; index++)
             {
@@ -189,7 +202,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 if (index == 0)
                 {
                     AddActorPrimitive(actor, "Snake Head Outline", WallRim, new Vector2(0.70f, 0.70f), 7, 45f);
-                    Transform snakeHeadMark = AddActorPrimitive(actor, "Snake Head Mark", SnakeHeadMark, new Vector2(0.25f, 0.12f), 9, 0f);
+                    Transform snakeHeadMark = AddActorPrimitive(actor, "Snake Head Eye", SnakeHeadEye, new Vector2(0.25f, 0.12f), 9, 0f);
                     snakeHeadMark.localPosition = new Vector3(0.24f, 0f, 0f);
                 }
                 else
@@ -245,6 +258,20 @@ namespace Nectorial.SlideEscape.Unity.Raid
             UpdateSnakeHeadOrientation();
         }
 
+        private void UpdatePlayerCharge(RaidState state)
+        {
+            int collected = state.CollectedTailIds == null ? 0 : state.CollectedTailIds.Length;
+            int filled = Mathf.Clamp(collected, 0, _playerChargePips.Count);
+            for (int index = 0; index < _playerChargePips.Count; index++)
+            {
+                SpriteRenderer renderer = _playerChargePips[index] == null ? null : _playerChargePips[index].GetComponent<SpriteRenderer>();
+                if (renderer != null) renderer.color = index < filled ? Tail : ChargeEmpty;
+            }
+            bool armed = state.Status == RaidRunStatus.Armed;
+            if (_playerArmedOutline != null) _playerArmedOutline.gameObject.SetActive(armed);
+            if (_playerChargeGlyph != null) _playerChargeGlyph.gameObject.SetActive(armed);
+        }
+
         private void UpdatePickups(string[] collectedTails, string[] collectedItems)
         {
             var collected = new HashSet<string>(StringComparer.Ordinal);
@@ -282,6 +309,68 @@ namespace Nectorial.SlideEscape.Unity.Raid
         {
             var visual = new GameObject(name);
             visual.transform.SetParent(parent, false);
+            visual.transform.localScale = new Vector3(scale.x, scale.y, 1f);
+            visual.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
+            var renderer = visual.AddComponent<SpriteRenderer>();
+            renderer.sprite = _whiteSprite;
+            renderer.color = color;
+            renderer.sortingOrder = order;
+            return visual.transform;
+        }
+
+        private GameObject AddTailGlyph(List<GameObject> owner, string name, GridPoint point)
+        {
+            GameObject glyph = CreateGlyphRoot(owner, name, point);
+            AddGlyphPrimitive(glyph.transform, name + " Backing", GlyphBacking, new Vector2(0.86f, 0.86f), Vector2.zero, 4, 0f);
+            AddGlyphPrimitive(glyph.transform, name + " Bolt Upper", Tail, new Vector2(0.16f, 0.36f), new Vector2(-0.08f, 0.10f), 5, -28f);
+            AddGlyphPrimitive(glyph.transform, name + " Bolt Lower", Tail, new Vector2(0.16f, 0.36f), new Vector2(0.08f, -0.12f), 5, 28f);
+            AddGlyphPrimitive(glyph.transform, name + " Bolt Core", Tail, new Vector2(0.18f, 0.18f), Vector2.zero, 5, 0f);
+            return glyph;
+        }
+
+        private GameObject AddItemGlyph(List<GameObject> owner, string name, GridPoint point, RaidItemKind kind)
+        {
+            GameObject glyph = CreateGlyphRoot(owner, name, point);
+            AddGlyphPrimitive(glyph.transform, name + " Backing", GlyphBacking, new Vector2(0.84f, 0.84f), Vector2.zero, 4, 0f);
+            if (kind == RaidItemKind.Shield)
+            {
+                AddGlyphPrimitive(glyph.transform, name + " Shield Top", Shield, new Vector2(0.56f, 0.12f), new Vector2(0f, 0.23f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Shield Body", Shield, new Vector2(0.52f, 0.34f), new Vector2(0f, 0.01f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Shield Tip", Shield, new Vector2(0.24f, 0.18f), new Vector2(0f, -0.22f), 5, 0f);
+            }
+            else if (kind == RaidItemKind.Magnet)
+            {
+                AddGlyphPrimitive(glyph.transform, name + " Magnet Left", Magnet, new Vector2(0.14f, 0.42f), new Vector2(-0.21f, 0.01f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Magnet Right", Magnet, new Vector2(0.14f, 0.42f), new Vector2(0.21f, 0.01f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Magnet Base", Magnet, new Vector2(0.44f, 0.14f), new Vector2(0f, -0.20f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Magnet Cap Left", Magnet, new Vector2(0.18f, 0.10f), new Vector2(-0.21f, 0.25f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Magnet Cap Right", Magnet, new Vector2(0.18f, 0.10f), new Vector2(0.21f, 0.25f), 5, 0f);
+            }
+            else
+            {
+                AddGlyphPrimitive(glyph.transform, name + " Slow Top", Slow, new Vector2(0.58f, 0.12f), new Vector2(0f, 0.24f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Bottom", Slow, new Vector2(0.58f, 0.12f), new Vector2(0f, -0.24f), 5, 0f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Upper Left", Slow, new Vector2(0.14f, 0.22f), new Vector2(-0.12f, 0.12f), 5, -35f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Upper Right", Slow, new Vector2(0.14f, 0.22f), new Vector2(0.12f, 0.12f), 5, 35f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Waist", Slow, new Vector2(0.14f, 0.18f), Vector2.zero, 5, 0f);
+            }
+            return glyph;
+        }
+
+        private GameObject CreateGlyphRoot(List<GameObject> owner, string name, GridPoint point)
+        {
+            var glyph = new GameObject(name);
+            glyph.transform.SetParent(_root, false);
+            glyph.transform.localPosition = ToLocalPosition(point);
+            owner.Add(glyph);
+            return glyph;
+        }
+
+        private Transform AddGlyphPrimitive(Transform parent, string name, Color color, Vector2 scale, Vector2 offset, int order, float rotation)
+        {
+            var visual = new GameObject(name);
+            visual.transform.SetParent(parent, false);
+            visual.transform.localPosition = new Vector3(offset.x, offset.y, 0f);
             visual.transform.localScale = new Vector3(scale.x, scale.y, 1f);
             visual.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
             var renderer = visual.AddComponent<SpriteRenderer>();

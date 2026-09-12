@@ -38,8 +38,9 @@ function deferred() {
 }
 
 function makeElement(documentObject, id, dataset = {}) {
+  const classes = new Set();
   return {
-    id, dataset, hidden: false, disabled: false, open: false, textContent: "", innerHTML: "", value: "", style: {}, tagName: id.includes("fallback") ? "INPUT" : "BUTTON", listeners: {}, children: [],
+    id, dataset, hidden: false, disabled: false, open: false, textContent: "", innerHTML: "", value: "", style: {}, tagName: id.includes("fallback") ? "INPUT" : "BUTTON", listeners: {}, children: [], classList: { toggle(name, force) { if (force === undefined ? !classes.has(name) : force) classes.add(name); else classes.delete(name); return classes.has(name); }, contains(name) { return classes.has(name); } },
     addEventListener(name, handler) { this.listeners[name] = handler; },
     setAttribute(name, value) { if (name === "open") this.open = true; this[name] = value; },
     removeAttribute(name) { if (name === "open") this.open = false; delete this[name]; },
@@ -63,7 +64,7 @@ function observation(status = "Playing", overrides = {}) {
 
 function createHarness(hash = "#record=fm1.shared") {
   const documentObject = { activeElement: null, listeners: {}, loader: null };
-  const ids = ["unity-canvas","feedback","turn-label","player-state","snake-state","tail-count","shield-count","magnet-count","slow-count","result-dialog","result-title","result-copy","result-record","result-restart","restart-top","save-button","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
+  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-help","shield-count","magnet-count","slow-count","charge-0","charge-1","charge-2","result-dialog","result-title","result-copy","result-record","result-restart","restart-top","save-button","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
   const elements = Object.fromEntries(ids.map(id => [id, makeElement(documentObject, id)]));
   elements["result-dialog"].tagName = "DIALOG"; elements["record-dialog"].tagName = "DIALOG";
   const actions = [makeElement(documentObject,"up",{raidAction:"Slide",direction:"Up"}),makeElement(documentObject,"left",{raidAction:"Slide",direction:"Left"}),makeElement(documentObject,"right",{raidAction:"Slide",direction:"Right"}),makeElement(documentObject,"down",{raidAction:"Slide",direction:"Down"}),elements["save-button"],elements["result-restart"]];
@@ -71,7 +72,7 @@ function createHarness(hash = "#record=fm1.shared") {
   const boardStage = makeElement(documentObject, "board-stage"); boardStage.tagName = "SECTION";
   documentObject.body = { appendChild(node) { documentObject.loader = node; } };
   documentObject.querySelector = selector => selector === ".board-stage" ? boardStage : selector === "dialog[open]" ? [elements["result-dialog"],elements["record-dialog"]].find(item => item.open) || null : selector.startsWith("#") ? elements[selector.slice(1)] : null;
-  documentObject.querySelectorAll = selector => selector === "button[data-raid-action]" ? actions : [];
+  documentObject.querySelectorAll = selector => selector === "button[data-raid-action]" ? actions : selector === ".charge-pip" ? [elements["charge-0"],elements["charge-1"],elements["charge-2"]] : [];
   documentObject.createElement = () => makeElement(documentObject, "loader");
   documentObject.addEventListener = (name, handler) => { documentObject.listeners[name] = handler; };
   const sent = [], unityReady = deferred(), clipboardCalls = [];
@@ -100,6 +101,43 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.match(firstRequestId,/^record-hash-\d+$/); assert.ok(firstRequestId.length<=96);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{sharedRecordRequestId:firstRequestId})));
   assert.equal(h.sent.filter(item => item.payload.kind === "LoadSharedRecord").length, 1, "one hash is imported exactly once");
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 0/3");
+  assert.equal(h.elements["goal-help"].textContent, "3개 모으면 강화");
+  assert.equal(h.elements["shield-count"].textContent, "1회");
+  assert.equal(h.elements["magnet-count"].textContent, "대기");
+  assert.equal(h.elements["slow-count"].textContent, "대기");
+  assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1 })));
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 1/3");
+  assert.equal(h.elements["charge-0"].classList.contains("filled"), true);
+  assert.equal(h.elements["charge-1"].classList.contains("filled"), false);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:2 })));
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 2/3");
+  assert.equal(h.elements["charge-1"].classList.contains("filled"), true);
+  assert.equal(h.elements["charge-2"].classList.contains("filled"), false);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { transitioning:true, tailCount:3 })));
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 3/3", "count alone does not authorize the armed state");
+  assert.equal(h.elements["goal-help"].textContent, "강화 적용 대기");
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Armed", { tailCount:3 })));
+  assert.equal(h.elements["tail-count"].textContent, "강화 완료");
+  assert.equal(h.elements["goal-help"].textContent, "뱀 몸통에 돌진");
+  assert.equal(h.elements["charge-2"].classList.contains("filled"), true);
+  assert.equal(h.elements["charge-2"].classList.contains("armed"), true);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Failed", { tailCount:2, shieldCharges:0 })));
+  assert.equal(h.elements["tail-count"].textContent, "레이드 실패");
+  assert.match(h.elements["goal-help"].textContent, /다시 시작/);
+  h.elements["restart-top"].listeners.click();
+  assert.equal(h.sent.at(-1).payload.kind, "Restart", "failed state keeps the explicit reset action available");
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:0, shieldCharges:1 })));
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 0/3", "restart redraws an empty charge");
+  assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
+  assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 1/3", "restored playing state redraws the confirmed charge");
+  assert.equal(h.elements["shield-count"].textContent, "1회");
+  assert.equal(h.elements["magnet-count"].textContent, "활성");
+  assert.equal(h.elements["slow-count"].textContent, "활성");
+  assert.equal(h.elements["magnet-count"].classList.contains("active"), true);
+  assert.equal(h.elements["slow-count"].classList.contains("active"), true);
 
   h.elements["record-top"].listeners.click();
   assert.equal(h.elements["record-dialog"].open, true, "record opens in its own dialog");

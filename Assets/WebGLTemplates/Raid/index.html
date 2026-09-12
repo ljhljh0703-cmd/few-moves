@@ -24,17 +24,31 @@
     .board-stage { position:relative; width:100%; min-height:0; display:grid; place-items:center; }
     #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:2px solid color-mix(in srgb,var(--charcoal) 32%,var(--grid)); border-radius:7px; background:var(--floor); box-shadow:0 6px 0 color-mix(in srgb,var(--charcoal) 16%,transparent),0 0 0 1px color-mix(in srgb,var(--grid) 78%,transparent); image-rendering:pixelated; }
     .controls { width:min(100%,360px); display:grid; align-content:start; gap:3px; }
-    .status-row { min-height:38px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:4px; }
-    .status-chip { display:inline-flex; align-items:center; justify-content:center; gap:4px; color:var(--muted); font-size:10px; font-weight:700; white-space:nowrap; }
-    .status-chip strong { color:var(--ink); font-size:12px; }
-    .status-dot { width:11px; height:11px; border-radius:2px; background:var(--player); }
-    .status-dot.snake { background:var(--snake); transform:rotate(45deg); }
-    .turn-label { display:grid; place-items:center; min-width:96px; min-height:36px; padding:3px 7px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; font-size:12px; line-height:1.1; text-align:center; }
+    .status-row { width:100%; min-height:48px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:stretch; gap:6px; }
+    .goal-panel { min-width:0; min-height:48px; display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:5px; padding:4px 7px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; }
+    .goal-icon,.bonus-icon { display:block; width:18px; height:18px; flex:0 0 auto; }
+    .goal-icon.tail,.bonus-icon.tail { color:var(--tail); }
+    .bonus-icon.shield { color:var(--shield); }
+    .bonus-icon.magnet { color:var(--magnet); }
+    .bonus-icon.slow { color:var(--slow); }
+    .goal-copy { min-width:0; display:grid; gap:1px; }
+    .goal-copy strong { min-width:0; color:var(--ink); font-size:11px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .goal-copy small { min-width:0; color:var(--muted); font-size:9px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .charge-meter { display:flex; align-items:center; gap:3px; }
+    .charge-pip { width:8px; height:16px; border:1px solid var(--grid); border-radius:2px; background:transparent; opacity:.76; }
+    .charge-pip.filled { border-color:var(--tail); background:var(--tail); opacity:1; }
+    .charge-pip.armed { box-shadow:0 0 0 1px color-mix(in srgb,var(--tail) 70%,transparent); }
+    .turn-label { display:grid; place-items:center; min-width:78px; min-height:48px; padding:3px 7px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; font-size:11px; line-height:1.1; text-align:center; }
     .turn-label small { color:var(--muted); font-size:9px; }
-    .item-row { display:flex; justify-content:center; gap:4px; min-height:28px; }
-    .item-badge { display:inline-flex; align-items:center; gap:3px; min-height:28px; padding:2px 6px; border:1px solid var(--grid); border-radius:999px; background:#fffdf7; color:var(--muted); font-size:9px; font-weight:800; }
-    .item-badge strong { color:var(--ink); font-size:10px; }
-    .item-badge.shield strong { color:var(--shield); } .item-badge.magnet strong { color:var(--magnet); } .item-badge.slow strong { color:var(--slow); }
+    .bonus-row { width:100%; min-height:44px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+    .bonus-chip { min-width:0; min-height:44px; display:grid; grid-template-columns:18px minmax(0,1fr); align-items:center; column-gap:4px; padding:4px 5px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; }
+    .bonus-copy { min-width:0; display:grid; gap:1px; }
+    .bonus-copy strong { min-width:0; color:var(--ink); font-size:9px; line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bonus-copy strong span { color:var(--muted); font-size:8px; }
+    .bonus-chip.shield .bonus-copy strong span { color:var(--shield); }
+    .bonus-chip.magnet .bonus-copy strong span.active { color:var(--magnet); }
+    .bonus-chip.slow .bonus-copy strong span.active { color:var(--slow); }
+    .bonus-copy small { min-width:0; color:var(--muted); font-size:8px; line-height:1.05; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .dpad { position:relative; width:180px; height:168px; margin:0 auto; }
     .dpad button { position:absolute; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; }
     .dpad button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--edge); }
@@ -76,8 +90,28 @@
     <section class="raid-layout" aria-label="Few Moves 레이드">
       <section class="board-stage" aria-label="16×16 레이드 보드"><canvas id="unity-canvas" tabindex="0" aria-label="16×16 보드에서 플레이어와 뱀이 움직이는 레이드 보드"></canvas></section>
       <section class="controls" aria-label="레이드 조작">
-        <div class="status-row"><span class="status-chip"><span class="status-dot" aria-hidden="true"></span><strong>플레이어</strong><span id="player-state">준비</span></span><span id="turn-label" class="turn-label">레이드 대기<small>행동 0</small></span><span class="status-chip"><span class="status-dot snake" aria-hidden="true"></span><strong>뱀</strong><span id="snake-state">순찰</span></span></div>
-        <div class="item-row" aria-label="레이드 강화 상태"><span class="item-badge"><strong>◆</strong> 꼬리 <span id="tail-count">0 / 3</span></span><span class="item-badge shield"><strong>▣</strong> 보호막 <span id="shield-count">0</span></span><span class="item-badge magnet"><strong>✦</strong> 자석 <span id="magnet-count">0</span></span><span class="item-badge slow"><strong>◌</strong> 감속 <span id="slow-count">0</span></span></div>
+        <div class="status-row">
+          <div class="goal-panel" aria-live="polite">
+            <svg class="goal-icon tail" viewBox="0 0 9 9" aria-hidden="true"><path fill="currentColor" d="M5 0 3 4h2L3 9l4-5H5l1-4Z"></path></svg>
+            <div class="goal-copy"><strong id="tail-count">꼬리 조각 0/3</strong><small id="goal-help">3개 모으면 강화</small></div>
+            <div class="charge-meter" aria-label="꼬리 조각 충전"><span class="charge-pip" aria-hidden="true"></span><span class="charge-pip" aria-hidden="true"></span><span class="charge-pip" aria-hidden="true"></span></div>
+          </div>
+          <span id="turn-label" class="turn-label">레이드 대기<small>행동 0</small></span>
+        </div>
+        <div class="bonus-row" aria-label="레이드 강화 효과">
+          <div class="bonus-chip shield">
+            <svg class="bonus-icon shield" viewBox="0 0 9 9" aria-hidden="true"><path fill="currentColor" d="M1 1h7v3c0 2-2 3.5-3.5 4C3 7.5 1 6 1 4V1Z"></path></svg>
+            <div class="bonus-copy"><strong>보호막 <span id="shield-count">0회</span></strong><small>충돌 막기</small></div>
+          </div>
+          <div class="bonus-chip magnet">
+            <svg class="bonus-icon magnet" viewBox="0 0 9 9" aria-hidden="true"><path fill="currentColor" d="M1 1v4c0 2 1.5 3 3.5 3S8 7 8 5V1H6v4c0 .8-.6 1-1.5 1S3 5.8 3 5V1H1Z"></path></svg>
+            <div class="bonus-copy"><strong>자석 <span id="magnet-count">대기</span></strong><small>주변 조각 수집</small></div>
+          </div>
+          <div class="bonus-chip slow">
+            <svg class="bonus-icon slow" viewBox="0 0 9 9" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="square" d="M1 1h7M1 8h7M2 1c0 2 2.5 2 2.5 3.5S2 6 2 8M7 1c0 2-2.5 2-2.5 3.5S7 6 7 8"></path></svg>
+            <div class="bonus-copy"><strong>감속 <span id="slow-count">대기</span></strong><small>뱀 이동 늦춤</small></div>
+          </div>
+        </div>
         <div class="dpad" aria-label="방향 조작"><button class="dpad-up" type="button" data-raid-action="Slide" data-direction="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button><button class="dpad-left" type="button" data-raid-action="Slide" data-direction="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button><button class="dpad-right" type="button" data-raid-action="Slide" data-direction="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button><button class="dpad-down" type="button" data-raid-action="Slide" data-direction="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button></div>
         <p id="feedback" class="feedback" role="status" aria-live="polite">레이드를 준비하는 중입니다.</p>
       </section>
@@ -89,7 +123,7 @@
     (function () {
       "use strict";
       var canvas=document.querySelector("#unity-canvas"), boardStage=document.querySelector(".board-stage"), unityInstance=null, currentState=null;
-      var feedback=document.querySelector("#feedback"), turnLabel=document.querySelector("#turn-label"), playerState=document.querySelector("#player-state"), snakeState=document.querySelector("#snake-state"), tailCount=document.querySelector("#tail-count"), shieldCount=document.querySelector("#shield-count"), magnetCount=document.querySelector("#magnet-count"), slowCount=document.querySelector("#slow-count");
+      var feedback=document.querySelector("#feedback"), turnLabel=document.querySelector("#turn-label"), tailCount=document.querySelector("#tail-count"), goalHelp=document.querySelector("#goal-help"), chargePips=Array.from(document.querySelectorAll(".charge-pip")), shieldCount=document.querySelector("#shield-count"), magnetCount=document.querySelector("#magnet-count"), slowCount=document.querySelector("#slow-count");
       var resultDialog=document.querySelector("#result-dialog"), resultTitle=document.querySelector("#result-title"), resultCopy=document.querySelector("#result-copy"), recordDialog=document.querySelector("#record-dialog"), recordTop=document.querySelector("#record-top"), recordNote=document.querySelector("#record-note"), recordGet=document.querySelector("#record-get"), recordShare=document.querySelector("#record-share"), recordChallenge=document.querySelector("#record-challenge"), recordFallback=document.querySelector("#record-fallback");
       var mineValue=document.querySelector("#mine-value"), mineMeta=document.querySelector("#mine-meta"), sharedValue=document.querySelector("#shared-value"), sharedMeta=document.querySelector("#shared-meta"), recordCompare=document.querySelector("#record-compare");
       var pendingRecordCapsule="", pendingRecordRequestId="", lastImportedRecordHash="", lastAcceptedRecordRequestId="", acceptedRecordView=null, recordImportSequence=0, observedInitialized=false, recordImportPending=false, recordImportAwaitingObservation=false, recordImportMessage="", suppressedResultKey="", shareAttempt=0;
@@ -108,7 +142,8 @@
       function terminalKey(state){ return (state.statusCode==="Cleared"||state.statusCode==="Failed")?[state.statusCode,state.actions,state.stateFingerprint].join("|"):""; }
       function renderResult(state){ var key=terminalKey(state); if(!key||state.transitioning){ closeDialog(resultDialog); if(!key)suppressedResultKey=""; return; } if(recordDialog.open){suppressedResultKey=key;return;} if(suppressedResultKey===key)return; resultTitle.textContent=state.statusCode==="Cleared"?"레이드 성공":"다시 도전"; resultCopy.textContent=state.statusCode==="Cleared"?("행동 "+String(state.actions)+"회 · 피격 "+String(state.hits)+"회로 끝냈습니다."):"보호막이 없던 충돌로 이번 판이 끝났습니다."; openDialog(resultDialog); }
       function renderRecord(state){ var source=acceptedRecordView||state,mine=state.hasMine===true&&usable(state.mine)?state.mine:null, shared=!recordImportPending&&source.hasShared===true&&usable(source.shared)?source.shared:null; mineValue.textContent=mine?String(mine.effectiveActionCount)+"수":"기록 없음"; mineMeta.textContent=mine?"피격 "+String(mine.hits)+"회":"완주하면 최고 기록이 남습니다."; sharedValue.textContent=recordImportPending?"확인 중":shared?String(shared.effectiveActionCount)+"수":"기록 없음"; sharedMeta.textContent=recordImportPending?"":shared?"피격 "+String(shared.hits)+"회":"링크를 열면 여기 표시됩니다."; if(recordImportPending)recordCompare.textContent="새 링크의 기록을 확인하고 있습니다."; else if(mine&&shared&&sameIdentity(mine,shared)){ var delta=mine.effectiveActionCount-shared.effectiveActionCount; recordCompare.textContent=delta===0?(mine.hits===shared.hits?"행동 수와 피격 수가 같습니다.":(mine.hits<shared.hits?"행동 수는 같고 내 피격이 "+String(shared.hits-mine.hits)+"회 적습니다.":"행동 수는 같고 내 피격이 "+String(mine.hits-shared.hits)+"회 많습니다.")):(delta<0?"내 최고가 공유 기록보다 "+String(-delta)+"수 적습니다.":"내 최고가 공유 기록보다 "+String(delta)+"수 많습니다."); }else recordCompare.textContent=mine&&shared?"같은 판의 기록만 비교할 수 있습니다.":"비교할 두 기록이 아직 없습니다."; var capsule=typeof source.recordCapsule==="string"?source.recordCapsule:""; recordGet.disabled=!state.initialized||state.transitioning||state.statusCode!=="Cleared"; recordShare.disabled=!capsule||source.recordStatus!=="ready"||state.transitioning; recordChallenge.disabled=!shared||state.transitioning; if(!capsule)recordFallback.hidden=true; if(recordImportPending)recordNote.textContent=recordImportMessage; else if(source.recordError)recordNote.textContent="기록을 확인할 수 없습니다."; else if(shared)recordNote.textContent="검증된 공유 기록을 불러왔습니다."; else if(capsule&&source.recordStatus==="ready")recordNote.textContent="현재 완주 기록을 공유할 수 있습니다."; else recordNote.textContent="완주 기록만 공유할 수 있습니다."; }
-      function renderState(state){ if(!validState(state))return; currentState=state; observedInitialized=state.initialized===true; window.__nectorialRaid.state=state; var status=state.statusCode; turnLabel.innerHTML=(status==="Armed"?"강화 완료":status==="Cleared"?"격파 성공":status==="Failed"?"실패":"레이드 진행")+"<small>행동 "+String(state.actions)+"</small>"; playerState.textContent=status==="Failed"?"회복 필요":status==="Cleared"?"완주":status==="Armed"?"박치기 준비":"이동"; snakeState.textContent=status==="Cleared"?"멈춤":status==="Failed"?"충돌":"순찰"; tailCount.textContent=String(state.tailCount)+" / "+String(state.tailTarget); shieldCount.textContent=String(state.shieldCharges); magnetCount.textContent=String(state.magnetStepsRemaining); slowCount.textContent=String(state.slowStepsRemaining); feedback.textContent=state.message||state.error||""; renderRecord(state); renderButtons(); renderResult(state); flushRecordImport(); }
+      function renderGoal(state){ var count=Math.max(0,Number(state.tailCount)||0),target=Math.max(0,Number(state.tailTarget)||0),status=state.statusCode; if(status==="Armed"){tailCount.textContent="강화 완료";goalHelp.textContent="뱀 몸통에 돌진";}else if(status==="Cleared"){tailCount.textContent="레이드 완료";goalHelp.textContent="뱀을 격파했습니다";}else if(status==="Failed"){tailCount.textContent="레이드 실패";goalHelp.textContent="다시 시작해 꼬리 조각을 모으세요";}else if(!state.initialized){tailCount.textContent="레이드 준비";goalHelp.textContent="꼬리 조각을 모아 강화";}else{tailCount.textContent="꼬리 조각 "+String(count)+"/"+String(target);goalHelp.textContent=count>=target&&target>0?"강화 적용 대기":String(target)+"개 모으면 강화";} chargePips.forEach(function(pip,index){pip.classList.toggle("filled",index<count);pip.classList.toggle("armed",status==="Armed");}); }
+      function renderState(state){ if(!validState(state))return; currentState=state; observedInitialized=state.initialized===true; window.__nectorialRaid.state=state; var status=state.statusCode,magnetActive=Number(state.magnetStepsRemaining)>0,slowActive=Number(state.slowStepsRemaining)>0; turnLabel.innerHTML=(status==="Armed"?"강화 완료":status==="Cleared"?"격파 성공":status==="Failed"?"실패":"레이드 진행")+"<small>행동 "+String(state.actions)+"</small>"; renderGoal(state); shieldCount.textContent=String(Math.max(0,Number(state.shieldCharges)||0))+"회"; magnetCount.textContent=magnetActive?"활성":"대기"; slowCount.textContent=slowActive?"활성":"대기"; magnetCount.classList.toggle("active",magnetActive); slowCount.classList.toggle("active",slowActive); feedback.textContent=state.message||state.error||""; renderRecord(state); renderButtons(); renderResult(state); flushRecordImport(); }
       function receiveState(json){ try{var state=JSON.parse(json);if(!validState(state))return;observeRecordResult(state);renderState(state);}catch(error){feedback.textContent="레이드 상태를 확인할 수 없습니다.";} }
       function queueRecordHash(){var capsule=typeof location!=="undefined"&&location.hash.indexOf("#record=")===0?location.hash.slice(8):"";if(!capsule){pendingRecordCapsule="";pendingRecordRequestId="";recordImportPending=false;recordImportAwaitingObservation=false;recordImportMessage="";if(currentState)renderRecord(currentState);return;}if(capsule===pendingRecordCapsule&&(recordImportPending||capsule===lastImportedRecordHash))return;pendingRecordCapsule=capsule;pendingRecordRequestId="record-hash-"+String(++recordImportSequence);recordImportPending=true;recordImportAwaitingObservation=false;recordImportMessage="공유 기록을 확인하는 중입니다.";shareAttempt+=1;recordFallback.hidden=true;if(currentState)renderRecord(currentState);flushRecordImport();}
       function flushRecordImport(){ if(!pendingRecordCapsule||pendingRecordCapsule===lastImportedRecordHash||!unityInstance||!observedInitialized)return; lastImportedRecordHash=pendingRecordCapsule; if(pendingRecordCapsule.length>4096){recordImportMessage="기록 링크가 너무 깁니다.";if(currentState)renderRecord(currentState);return;} recordImportAwaitingObservation=true;send({kind:"LoadSharedRecord",capsule:pendingRecordCapsule,requestId:pendingRecordRequestId}); }
