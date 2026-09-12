@@ -185,10 +185,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
             for (int index = 0; index < count; index++)
             {
                 Transform actor = AddActor("Snake " + index, index == 0 ? SnakeHead : Snake,
-                    new Vector2(index == 0 ? 0.92f : 0.72f, index == 0 ? 0.92f : 0.72f), 8, index == 0 ? 45f : 0f);
+                    new Vector2(index == 0 ? 0.66f : 0.72f, index == 0 ? 0.66f : 0.72f), 8, index == 0 ? 45f : 0f);
                 if (index == 0)
                 {
-                    AddActorPrimitive(actor, "Snake Head Outline", WallRim, new Vector2(1.01f, 1.01f), 7, 45f);
+                    AddActorPrimitive(actor, "Snake Head Outline", WallRim, new Vector2(0.70f, 0.70f), 7, 45f);
                     Transform snakeHeadMark = AddActorPrimitive(actor, "Snake Head Mark", SnakeHeadMark, new Vector2(0.25f, 0.12f), 9, 0f);
                     snakeHeadMark.localPosition = new Vector3(0.24f, 0f, 0f);
                 }
