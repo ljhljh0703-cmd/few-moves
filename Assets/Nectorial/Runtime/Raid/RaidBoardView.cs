@@ -349,7 +349,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 AddLine(_staticTiles, section ? "Section Grid Vertical" : "Grid Vertical",
                     section ? SectionGrid : Grid,
                     new Vector3(x - 0.5f, 0.5f, 0f), new Vector3(x - 0.5f, bottom - 0.5f, 0f),
-                    section ? 0.055f : 0.025f, section ? 2 : 1);
+                    section ? 0.09f : 0.06f, section ? 2 : 1);
             }
             for (int y = 1; y < arena.Height; y++)
             {
@@ -358,7 +358,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 AddLine(_staticTiles, section ? "Section Grid Horizontal" : "Grid Horizontal",
                     section ? SectionGrid : Grid,
                     new Vector3(-0.5f, boundary, 0f), new Vector3(right + 0.5f, boundary, 0f),
-                    section ? 0.055f : 0.025f, section ? 2 : 1);
+                    section ? 0.09f : 0.06f, section ? 2 : 1);
             }
         }
 
