@@ -103,9 +103,10 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.sent.filter(item => item.payload.kind === "LoadSharedRecord").length, 1, "one hash is imported exactly once");
   assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 0/3");
   assert.equal(h.elements["goal-help"].textContent, "3개 모으면 강화");
+  assert.equal(h.elements["turn-label"].textContent, "행동 2");
   assert.equal(h.elements["shield-count"].textContent, "1회");
-  assert.equal(h.elements["magnet-count"].textContent, "대기");
-  assert.equal(h.elements["slow-count"].textContent, "대기");
+  assert.equal(h.elements["magnet-count"].textContent, "없음");
+  assert.equal(h.elements["slow-count"].textContent, "없음");
   assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1 })));
   assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 1/3");
@@ -117,7 +118,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements["charge-2"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { transitioning:true, tailCount:3 })));
   assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 3/3", "count alone does not authorize the armed state");
-  assert.equal(h.elements["goal-help"].textContent, "강화 적용 대기");
+  assert.equal(h.elements["goal-help"].textContent, "이동이 끝나면 강화");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Armed", { tailCount:3 })));
   assert.equal(h.elements["tail-count"].textContent, "강화 완료");
   assert.equal(h.elements["goal-help"].textContent, "뱀 몸통에 돌진");
@@ -134,8 +135,8 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
   assert.equal(h.elements["tail-count"].textContent, "꼬리 조각 1/3", "restored playing state redraws the confirmed charge");
   assert.equal(h.elements["shield-count"].textContent, "1회");
-  assert.equal(h.elements["magnet-count"].textContent, "활성");
-  assert.equal(h.elements["slow-count"].textContent, "활성");
+  assert.equal(h.elements["magnet-count"].textContent, "작동 중");
+  assert.equal(h.elements["slow-count"].textContent, "작동 중");
   assert.equal(h.elements["magnet-count"].classList.contains("active"), true);
   assert.equal(h.elements["slow-count"].classList.contains("active"), true);
 
@@ -201,7 +202,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(route.elements["record-compare"].textContent,"새 링크의 기록을 확인하고 있습니다.");
   const requestB=route.sent.at(-1).payload.requestId;assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B",requestId:requestB});assert.notEqual(requestB,requestA);
   route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {actions:3,recordStatus:"ready",hasMine:true,mine:summary(7,0),hasShared:true,shared:summary(13,2),sharedRecordRequestId:requestA})));
-  assert.equal(route.elements["shared-value"].textContent,"확인 중","late A success cannot release B");assert.equal(route.elements["mine-value"].textContent,"7수","late record observation still preserves current mine");assert.match(route.elements["turn-label"].innerHTML,/행동 3/);
+  assert.equal(route.elements["shared-value"].textContent,"확인 중","late A success cannot release B");assert.equal(route.elements["mine-value"].textContent,"7수","late record observation still preserves current mine");assert.equal(route.elements["turn-label"].textContent,"행동 3","action count remains the sole turn label");
   route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {actions:4,recordStatus:"ready",hasShared:true,shared:summary(13,2),sharedRecordRequestId:""})));
   assert.equal(route.elements["shared-value"].textContent,"확인 중","ordinary observation cannot release B");
   route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", {recordStatus:"ready",hasShared:true,shared:summary(9,1),sharedRecordRequestId:requestB})));

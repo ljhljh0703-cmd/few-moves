@@ -352,6 +352,8 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 AddGlyphPrimitive(glyph.transform, name + " Slow Bottom", Slow, new Vector2(0.58f, 0.12f), new Vector2(0f, -0.24f), 5, 0f);
                 AddGlyphPrimitive(glyph.transform, name + " Slow Upper Left", Slow, new Vector2(0.14f, 0.22f), new Vector2(-0.12f, 0.12f), 5, -35f);
                 AddGlyphPrimitive(glyph.transform, name + " Slow Upper Right", Slow, new Vector2(0.14f, 0.22f), new Vector2(0.12f, 0.12f), 5, 35f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Lower Left", Slow, new Vector2(0.14f, 0.22f), new Vector2(-0.12f, -0.12f), 5, 35f);
+                AddGlyphPrimitive(glyph.transform, name + " Slow Lower Right", Slow, new Vector2(0.14f, 0.22f), new Vector2(0.12f, -0.12f), 5, -35f);
                 AddGlyphPrimitive(glyph.transform, name + " Slow Waist", Slow, new Vector2(0.14f, 0.18f), Vector2.zero, 5, 0f);
             }
             return glyph;
