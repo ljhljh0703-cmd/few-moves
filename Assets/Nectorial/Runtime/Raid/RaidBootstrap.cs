@@ -13,8 +13,8 @@ namespace Nectorial.SlideEscape.Unity.Raid
     {
         private const string ProductName = "Few Moves Raid Pilot";
         private const string ArenaResource = RaidContent.DefaultArenaResource;
-        private const string SaveKey = "nectorial-raid.save.v1";
-        private const string FailedSaveKey = "nectorial-raid.save.v1.restore-failed";
+        private const string SaveKey = "nectorial-raid.save.v1.raid-v1." + RaidContent.DefaultArenaId;
+        private const string FailedSaveKey = SaveKey + ".restore-failed";
         private const int SharedRecordRequestIdMaximumLength = 96;
 
         private RaidArenaDefinition _arena;
@@ -200,7 +200,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 CompleteActionPresentation();
                 return;
             }
-            float duration = Mathf.Clamp(0.08f * _pendingAction.Frames.Length, 0.16f, 0.72f);
+            float duration = PresentationDuration(_pendingAction.Frames.Length);
             _transitionRoutine = StartCoroutine(CompleteActionAfter(duration));
         }
 
@@ -283,6 +283,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                     Fail("레이드 arena가 올바르지 않습니다", "raid_arena_invalid:" + errors[0]);
                     return;
                 }
+                ConfigureCameraForArena(_arena);
                 _session = RaidSession.Create(_arena);
                 _displayState = _session.State;
                 _board = new RaidBoardView();
@@ -572,6 +573,14 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _displayState = _session == null ? null : _session.State;
         }
 
+        private float PresentationDuration(int frameCount)
+        {
+            bool expandedArena = _arena != null && Mathf.Max(_arena.Width, _arena.Height) >= 16;
+            float perFrame = expandedArena ? 0.09f : 0.08f;
+            float maximum = expandedArena ? 0.90f : 0.72f;
+            return Mathf.Clamp(perFrame * frameCount, 0.16f, maximum);
+        }
+
         private void Fail(string message, string error)
         {
             _initialized = false;
@@ -639,6 +648,16 @@ namespace Nectorial.SlideEscape.Unity.Raid
             camera.transform.position = new Vector3(0f, 0f, -10f);
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color32(0xf0, 0xec, 0xe2, 0xff);
+        }
+
+        private static void ConfigureCameraForArena(RaidArenaDefinition arena)
+        {
+            if (arena == null) return;
+            ConfigureCamera();
+            Camera camera = Camera.main;
+            if (camera == null) return;
+            float halfExtent = Mathf.Max(arena.Width, arena.Height) * 0.5f;
+            camera.orthographicSize = Mathf.Max(4.65f, halfExtent + 0.65f);
         }
 
         private string NextCommandId()
