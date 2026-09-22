@@ -24,6 +24,10 @@ assert.match(template, /세 번째 판/);
 assert.match(template, /left:50%; top:0; width:180px; height:168px/);
 assert.match(template, /grid-template-rows:48px 48px 56px 168px 18px/);
 assert.match(template, /id="join-open"/);
+assert.match(template, /id="lobby-intro"/);
+assert.match(template, /class="board-stage" hidden/);
+assert.match(template, /class="play-controls" hidden/);
+assert.match(template, /function canUseLobby\(\).*currentState\.initialized.*!currentState\.joined/);
 assert.match(template, /id="menu-dialog"/);
 assert.match(template, /id="help-dialog"/);
 assert.match(template, /id="invite-dialog"/);
@@ -277,15 +281,15 @@ function onlineObservation(overrides={}) {
 
 function uiHarness(hash="#record=fm1.shared") {
   const documentObject={activeElement:null,listeners:{},loader:null};
-  const ids=["unity-canvas","online-controls","feedback","connection-label","room-form","room-start","join-entry","join-open","join-back","room-info","invite-input","invite-code","resume-invite-input","resume-button","copy-invite-button","invite-copy","invite-close","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","menu-dialog","menu-top","menu-close","menu-record","help-dialog","help-top","help-close","invite-dialog","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-record","clear-restart","clear-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
+  const ids=["unity-canvas","online-layout","lobby-intro","status-row","play-controls","online-controls","feedback","connection-label","room-form","room-start","join-entry","join-open","join-back","room-info","invite-input","invite-code","resume-invite-input","resume-button","copy-invite-button","invite-copy","invite-close","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","menu-dialog","menu-top","menu-close","menu-record","help-dialog","help-top","help-close","invite-dialog","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-record","clear-restart","clear-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
   const elements=Object.fromEntries(ids.map(id=>[id,uiElement(documentObject,id)]));
-  elements["join-entry"].hidden=true;
+  elements["join-entry"].hidden=true;elements["status-row"].hidden=true;elements["play-controls"].hidden=true;
   ["menu-dialog","help-dialog","invite-dialog","consent-dialog","clear-dialog","record-dialog"].forEach(id=>{elements[id].tagName="DIALOG";});
   const actions=[uiElement(documentObject,"up",{onlineAction:"Slide",direction:"Up"}),uiElement(documentObject,"left",{onlineAction:"Slide",direction:"Left"}),uiElement(documentObject,"right",{onlineAction:"Slide",direction:"Right"}),uiElement(documentObject,"down",{onlineAction:"Slide",direction:"Down"}),uiElement(documentObject,"look",{onlineAction:"Express",expression:"Look"}),uiElement(documentObject,"thumb",{onlineAction:"Express",expression:"ThumbsUp"}),uiElement(documentObject,"hand",{onlineAction:"Express",expression:"Handshake"}),uiElement(documentObject,"wait",{onlineAction:"Express",expression:"Waiting"}),uiElement(documentObject,"undo",{onlineAction:"RequestUndo"}),elements["clear-restart"]];
   elements["clear-restart"].dataset={onlineAction:"RequestRestart"};
-  const boardStage=uiElement(documentObject,"board-stage"); boardStage.tagName="SECTION";
+  const boardStage=uiElement(documentObject,"board-stage"); boardStage.tagName="SECTION";boardStage.hidden=true;
   documentObject.body={appendChild(node){documentObject.loader=node;}};
-  documentObject.querySelector=selector=>selector===".board-stage"?boardStage:selector==="dialog[open]"?[elements["menu-dialog"],elements["help-dialog"],elements["invite-dialog"],elements["consent-dialog"],elements["clear-dialog"],elements["record-dialog"]].find(item=>item.open)||null:selector.startsWith("#")?elements[selector.slice(1)]:null;
+  documentObject.querySelector=selector=>selector===".board-stage"?boardStage:selector===".status-row"?elements["status-row"]:selector===".play-controls"?elements["play-controls"]:selector==="dialog[open]"?[elements["menu-dialog"],elements["help-dialog"],elements["invite-dialog"],elements["consent-dialog"],elements["clear-dialog"],elements["record-dialog"]].find(item=>item.open)||null:selector.startsWith("#")?elements[selector.slice(1)]:null;
   documentObject.querySelectorAll=selector=>selector==="button[data-online-action]"?actions:[];
   documentObject.createElement=()=>uiElement(documentObject,"dynamic");
   documentObject.addEventListener=(name,handler)=>{documentObject.listeners[name]=handler;};
@@ -295,10 +299,38 @@ function uiHarness(hash="#record=fm1.shared") {
   const script=template.slice(template.indexOf("<script>")+8,template.lastIndexOf("</script>"));
   vm.runInNewContext(script,sandbox,{filename:"CoopOnline/index.html"});
   const instance={SendMessage(name,method,payload){sent.push({name,method,payload:JSON.parse(payload)});}};
-  return {sandbox,documentObject,elements,actions,sent,unityReady,instance,clipboardCalls};
+  return {sandbox,documentObject,elements,boardStage,actions,sent,unityReady,instance,clipboardCalls};
 }
 
 async function runUiFixtures() {
+  const boot=uiHarness("");
+  boot.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({transportLocked:true})));
+  assert.equal(boot.boardStage.hidden,true,"unjoined lobby hides the empty board");
+  assert.equal(boot.elements["lobby-intro"].hidden,false);
+  assert.equal(boot.elements["status-row"].hidden,true);
+  assert.equal(boot.elements["play-controls"].hidden,true,"inactive pad is not shown in the lobby");
+  assert.equal(boot.elements["online-controls"].classList.contains("lobby"),true);
+  assert.equal(boot.elements["create-button"].disabled,false,"initial transport lock does not disable creating a room");
+  assert.equal(boot.elements["join-open"].disabled,false);
+  assert.equal(boot.elements["definition-options"].children.every(button=>!button.disabled),true,"board selection remains available before joining");
+  boot.documentObject.loader.onload();boot.unityReady.resolve(boot.instance);await settle();
+  boot.elements["create-button"].listeners.click();
+  assert.deepEqual(boot.sent.at(-1).payload,{kind:"Create",definitionId:"coop-c2"},"initial locked lobby can send Create");
+  boot.elements["join-open"].listeners.click();
+  assert.equal(boot.elements["join-entry"].hidden,false);
+  boot.elements["invite-input"].value="INV-BOOT";boot.elements["join-button"].listeners.click();
+  assert.deepEqual(boot.sent.at(-1).payload,{kind:"Join",inviteCode:"INV-BOOT"},"initial locked lobby can send Join");
+  const lobbyCount=boot.sent.length;boot.actions[0].listeners.click();boot.actions[4].listeners.click();
+  assert.equal(boot.sent.length,lobbyCount,"transport lock still blocks room movement and expressions");
+  boot.documentObject.activeElement=null;
+  boot.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({transportLocked:true,recordStatus:"ready",hasShared:true,shared:recordSummary(9)})));
+  boot.elements["record-top"].listeners.click();
+  assert.equal(boot.elements["record-challenge"].disabled,false,"shared board choice stays usable in the locked lobby");
+  boot.elements["record-challenge"].listeners.click();assert.equal(boot.sent.at(-1).payload.kind,"Challenge");
+  boot.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({joined:true,transportLocked:true,roomId:"boot-room",seatCode:0,inviteCode:"INV-BOOT"})));
+  assert.equal(boot.boardStage.hidden,false,"joined room reveals the board even during reconnection");
+  assert.equal(boot.elements["lobby-intro"].hidden,true);
+  assert.equal(boot.elements["play-controls"].hidden,false);
   const h=uiHarness();
   h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation()));
   assert.equal(h.sent.length,0,"initial observation before Unity instance defers record import");
