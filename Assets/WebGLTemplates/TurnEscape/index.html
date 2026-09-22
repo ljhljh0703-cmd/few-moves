@@ -6,111 +6,93 @@
   <link rel="icon" href="data:,">
   <title>{{{ PRODUCT_NAME }}}</title>
   <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --warm-surface: #f0ece2; --warm-ink: #293238; --warm-muted: #6e736f; --warm-floor: #e5e0d3; --warm-grid: #d2cbbb; --warm-charcoal: #313a3b; --warm-charcoal-edge: #171e1f; --warm-pressed: #151c1d; --warm-focus: #5d8960; }
-    * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; overflow-x: hidden; overflow-y: auto; background: var(--warm-surface); }
-    body { min-height: 100svh; color: var(--warm-ink); }
-    button { min-width: 48px; min-height: 48px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-    button:focus-visible, canvas:focus-visible, textarea:focus-visible { outline: 3px solid var(--warm-focus); outline-offset: 3px; }
-    button:disabled { opacity: .38; cursor: default; }
-    canvas { display: block; object-fit: contain; image-rendering: pixelated; }
-    /* Mobile player UI: the real Unity canvas remains the board. */
-    main#app { width: min(640px, 100%); min-height: 100svh; height: 100svh; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); display: grid; grid-template-rows: 48px minmax(0, 1fr); gap: 6px; }
-    .utility-bar { min-height: 48px; display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; }
-    .utility-button { min-width: 48px; min-height: 48px; display: inline-grid; place-items: center; padding: 0; color: var(--warm-ink); background: transparent; border: 0; border-radius: 12px; box-shadow: none; }
-    .utility-button:enabled:hover, .utility-button:enabled:active { background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
-    .utility-button svg { width: 19px; height: 19px; stroke: currentColor; stroke-width: 1.9; fill: none; }
-    .play-layout { min-height: 0; height: auto; width: 100%; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 284px; justify-items: center; align-items: stretch; gap: 8px; }
-    .board-stage { grid-row: 1; position: relative; width: 100%; min-width: 0; min-height: 0; container-type: size; }
-    .game { position: absolute; inset: 0; display: grid; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; }
-    canvas { width: min(100%, 560px); height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; border: 1px solid var(--warm-grid); border-radius: 6px; background: var(--warm-floor); box-shadow: 0 5px 0 color-mix(in srgb, var(--warm-charcoal) 16%, transparent); }
-    @supports (width: 1cqh) { canvas { width: min(100%, 560px, 100cqh); } }
-    .feedback { position: absolute; z-index: 2; bottom: 8px; left: 50%; width: min(calc(100% - 24px), 360px); min-height: 32px; margin: 0; padding: 7px 10px; color: var(--warm-ink); background: color-mix(in srgb, var(--warm-surface) 92%, var(--warm-grid)); border: 1px solid var(--warm-grid); border-radius: 9px; font-size: 12px; line-height: 1.35; text-align: center; transform: translateX(-50%); }
-    .feedback[hidden] { display: none; }
-    .control-slot { grid-row: 2; width: min(100%, 320px); height: 284px; display: grid; align-content: start; justify-items: center; }
-    .play-controls { width: 100%; display: grid; gap: 8px; justify-items: center; }
-    .play-controls[hidden] { display: grid !important; visibility: hidden; pointer-events: none; }
-    .runline { width: 100%; min-height: 48px; display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 4px; }
-    #turn-runline { color: var(--warm-ink); font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: -.04em; white-space: nowrap; }
-    .piece-chips { display: flex; align-items: center; justify-content: center; gap: 4px; }
-    .piece-chip { min-width: 48px; min-height: 48px; display: grid; place-items: center; padding: 0; border: 1px solid var(--warm-grid); border-radius: 9px; background: #fffdf7; }
-    .piece-chip[hidden] { display: none; }
-    .piece-chip[aria-pressed="true"] { border-color: var(--warm-focus); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--warm-focus) 35%, transparent); }
-    .piece-chip:enabled:hover { background: color-mix(in srgb, #fffdf7 88%, var(--warm-grid)); }
-    .piece-mark { width: 22px; height: 22px; display: block; background: #4374b7; border: 2px solid color-mix(in srgb, #4374b7 70%, var(--warm-charcoal)); border-radius: 50%; }
-    .piece-chip[data-piece-index="1"] .piece-mark { background: #d09743; border-radius: 2px; transform: rotate(45deg); }
-    .piece-chip[data-piece-index="2"] .piece-mark { background: #439491; border-radius: 2px; }
-    .quiet-reset { min-width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 7px; color: var(--warm-muted); background: transparent; border: 0; border-radius: 9px; box-shadow: none; font-size: 12px; font-weight: 600; }
-    .quiet-reset svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.8; fill: none; }
-    .quiet-reset:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 5%, transparent); }
-    .quiet-reset:enabled:active { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
-    .direction-console { position: relative; width: 228px; height: 228px; margin: 0 auto; }
-    .direction-button, .wait-button { position: absolute; display: grid; place-items: center; padding: 0; isolation: isolate; color: var(--warm-ink); background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-    .direction-button { width: 72px; height: 72px; }
-    .direction-button::after { position: absolute; inset: 2px; z-index: 0; content: ""; background: var(--warm-charcoal-edge); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); }
-    .direction-button::before { position: absolute; inset: 5px; z-index: 1; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-charcoal-edge))); clip-path: polygon(32% 0, 68% 0, 68% 12%, 80% 12%, 80% 24%, 92% 24%, 92% 36%, 100% 36%, 100% 60%, 78% 60%, 78% 100%, 22% 100%, 22% 60%, 0 60%, 0 36%, 8% 36%, 8% 24%, 20% 24%, 20% 12%, 32% 12%); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--warm-surface) 42%, transparent); }
-    .direction-button:enabled:hover::before { background: linear-gradient(135deg, #3b4647, var(--warm-charcoal)); }
-    .direction-button:enabled:active::before { background: var(--warm-pressed); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--warm-charcoal-edge) 56%, transparent); }
-    .direction-up { top: 0; left: 78px; } .direction-left { top: 78px; left: 0; } .direction-right { top: 78px; right: 0; } .direction-down { bottom: 0; left: 78px; }
-    .direction-left::before, .direction-left::after { transform: rotate(-90deg); } .direction-right::before, .direction-right::after { transform: rotate(90deg); } .direction-down::before, .direction-down::after { transform: rotate(180deg); }
-    .wait-button { top: 82px; left: 82px; width: 64px; height: 64px; color: #f4f0e6; font-size: 11px; font-weight: 700; letter-spacing: .01em; }
-    .wait-button::before { position: absolute; inset: 3px; z-index: 0; content: ""; background: linear-gradient(135deg, var(--warm-charcoal), color-mix(in srgb, var(--warm-charcoal) 78%, var(--warm-charcoal-edge))); clip-path: polygon(14% 0, 86% 0, 86% 14%, 100% 14%, 100% 86%, 86% 86%, 86% 100%, 14% 100%, 14% 86%, 0 86%, 0 14%, 14% 14%); }
-    .wait-button:enabled:hover::before { background: linear-gradient(135deg, #3b4647, var(--warm-charcoal)); }
-    .wait-button span { position: relative; z-index: 1; }
-    .wait-button:enabled:active::before { background: var(--warm-pressed); }
-    .direction-button:disabled, .wait-button:disabled { opacity: .38; }
-    dialog { width: min(328px, calc(100% - 32px)); margin: auto; padding: 0; color: var(--warm-ink); background: var(--warm-surface); border: 1px solid var(--warm-grid); border-radius: 14px; box-shadow: 0 18px 50px color-mix(in srgb, var(--warm-charcoal) 26%, transparent); }
-    dialog::backdrop { background: color-mix(in srgb, var(--warm-charcoal) 30%, transparent); }
-    .dialog-body { display: grid; gap: 12px; padding: 18px; }
-    .dialog-title { margin: 0; font-size: 20px; font-weight: 750; letter-spacing: -.04em; }
-    .dialog-room { margin: 0; color: var(--warm-muted); font-size: 14px; }
-    .menu-panel { display: grid; gap: 12px; }
-    .menu-panel[hidden] { display: none; }
-    .menu-save-status { min-height: 18px; margin: 0; color: var(--warm-muted); font-size: 12px; line-height: 1.35; }
-    .menu-actions { display: grid; gap: 8px; }
-    .menu-secondary { color: var(--warm-ink) !important; background: transparent !important; border: 1px solid var(--warm-grid) !important; }
-    .menu-secondary:enabled:hover { background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent) !important; }
-    .menu-confirm-copy { margin: 0; color: var(--warm-ink); font-size: 14px; line-height: 1.45; }
-    .dialog-body button, .share-actions button { min-height: 48px; padding: 0 12px; color: #f4f0e6; background: var(--warm-charcoal); border: 0; border-radius: 9px; box-shadow: none; font-size: 14px; font-weight: 700; }
-    .dialog-body button:enabled:hover, .share-actions button:enabled:hover { background: #21292a; }
-    .share-record { width: 100%; min-height: 58px; padding: 9px 10px; color: var(--warm-ink); background: #fffdf7; border: 1px solid var(--warm-grid); border-radius: 9px; font: inherit; font-size: 13px; line-height: 1.4; resize: vertical; }
-    .share-panel-feedback { min-height: 18px; margin: 0; color: var(--warm-muted); font-size: 12px; line-height: 1.35; }
-    .share-panel-feedback:empty { display: none; }
-    .share-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .share-actions .share-close { color: var(--warm-muted); background: transparent; border: 1px solid var(--warm-grid); }
-    .share-actions .share-close:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
-    .share-actions .share-native[hidden] { display: none; }
-    #result-dialog { width: min(286px, calc(100% - 36px)); background: var(--warm-surface); border-color: var(--warm-charcoal); }
-    #result-dialog::backdrop { background: color-mix(in srgb, var(--warm-charcoal) 36%, transparent); }
-    .result-card { position: relative; display: grid; gap: 12px; padding: 22px 18px 18px; background: var(--warm-surface); }
-    .result-title { margin: 0; color: var(--warm-ink); font-size: 24px; font-weight: 750; letter-spacing: -.05em; text-align: center; }
-    .result-turn { margin: 0; color: var(--warm-ink); font-size: 42px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.08em; text-align: center; }
-    .result-par { margin: -6px 0 0; color: var(--warm-muted); font-size: 13px; text-align: center; }
-    .result-share { position: absolute; top: 8px; right: 8px; width: 48px; height: 48px; display: grid; place-items: center; padding: 0; color: var(--warm-ink); background: transparent; border: 0; border-radius: 9px; }
-    .result-share svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
-    .result-share:enabled:hover, .result-share:enabled:active { background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
-    .result-share[hidden] { display: none; }
-    .result-menu { position: absolute; top: 8px; left: 8px; width: 48px; height: 48px; padding: 0; color: var(--warm-muted); background: transparent; border: 0; border-radius: 9px; font-size: 12px; font-weight: 700; }
-    .result-menu:enabled:hover, .result-menu:enabled:active { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 9%, transparent); }
-    .result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .result-actions.is-single { grid-template-columns: minmax(0, 1fr); }
-    .result-actions button { min-height: 48px; padding: 0 12px; border-radius: 9px; font-size: 14px; font-weight: 700; }
-    .result-retry { color: var(--warm-muted); background: transparent; border: 1px solid var(--warm-grid); }
-    .result-next { color: #f4f0e6; background: var(--warm-charcoal); border: 0; }
-    .result-retry:enabled:hover { color: var(--warm-ink); background: color-mix(in srgb, var(--warm-charcoal) 8%, transparent); }
-    .result-next:enabled:hover { background: #21292a; }
-    @media (max-height: 480px) { main#app { height: auto; min-height: 100svh; } .board-stage { min-height: 180px; } }
-    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --focus:#5d8960; --blue:#4374b7; --amber:#d09743; --teal:#439491; }
+    * { box-sizing:border-box; }
+    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--paper); }
+    body { color:var(--ink); }
+    button,a { min-width:48px; min-height:48px; border:0; color:inherit; background:transparent; font:inherit; font-weight:750; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+    a { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
+    button:focus-visible,a:focus-visible,canvas:focus-visible,textarea:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    button:disabled { opacity:.36; cursor:default; }
+    [hidden] { display:none!important; }
+    main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
+    .utility-bar { min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; border-bottom:1px solid var(--line); }
+    .top-actions { display:flex; align-items:center; flex:none; }
+    .moves { flex:none; font-size:14px; font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .quick-retry { flex:none; min-width:78px; min-height:48px; padding:0 7px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .icon-button { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border-radius:10px; font-size:23px; }
+    .icon-button svg { width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; }
+    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:24px minmax(0,1fr) 220px; gap:4px; }
+    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; min-width:0; margin:0; color:var(--muted); font-size:14px; line-height:20px; font-weight:650; text-align:center; }
+    .board-stage { grid-row:2; position:relative; min-width:0; min-height:0; width:100%; overflow:hidden; display:grid; place-items:center; }
+    .game { min-width:0; min-height:0; width:100%; height:100%; display:grid; place-items:center; }
+    canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:1px solid var(--line); border-radius:9px; background:var(--floor); image-rendering:pixelated; }
+    .feedback { position:absolute; z-index:2; left:50%; bottom:4px; width:min(calc(100% - 20px),360px); margin:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font-size:14px; line-height:1.3; text-align:center; transform:translateX(-50%); }
+    .control-slot { grid-row:3; min-height:0; display:grid; place-items:center; border-top:1px solid var(--line); }
+    .play-controls { width:100%; height:220px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:4px; }
+    .play-controls[hidden] { display:grid!important; visibility:hidden; pointer-events:none; }
+    .piece-row { grid-row:1; width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; }
+    .piece-chips { display:flex; align-items:center; justify-content:center; gap:6px; }
+    .piece-chip { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
+    .piece-chip[aria-pressed="true"] { border-color:var(--focus); box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--focus) 38%,transparent); }
+    .piece-mark { width:22px; height:22px; display:block; border:2px solid color-mix(in srgb,var(--blue) 65%,var(--ink)); border-radius:50%; background:var(--blue); }
+    .piece-chip[data-piece-index="1"] .piece-mark { border-color:color-mix(in srgb,var(--amber) 65%,var(--ink)); border-radius:2px; background:var(--amber); transform:rotate(45deg); }
+    .piece-chip[data-piece-index="2"] .piece-mark { border-color:color-mix(in srgb,var(--teal) 65%,var(--ink)); border-radius:2px; background:var(--teal); }
+    .direction-console { grid-row:2; position:relative; width:180px; height:168px; margin:0 auto; }
+    .direction-button,.undo-button { position:absolute; width:56px; height:56px; display:grid; place-items:center; padding:0; border-radius:12px; }
+    .direction-button::after,.undo-button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--line); }
+    .direction-button::before,.undo-button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:var(--surface); }
+    .direction-button:enabled:hover::before,.undo-button:enabled:hover::before { background:var(--floor); }
+    .direction-button:enabled:active::before,.undo-button:enabled:active::before { background:#d1c5af; }
+    .direction-button span,.undo-button span { position:relative; z-index:2; color:var(--ink); font-size:24px; line-height:1; }
+    .direction-up { left:62px; top:0; } .direction-left { left:0; top:56px; } .direction-right { left:124px; top:56px; } .direction-down { left:62px; top:112px; } .undo-button { left:62px; top:56px; }
+    dialog { width:min(360px,calc(100% - 24px)); max-height:calc(100dvh - 24px); margin:auto; padding:0; overflow:auto; border:1px solid var(--line); border-radius:13px; background:var(--surface); color:var(--ink); box-shadow:0 14px 44px color-mix(in srgb,var(--ink) 28%,transparent); }
+    dialog::backdrop { background:color-mix(in srgb,var(--ink) 30%,transparent); }
+    .dialog-body { display:grid; gap:10px; padding:14px; }
+    .dialog-title { margin:0; font-size:21px; font-weight:850; text-align:center; }
+    .dialog-room,.dialog-copy { margin:0; color:var(--muted); font-size:14px; line-height:1.4; text-align:center; }
+    .dialog-head { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center; }
+    .dialog-head .dialog-title { grid-column:2; }
+    .dialog-close { grid-column:3; min-width:48px; min-height:48px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .menu-panel { display:grid; gap:10px; }
+    .menu-panel[hidden] { display:none; }
+    .menu-save-status,.share-panel-feedback { min-height:18px; margin:0; color:var(--muted); font-size:12px; line-height:1.4; text-align:center; }
+    .menu-actions { display:grid; gap:7px; }
+    .menu-actions button,.menu-actions a,.share-actions button { min-height:48px; padding:0 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font-size:14px; text-align:center; }
+    .menu-actions .primary,.share-actions .primary { border-color:var(--ink); background:var(--ink); color:#fff; }
+    .menu-confirm-copy { margin:0; color:var(--ink); font-size:14px; line-height:1.4; text-align:center; }
+    .help-list { display:grid; gap:9px; padding:0; margin:0; list-style:none; font-size:14px; line-height:1.4; }
+    .help-list li { display:flex; align-items:flex-start; gap:9px; }
+    .help-mark { width:20px; height:20px; flex:none; display:grid; place-items:center; border:1px solid var(--line); border-radius:5px; background:var(--floor); color:var(--ink); font-size:14px; }
+    .share-record { width:100%; min-height:58px; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#fffdf7; color:var(--ink); font:inherit; font-size:14px; line-height:1.4; resize:vertical; }
+    .share-panel-feedback:empty { display:none; }
+    .share-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    #result-dialog { width:min(296px,calc(100% - 24px)); }
+    .result-card { position:relative; display:grid; gap:10px; padding:13px; }
+    .result-title { margin:0; font-size:21px; font-weight:850; text-align:center; }
+    .result-turn { margin:0; font-size:38px; font-weight:850; font-variant-numeric:tabular-nums; text-align:center; }
+    .result-par { margin:0; color:var(--muted); font-size:14px; text-align:center; }
+    .result-share,.result-menu { position:absolute; top:8px; min-width:48px; min-height:48px; display:grid; place-items:center; border-radius:9px; }
+    .result-share { right:8px; font-size:20px; } .result-menu { left:8px; font-size:14px; }
+    .result-share svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
+    .result-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+    .result-actions.is-single { grid-template-columns:1fr; }
+    .result-actions button { min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .result-actions .result-next { border-color:var(--ink); background:var(--ink); color:#fff; }
+    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:24px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; border-top:0; border-left:1px solid var(--line); } }
+    @media (max-height:520px) and (orientation:portrait) { html,body { overflow-y:auto; } main#app { min-height:520px; height:auto; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
   </style>
 </head>
 <body>
   <main id="app">
     <header class="utility-bar">
-      <button id="menu-toggle" class="utility-button" type="button" disabled aria-label="게임 메뉴">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
+      <span id="turn-runline" class="moves">0번 이동</span>
+      <button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button>
+      <div class="top-actions"><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
     </header>
     <section class="play-layout" aria-label="Few Moves">
+      <p class="goal-hint">파란 말을 목표 칸에 넣어요</p>
       <section class="board-stage" aria-label="게임 보드">
         <section class="game">
           <canvas id="unity-canvas" tabindex="0" aria-label="Few Moves 보드"></canvas>
@@ -119,24 +101,19 @@
       </section>
       <section class="control-slot">
         <section id="play-controls" class="play-controls" aria-label="조작">
-          <div id="runline" class="runline">
-            <span id="turn-runline">0수</span>
-            <div class="piece-chips" role="group" aria-label="기물 선택">
-              <button class="piece-chip" type="button" data-piece-index="0" aria-pressed="true" aria-label="목표 기물 선택"><span class="piece-mark" aria-hidden="true"></span></button>
-              <button class="piece-chip" type="button" data-piece-index="1" aria-pressed="false" aria-label="호박색 도움 기물 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
-              <button class="piece-chip" type="button" data-piece-index="2" aria-pressed="false" aria-label="청록 도움 기물 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
+          <div class="piece-row">
+            <div class="piece-chips" role="group" aria-label="말 선택">
+              <button class="piece-chip" type="button" data-piece-index="0" aria-pressed="true" aria-label="파란 원 말 선택"><span class="piece-mark" aria-hidden="true"></span></button>
+              <button class="piece-chip" type="button" data-piece-index="1" aria-pressed="false" aria-label="호박색 마름모 말 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
+              <button class="piece-chip" type="button" data-piece-index="2" aria-pressed="false" aria-label="청록 네모 말 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
             </div>
-            <button class="quiet-reset" type="button" data-game-action="Restart" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l4 4a7 7 0 1 1-1.4 8.8"/></svg>
-              <span>다시</span>
-            </button>
           </div>
           <div class="direction-console" aria-label="방향 조작">
-            <button class="direction-button direction-up" type="button" data-game-action="Up" disabled aria-label="위로 이동"></button>
-            <button class="direction-button direction-left" type="button" data-game-action="Left" disabled aria-label="왼쪽으로 이동"></button>
-            <button class="wait-button" type="button" data-game-action="Undo" disabled aria-label="한 수 되돌리기"><span>되돌림</span></button>
-            <button class="direction-button direction-right" type="button" data-game-action="Right" disabled aria-label="오른쪽으로 이동"></button>
-            <button class="direction-button direction-down" type="button" data-game-action="Down" disabled aria-label="아래로 이동"></button>
+            <button class="direction-button direction-up" type="button" data-game-action="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button>
+            <button class="direction-button direction-left" type="button" data-game-action="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
+            <button class="undo-button" type="button" data-game-action="Undo" disabled aria-label="한 수 되돌리기"><span aria-hidden="true">↶</span></button>
+            <button class="direction-button direction-right" type="button" data-game-action="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
+            <button class="direction-button direction-down" type="button" data-game-action="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button>
           </div>
         </section>
       </section>
@@ -152,31 +129,42 @@
       <p id="result-turn" class="result-turn">0수</p>
       <p id="result-par" class="result-par">최단 0수</p>
       <div id="result-actions" class="result-actions">
-        <button id="result-retry" class="result-retry" type="button" data-game-action="Restart" disabled>재도전</button>
-        <button id="result-next" class="result-next" type="button" data-game-action="Next" disabled>다음 스테이지</button>
+        <button id="result-retry" class="result-retry" type="button" data-game-action="Restart" disabled>다시</button>
+        <button id="result-next" class="result-next" type="button" data-game-action="Next" disabled>다음</button>
       </div>
     </section>
   </dialog>
   <dialog id="menu-dialog" aria-labelledby="menu-title">
     <div class="dialog-body">
       <section id="menu-main" class="menu-panel">
-        <p id="menu-title" class="dialog-title">Few Moves</p>
+        <p id="menu-title" class="dialog-title">메뉴</p>
         <p id="menu-room" class="dialog-room">방 —</p>
         <p id="menu-save-status" class="menu-save-status" role="status" aria-live="polite"></p>
         <div class="menu-actions">
+          <button id="menu-continue" class="primary" type="button">계속하기</button>
           <button id="menu-save" type="button">저장하기</button>
-          <button id="menu-start-over" class="menu-secondary" type="button">처음부터 하기</button>
-          <button id="menu-continue" class="menu-secondary" type="button">계속</button>
+          <a href="../index.html">다른 모드</a>
+          <button id="menu-start-over" type="button">처음부터 하기</button>
         </div>
       </section>
       <section id="menu-confirmation" class="menu-panel" hidden aria-live="polite">
         <p class="dialog-title">처음부터 할까요?</p>
-        <p class="menu-confirm-copy">현재 진행은 첫 번째 방의 새 진행으로 바뀝니다.</p>
+        <p class="menu-confirm-copy">현재 진행을 지우고 첫 번째 판부터 다시 시작해요.</p>
         <div class="menu-actions">
+          <button id="menu-start-over-cancel" class="primary" type="button">취소</button>
           <button id="menu-start-over-confirm" type="button">처음부터 하기</button>
-          <button id="menu-start-over-cancel" class="menu-secondary" type="button">취소</button>
         </div>
       </section>
+    </div>
+  </dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="dialog-body">
+      <header class="dialog-head"><span></span><p id="help-title" class="dialog-title">놀이 방법</p><button id="help-close" class="dialog-close" type="button">닫기</button></header>
+      <ul class="help-list">
+        <li><span class="help-mark" aria-hidden="true">▲</span><span>방향을 누르면 선택한 말이 벽이나 다른 말 앞까지 미끄러져요.</span></li>
+        <li><span class="help-mark" aria-hidden="true">●</span><span>파란 말을 목표 칸에 넣으면 성공해요.</span></li>
+        <li><span class="help-mark" aria-hidden="true">↶</span><span>위의 말 버튼으로 움직일 말을 바꾸고, 가운데 버튼으로 한 번 되돌려요.</span></li>
+      </ul>
     </div>
   </dialog>
   <dialog id="share-dialog" aria-labelledby="share-title">
@@ -193,10 +181,14 @@
   </dialog>
   <script>
     var canvas = document.querySelector("#unity-canvas");
+    var boardStage = document.querySelector(".board-stage");
     var unityInstance = null;
     var gameActionButtons = Array.from(document.querySelectorAll("button[data-game-action]"));
     var pieceButtons = Array.from(document.querySelectorAll("button[data-piece-index]"));
     var menuButton = document.querySelector("#menu-toggle");
+    var helpButton = document.querySelector("#help-toggle");
+    var helpDialog = document.querySelector("#help-dialog");
+    var helpCloseButton = document.querySelector("#help-close");
     var menuDialog = document.querySelector("#menu-dialog");
     var menuMain = document.querySelector("#menu-main");
     var menuConfirmation = document.querySelector("#menu-confirmation");
@@ -234,6 +226,20 @@
     var copyOperationId = 0;
     var menuConfirming = false;
     var menuReturnsToResult = false;
+
+    function sizeCanvasToStage() {
+      if (!boardStage || !canvas || typeof boardStage.getBoundingClientRect !== "function") return;
+      var bounds = boardStage.getBoundingClientRect();
+      var side = Math.floor(Math.min(bounds.width, bounds.height, 560));
+      if (!Number.isFinite(side) || side < 1) return;
+      canvas.style.width = side + "px";
+      canvas.style.height = side + "px";
+    }
+    if (boardStage && typeof ResizeObserver === "function") {
+      new ResizeObserver(sizeCanvasToStage).observe(boardStage);
+    }
+    if (window.addEventListener) window.addEventListener("resize", sizeCanvasToStage);
+    sizeCanvasToStage();
 
     function isNonNegativeInteger(value) {
       return typeof value === "number" && Number.isInteger(value) && value >= 0;
@@ -388,6 +394,7 @@
       }
     }
     function openMenu(returnsToResult) {
+      if (helpDialog.open || shareDialog.open) return;
       menuReturnsToResult = returnsToResult === true;
       setMenuConfirmation(false);
       openLocalDialog(menuDialog);
@@ -404,7 +411,8 @@
       openMenu(true);
     }
     function isOverlayOpen() {
-      return !!((menuDialog && menuDialog.open) || (resultDialog && resultDialog.open) || (shareDialog && shareDialog.open));
+      return !!((menuDialog && menuDialog.open) || (helpDialog && helpDialog.open) ||
+        (resultDialog && resultDialog.open) || (shareDialog && shareDialog.open));
     }
     function formatShareRecord(state) {
       return "Few Moves | 방 " + state.roomNumber + " / " + state.roomCount + " | " + state.turn + "수 클리어";
@@ -542,7 +550,7 @@
       var roomLabel = state && state.initialized ? "방 " + state.roomNumber + " / " + state.roomCount : "방 —";
       menuRoom.textContent = roomLabel;
       menuButton.disabled = !state || !state.initialized;
-      turnRunline.textContent = state ? state.turn + "수" : "0수";
+      turnRunline.textContent = state ? state.turn + "번 이동" : "0번 이동";
       playControls.hidden = isResultState(state);
       setFeedback(usefulStateFeedback(state));
       renderGameButtons();
@@ -563,7 +571,7 @@
       closeLocalDialog(resultDialog);
       menuButton.disabled = true;
       menuRoom.textContent = "방 —";
-      turnRunline.textContent = "0수";
+      turnRunline.textContent = "0번 이동";
       playControls.hidden = false;
       resultNextButton.hidden = true;
       resultMenuButton.disabled = true;
@@ -639,19 +647,28 @@
     gameActionButtons.forEach(function (button) {
       button.addEventListener("click", function (event) {
         if (event && (event.ctrlKey || event.metaKey || event.altKey)) return;
+        if (menuDialog.open || helpDialog.open || shareDialog.open) return;
+        if (resultDialog.open && button !== resultRetryButton && button !== resultNextButton) return;
+        if (!resultDialog.open && (button === resultRetryButton || button === resultNextButton)) return;
         sendGameAction(button.dataset.gameAction);
       });
     });
     pieceButtons.forEach(function (button) {
       button.addEventListener("click", function (event) {
         if (event && (event.ctrlKey || event.metaKey || event.altKey)) return;
+        if (isOverlayOpen()) return;
         selectPiece(Number(button.dataset.pieceIndex));
       });
     });
     menuButton.addEventListener("click", function () {
-      if (!currentState || !currentState.initialized) return;
+      if (!currentState || !currentState.initialized || isOverlayOpen()) return;
       openMenu(false);
     });
+    helpButton.addEventListener("click", function () {
+      if (isOverlayOpen()) return;
+      openLocalDialog(helpDialog);
+    });
+    helpCloseButton.addEventListener("click", function () { closeLocalDialog(helpDialog); });
     menuSaveButton.addEventListener("click", function () { sendGameAction("Save"); });
     menuStartOverButton.addEventListener("click", function () {
       if (!isActionAllowed("StartOver")) return;
@@ -670,6 +687,7 @@
     shareNativeButton.addEventListener("click", function () { requestNativeShare(); });
     shareCloseButton.addEventListener("click", closeSharePanel);
     resultDialog.addEventListener("cancel", function (event) { event.preventDefault(); });
+    helpDialog.addEventListener("cancel", function (event) { event.preventDefault(); closeLocalDialog(helpDialog); });
     menuDialog.addEventListener("cancel", function (event) {
       event.preventDefault();
       if (menuConfirming) {

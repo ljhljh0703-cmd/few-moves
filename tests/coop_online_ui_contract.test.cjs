@@ -15,7 +15,22 @@ assert.match(template, /data-online-action="Slide" data-direction="Up"/);
 assert.doesNotMatch(template, /data-online-action="Pass"|>Pass</);
 assert.doesNotMatch(template, /원과 마름모|원 차례|원 좌석|>원</);
 assert.match(template, />사각형<\/strong>/);
-assert.match(template, /activeLabel\(state\).*사각형 차례/);
+assert.match(template, /activeLabel\(state\).*내 차례/);
+assert.match(template, /친구 차례/);
+assert.match(template, /번 이동/);
+assert.match(template, /첫 번째 판/);
+assert.match(template, /두 번째 판/);
+assert.match(template, /세 번째 판/);
+assert.match(template, /left:50%; top:0; width:180px; height:168px/);
+assert.match(template, /grid-template-rows:48px 48px 56px 168px 18px/);
+assert.match(template, /id="join-open"/);
+assert.match(template, /id="menu-dialog"/);
+assert.match(template, /id="help-dialog"/);
+assert.match(template, /id="invite-dialog"/);
+assert.match(template, /id="clear-close"/);
+assert.match(template, /id="invite-link-fallback"/);
+assert.match(template, /다시하기 요청/);
+assert.doesNotMatch(template, /저장된 방|>C1<|>C2<|>C3<|온라인 저장/);
 assert.match(template, /id="definition-picker"/);
 assert.match(template, /id="record-dialog"/);
 assert.match(template, /href="\.\.\/index\.html"/);
@@ -240,7 +255,7 @@ function stateBody(roomId, seatCode) {
 
 function uiElement(documentObject, id, dataset = {}) {
   return {
-    id, dataset, hidden:false, disabled:false, open:false, textContent:"", innerHTML:"", value:"", style:{}, tagName:id.includes("input")||id.includes("fallback")?"INPUT":"BUTTON", listeners:{}, children:[],
+    id, dataset, hidden:false, disabled:false, open:false, textContent:"", innerHTML:"", value:"", style:{}, classList:{values:new Set(),toggle(name,force){if(force)this.values.add(name);else this.values.delete(name);},contains(name){return this.values.has(name);}}, tagName:id.includes("input")||id.includes("fallback")?"INPUT":"BUTTON", listeners:{}, children:[],
     addEventListener(name, handler){ this.listeners[name]=handler; },
     setAttribute(name,value){ if(name==="open")this.open=true; this[name]=value; }, removeAttribute(name){ if(name==="open")this.open=false; delete this[name]; },
     appendChild(child){ this.children.push(child); this.firstChild=this.children[0]||null; }, removeChild(child){const index=this.children.indexOf(child);if(index>=0)this.children.splice(index,1);this.firstChild=this.children[0]||null;}, showModal(){this.open=true;}, close(){this.open=false;},
@@ -262,14 +277,15 @@ function onlineObservation(overrides={}) {
 
 function uiHarness(hash="#record=fm1.shared") {
   const documentObject={activeElement:null,listeners:{},loader:null};
-  const ids=["unity-canvas","feedback","connection-label","room-form","room-info","invite-input","invite-code","resume-button","copy-invite-button","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-record","clear-restart","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
+  const ids=["unity-canvas","online-controls","feedback","connection-label","room-form","room-start","join-entry","join-open","join-back","room-info","invite-input","invite-code","resume-invite-input","resume-button","copy-invite-button","invite-copy","invite-close","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","menu-dialog","menu-top","menu-close","menu-record","help-dialog","help-top","help-close","invite-dialog","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-record","clear-restart","clear-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
   const elements=Object.fromEntries(ids.map(id=>[id,uiElement(documentObject,id)]));
-  ["consent-dialog","clear-dialog","record-dialog"].forEach(id=>{elements[id].tagName="DIALOG";});
+  elements["join-entry"].hidden=true;
+  ["menu-dialog","help-dialog","invite-dialog","consent-dialog","clear-dialog","record-dialog"].forEach(id=>{elements[id].tagName="DIALOG";});
   const actions=[uiElement(documentObject,"up",{onlineAction:"Slide",direction:"Up"}),uiElement(documentObject,"left",{onlineAction:"Slide",direction:"Left"}),uiElement(documentObject,"right",{onlineAction:"Slide",direction:"Right"}),uiElement(documentObject,"down",{onlineAction:"Slide",direction:"Down"}),uiElement(documentObject,"look",{onlineAction:"Express",expression:"Look"}),uiElement(documentObject,"thumb",{onlineAction:"Express",expression:"ThumbsUp"}),uiElement(documentObject,"hand",{onlineAction:"Express",expression:"Handshake"}),uiElement(documentObject,"wait",{onlineAction:"Express",expression:"Waiting"}),uiElement(documentObject,"undo",{onlineAction:"RequestUndo"}),elements["clear-restart"]];
   elements["clear-restart"].dataset={onlineAction:"RequestRestart"};
   const boardStage=uiElement(documentObject,"board-stage"); boardStage.tagName="SECTION";
   documentObject.body={appendChild(node){documentObject.loader=node;}};
-  documentObject.querySelector=selector=>selector===".board-stage"?boardStage:selector==="dialog[open]"?[elements["consent-dialog"],elements["clear-dialog"],elements["record-dialog"]].find(item=>item.open)||null:selector.startsWith("#")?elements[selector.slice(1)]:null;
+  documentObject.querySelector=selector=>selector===".board-stage"?boardStage:selector==="dialog[open]"?[elements["menu-dialog"],elements["help-dialog"],elements["invite-dialog"],elements["consent-dialog"],elements["clear-dialog"],elements["record-dialog"]].find(item=>item.open)||null:selector.startsWith("#")?elements[selector.slice(1)]:null;
   documentObject.querySelectorAll=selector=>selector==="button[data-online-action]"?actions:[];
   documentObject.createElement=()=>uiElement(documentObject,"dynamic");
   documentObject.addEventListener=(name,handler)=>{documentObject.listeners[name]=handler;};
@@ -289,6 +305,9 @@ async function runUiFixtures() {
   assert.equal(h.elements["definition-picker"].hidden,false,"lobby preview keeps the selector visible even with activeDefinitionId");
   assert.equal(h.elements["definition-options"].children.length,3,"C1, C2, C3 come from the runtime definition observation");
   assert.equal(h.elements["definition-options"].children[1]["aria-pressed"],"true");
+  assert.deepEqual(h.elements["definition-options"].children.map(button=>button.textContent),["첫 번째 판","두 번째 판","세 번째 판"]);
+  assert.equal(h.elements["room-start"].hidden,false,"first view offers creation or joining without a code field");
+  assert.equal(h.elements["join-entry"].hidden,true);
   h.documentObject.loader.onload(); h.sandbox.progress(0.6);
   assert.equal(h.elements.feedback.textContent,"실제 상태","loading progress cannot overwrite an observed message");
   h.unityReady.resolve(h.instance); await settle();
@@ -297,6 +316,7 @@ async function runUiFixtures() {
   assert.equal(h.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,1,"one hash is imported once");
   h.elements["definition-options"].children[2].listeners.click();
   assert.deepEqual(h.sent.at(-1).payload,{kind:"SelectDefinition",definitionId:"coop-c3"});
+  h.elements["join-open"].listeners.click();assert.equal(h.elements["join-entry"].hidden,false,"join reveals code only on request");h.elements["join-back"].listeners.click();assert.equal(h.elements["room-start"].hidden,false);
 
   const mine=recordSummary(12),shared=recordSummary(14);
   const joined=onlineObservation({joined:true,roomId:"opaque-room",inviteCode:"INV-1",seatCode:0,availabilityCode:1,availabilityStatus:"연결됨",circleConnected:true,diamondConnected:true,inputEnabled:true,statusCode:"Cleared",logicalActionCount:14,activeDefinitionId:"coop-c2",selectedDefinitionId:"coop-c2",recordStatus:"ready",recordCapsule:"fm1.mine",hasMine:true,mine,hasShared:true,shared,sharedRecordRequestId:firstRequestId});
@@ -344,7 +364,7 @@ async function runUiFixtures() {
   assert.notEqual(h.elements["record-note"].textContent,"기록 링크를 복사했습니다.");
   const beforeKey=h.sent.length;h.documentObject.listeners.keydown({key:"ArrowUp",repeat:false,ctrlKey:false,metaKey:false,altKey:false,preventDefault(){}});assert.equal(h.sent.length,beforeKey,"modal blocks keyboard gameplay");
 
-  h.elements["record-close"].listeners.click(); h.elements["leave-button"].listeners.click();
+  h.elements["record-close"].listeners.click(); h.elements["menu-top"].listeners.click(); h.elements["leave-button"].listeners.click();
   assert.equal(h.sent.at(-1).payload.kind,"Leave","leaving is explicit");
   const lobbyShared=onlineObservation({selectedDefinitionId:"coop-c2",activeDefinitionId:"coop-c2",recordStatus:"ready",hasShared:true,shared:recordSummary(10,"coop-c3","fp-c3")});
   h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(lobbyShared));
@@ -364,13 +384,78 @@ async function runUiFixtures() {
   const route=uiHarness("#record=fm1.A"),roomA=onlineObservation({joined:true,roomId:"room-stays",seatCode:0,availabilityCode:1,inputEnabled:true,statusCode:"Playing",activeDefinitionId:"coop-c2",selectedDefinitionId:"coop-c2",recordStatus:"ready",hasShared:true,shared:recordSummary(14)});
   route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(roomA));route.documentObject.loader.onload();route.unityReady.resolve(route.instance);await settle();const requestA=route.sent.at(-1).payload.requestId;route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomA,{sharedRecordRequestId:requestA})));route.elements["record-top"].listeners.click();assert.equal(route.elements["shared-value"].textContent,"14수");
   route.sandbox.location.hash="#record=fm1.B";route.sandbox.window.listeners.hashchange();assert.equal(route.elements["shared-value"].textContent,"확인 중","new hash hides the previous coop record before C# replies");assert.equal(route.elements["record-compare"].textContent,"새 링크의 기록을 확인하고 있습니다.");const requestB=route.sent.at(-1).payload.requestId;assert.deepEqual(route.sent.at(-1).payload,{kind:"LoadSharedRecord",capsule:"fm1.B",requestId:requestB});assert.notEqual(requestB,requestA);
-  const staleA=Object.assign({},roomA,{authorityRevision:1,logicalActionCount:3,hasMine:true,mine:recordSummary(7),hasShared:true,shared:recordSummary(14),sharedRecordRequestId:requestA});route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(staleA));assert.equal(route.elements["shared-value"].textContent,"확인 중","late A success cannot release B");assert.equal(route.elements["mine-value"].textContent,"7수","mine continues to update while B waits");assert.match(route.elements["turn-label"].innerHTML,/행동 3/);
+  const staleA=Object.assign({},roomA,{authorityRevision:1,logicalActionCount:3,hasMine:true,mine:recordSummary(7),hasShared:true,shared:recordSummary(14),sharedRecordRequestId:requestA});route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(staleA));assert.equal(route.elements["shared-value"].textContent,"확인 중","late A success cannot release B");assert.equal(route.elements["mine-value"].textContent,"7수","mine continues to update while B waits");assert.match(route.elements["turn-label"].innerHTML,/3번 이동/);
   route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},staleA,{authorityRevision:2,sharedRecordRequestId:""})));assert.equal(route.elements["shared-value"].textContent,"확인 중","ordinary poll cannot release B");
   const roomB=Object.assign({},roomA,{authorityRevision:3,hasShared:true,shared:recordSummary(9),sharedRecordRequestId:requestB});route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(roomB));assert.equal(route.elements["shared-value"].textContent,"9수");route.sandbox.window.listeners.hashchange();assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"same coop hash is imported once");
   route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomB,{authorityRevision:4,recordStatus:"invalid",recordError:"late_A",hasShared:false,shared:{},sharedRecordRequestId:requestA})));assert.equal(route.elements["shared-value"].textContent,"9수","late A error cannot replace accepted B");route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomA,{authorityRevision:5,sharedRecordRequestId:""})));assert.equal(route.elements["shared-value"].textContent,"9수","empty legacy poll cannot replace accepted B");
   route.sandbox.location.hash="";route.sandbox.window.listeners.hashchange();assert.equal(route.sent.filter(item=>item.payload.kind==="LoadSharedRecord").length,2,"removing hash sends no command");assert.equal(route.elements["shared-value"].textContent,"9수");
   route.sandbox.location.hash="#record=fm1.A";route.sandbox.window.listeners.hashchange();const requestA2=route.sent.at(-1).payload.requestId;assert.notEqual(requestA2,requestA);route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomA,{authorityRevision:6,sharedRecordRequestId:requestA2})));assert.equal(route.elements["shared-value"].textContent,"14수");
   route.sandbox.location.hash="#record=malformed";route.sandbox.window.listeners.hashchange();assert.equal(route.elements["shared-value"].textContent,"확인 중","malformed candidate cannot look like record A");const requestC=route.sent.at(-1).payload.requestId;route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomB,{authorityRevision:7,recordStatus:"invalid",recordError:"stale_error",hasShared:false,shared:{},sharedRecordRequestId:requestA2})));assert.equal(route.elements["shared-value"].textContent,"확인 중","stale error cannot release C");route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomB,{authorityRevision:8,recordStatus:"invalid",recordError:"record_invalid",hasShared:false,shared:{},sharedRecordRequestId:requestC})));assert.equal(route.elements["shared-value"].textContent,"기록 없음");route.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},roomB,{authorityRevision:9,recordStatus:"ready",recordError:"",hasShared:true,shared:recordSummary(9),sharedRecordRequestId:requestB})));assert.equal(route.elements["shared-value"].textContent,"기록 없음","stale success cannot replace accepted latest failure");assert.equal(route.sandbox.window.__nectorialOnline.state.roomId,"room-stays");assert.equal(route.sent.every(item=>item.payload.kind==="LoadSharedRecord"),true,"record hash changes never leave, create, restart, or mutate the room");
+  const ux=uiHarness("");
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation()));
+  ux.documentObject.loader.onload();ux.unityReady.resolve(ux.instance);await settle();
+  ux.elements["join-open"].listeners.click();
+  assert.equal(ux.elements["join-entry"].hidden,false,"join code is requested only after choosing to join");
+  ux.elements["join-button"].listeners.click();
+  assert.match(ux.elements.feedback.textContent,/초대 코드를 입력/);
+  ux.elements["invite-input"].value="INV-UI";ux.elements["join-button"].listeners.click();
+  assert.deepEqual(ux.sent.at(-1).payload,{kind:"Join",inviteCode:"INV-UI"});
+  ux.documentObject.activeElement=null;ux.elements["help-top"].listeners.click();
+  assert.equal(ux.elements["help-dialog"].open,true,"help opens without changing the room");
+  ux.elements["menu-top"].listeners.click();assert.equal(ux.elements["menu-dialog"].open,false,"a second modal cannot stack over help");
+  const hiddenSelect=ux.sent.length;ux.elements["definition-options"].children[1].listeners.click();assert.equal(ux.sent.length,hiddenSelect,"board selection behind help cannot change the game");
+  const helpBlocked=ux.sent.length;ux.actions[0].listeners.click();ux.actions[4].listeners.click();assert.equal(ux.sent.length,helpBlocked,"a visible modal blocks pointer gameplay and expressions");
+  ux.elements["help-close"].listeners.click();ux.elements["menu-top"].listeners.click();
+  assert.equal(ux.elements["menu-dialog"].open,true);
+  ux.elements["join-back"].listeners.click();assert.equal(ux.elements["join-entry"].hidden,false,"menu prevents lobby controls behind it");
+  ux.elements["menu-close"].listeners.click();
+  const playing=onlineObservation({joined:true,roomId:"room-ux",inviteCode:"INV-UI",seatCode:0,availabilityCode:1,inputEnabled:true,statusCode:"Playing",authorityRevision:5,logicalActionCount:2,circleAtGoal:true,activeActorCode:"Circle"});
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(playing));
+  assert.match(ux.elements["turn-label"].innerHTML,/내 차례<small>2번 이동/);
+  assert.equal(ux.elements["online-controls"].classList.contains("joined"),true);
+  assert.equal(ux.actions[0].disabled,false,"arrived piece is not frozen while the server still allows movement");
+  ux.actions[0].listeners.click();assert.equal(ux.sent.at(-1).payload.kind,"Slide");
+  ux.elements["copy-invite-button"].listeners.click();
+  assert.equal(ux.elements["invite-dialog"].open,true);
+  assert.equal(ux.elements["invite-link-fallback"].value,"https://game.test/content/coop/index.html?invite=INV-UI","manual invite link is always selectable");
+  assert.equal(ux.elements["invite-code"].textContent,"INV-UI");
+  const inviteBlocked=ux.sent.length;ux.actions[0].listeners.click();assert.equal(ux.sent.length,inviteBlocked,"invite dialog blocks the board beneath it");
+  ux.elements["invite-copy"].listeners.click();ux.clipboardCalls.at(-1).item.resolve();await settle();
+  assert.equal(ux.elements["invite-link-fallback"].value,"https://game.test/content/coop/index.html?invite=INV-UI","clipboard success keeps the fallback");
+  ux.elements["invite-close"].listeners.click();
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{expressionSequence:1,expressionSender:"Diamond",expression:"ThumbsUp"})));
+  assert.equal(ux.elements["expression-name"].textContent,"마름모");
+  assert.equal(ux.elements["expression-bubble"].hidden,false);
+  ux.elements["record-top"].listeners.click();assert.equal(ux.elements["record-dialog"].open,true);
+  const incoming=Object.assign({},playing,{authorityRevision:6,pendingConsent:{active:true,requestId:"consent-ux",kind:"Undo",requesterCode:1}});
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(incoming));
+  assert.equal(ux.elements["record-dialog"].open,false,"incoming consent supersedes the record dialog");
+  assert.equal(ux.elements["consent-dialog"].open,true);
+  const beforeBlocked=ux.sent.length;ux.elements["menu-top"].listeners.click();ux.actions[0].listeners.click();
+  assert.equal(ux.sent.length,beforeBlocked,"game actions remain blocked under an incoming request");
+  ux.elements["consent-approve"].listeners.click();
+  assert.equal(ux.sent.at(-1).payload.kind,"ResolveUndo");
+  assert.equal(ux.sent.at(-1).payload.requestId,"consent-ux");
+  assert.equal(ux.sent.at(-1).payload.expectedRevision,6);
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{authorityRevision:7,pendingConsent:{active:true,requestId:"own-ux",kind:"Restart",requesterCode:0}})));
+  assert.equal(ux.elements["consent-dialog"].open,false,"requester waits without a blocking confirmation dialog");
+  assert.match(ux.elements.feedback.textContent,/친구의 확인/);
+  const cleared=Object.assign({},playing,{authorityRevision:8,statusCode:"Cleared",logicalActionCount:13,pendingConsent:null});
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(cleared));
+  assert.equal(ux.elements["clear-dialog"].open,true);
+  ux.elements["clear-restart"].listeners.click();
+  assert.equal(ux.sent.at(-1).payload.kind,"RequestRestart","result again requests consent instead of resetting locally");
+  assert.match(ux.sent.at(-1).payload.requestId,/^online-\d+-RequestRestart$/);
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{authorityRevision:9,logicalActionCount:14,activeActorCode:"Diamond",inputEnabled:false})));
+  assert.match(ux.elements["turn-label"].innerHTML,/친구 차례<small>14번 이동/);
+  assert.equal(ux.actions[0].disabled,true,"friend turn disables direction input");
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{authorityRevision:10,transportLocked:true,availabilityCode:0})));
+  assert.match(ux.elements["turn-label"].innerHTML,/다시 연결 중/);
+  assert.equal(ux.actions[0].disabled,true,"stale transport stays locked");
+  const lockedConsent=Object.assign({},playing,{authorityRevision:11,transportLocked:true,availabilityCode:0,pendingConsent:{active:true,requestId:"locked-ux",kind:"Undo",requesterCode:1}});
+  ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(lockedConsent));
+  const lockedCount=ux.sent.length;ux.elements["consent-approve"].listeners.click();
+  assert.equal(ux.sent.length,lockedCount,"stale connection cannot resolve consent");
 }
 
 async function runBridgeFixtures() {

@@ -1,1 +1,69 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Few Moves</title><link rel="stylesheet" href="style.css"></head><body><main><header class="topbar"><a class="brand" href="index.html" aria-label="Few Moves 처음으로"><h1>Few Moves</h1><small>플레이할 모드를 고르세요</small></a></header><section class="page"><div class="intro"><h2>모드 선택</h2><p>혼자 풀거나, 두 사람이 협력하거나, 움직이는 뱀과 맞설 수 있습니다.</p></div><section class="mode-grid" aria-label="게임 모드"><article class="mode-card solo"><div><span class="mode-mark" aria-hidden="true">●</span><h3>혼자</h3><p>한 번 움직이면 끝까지 미끄러집니다.</p></div><a href="solo/index.html">시작</a></article><article class="mode-card coop"><div><span class="mode-mark" aria-hidden="true">■ ◆</span><h3>온라인 협력</h3><p>C1, C2, C3 중 한 판을 골라 둘이 번갈아 움직입니다.</p></div><a href="coop/index.html">시작</a></article><article class="mode-card raid"><div><span class="mode-mark" aria-hidden="true">◆ ◈</span><h3>레이드</h3><p>꼬리를 모으고 아이템을 써서 뱀을 격파합니다.</p></div><a href="raid/index.html">시작</a></article></section></section></main></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Few Moves</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="home-shell">
+    <header class="home-header">
+      <a class="brand" href="index.html" aria-label="Few Moves 처음으로">
+        <span class="brand-name">Few Moves</span>
+      </a>
+    </header>
+
+    <section class="home-content" aria-labelledby="mode-title">
+      <header class="home-intro">
+        <h1 id="mode-title">모드 선택</h1>
+      </header>
+
+      <article class="featured-mode" aria-labelledby="solo-title">
+        <div class="featured-body">
+          <div class="mini-board solo-preview" role="img" aria-label="혼자 모드의 예시 보드입니다. 파란 원이 목표 점으로 가는 그림이며 실제 플레이 상태가 아닙니다.">
+            <span class="board-wall wall-one" aria-hidden="true"></span>
+            <span class="board-wall wall-two" aria-hidden="true"></span>
+            <span class="board-wall wall-three" aria-hidden="true"></span>
+            <span class="board-goal" aria-hidden="true"></span>
+            <span class="board-piece solo-piece" aria-hidden="true"></span>
+          </div>
+          <div class="featured-copy">
+            <h2 id="solo-title">혼자</h2>
+            <p>적게 움직여 목표에 도착</p>
+            <a class="play-button" href="solo/index.html">혼자 시작 <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+      </article>
+
+      <nav class="mode-list" aria-label="다른 놀이 고르기">
+        <a class="mode-row" href="coop/index.html">
+          <span class="mode-icon coop-icon" aria-hidden="true">
+            <span class="shape square"></span>
+            <span class="shape diamond"></span>
+            <span class="goal-dot circle-goal"></span>
+            <span class="goal-dot diamond-goal"></span>
+          </span>
+          <span class="mode-copy">
+            <strong>친구와 <em>협력</em></strong>
+            <span>친구와 번갈아 둘 다 도착</span>
+          </span>
+          <span class="mode-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="mode-row" href="raid/index.html">
+          <span class="mode-icon raid-icon" aria-hidden="true">
+            <span class="shape raid-player"></span>
+            <span class="shape gold-fragment"></span>
+            <span class="snake-line"><i></i><i></i><i></i></span>
+          </span>
+          <span class="mode-copy">
+            <strong>뱀잡기 <em>레이드</em></strong>
+            <span>금빛 조각 모아 뱀잡기</span>
+          </span>
+          <span class="mode-arrow" aria-hidden="true">→</span>
+        </a>
+      </nav>
+    </section>
+  </main>
+</body>
+</html>

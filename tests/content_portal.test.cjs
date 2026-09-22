@@ -13,9 +13,12 @@ assert.match(portal, /href="raid\/index\.html"/);
 assert.match(portal, /혼자/);
 assert.match(portal, /협력/);
 assert.match(portal, /레이드/);
-assert.match(style, /min-height:48px/);
-assert.match(style, /@media \(max-width:560px\)/);
+assert.match(portal, /aria-label="[^"]*실제 플레이 상태가 아닙니다/);
+assert.doesNotMatch(portal, />예시 보드/);
+assert.match(style, /min-height:\s*48px/);
+assert.match(style, /@media \(max-width:\s*359px\)/);
 assert.doesNotMatch(portal, /href="(?:solo|coop|raid)\/"/);
-assert.doesNotMatch(portal, /record\.js|recordStatus|recordCapsule|seatToken|bearer|requestId/);
+assert.doesNotMatch(portal, /C1|C2|C3|record\.js|recordStatus|recordCapsule|seatToken|bearer|requestId|localStorage|nickname|rank/i);
+assert.doesNotMatch(portal, /<script\b/i);
 
 console.log("Content portal contract checks passed");
