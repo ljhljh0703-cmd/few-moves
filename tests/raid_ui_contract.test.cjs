@@ -21,6 +21,13 @@ assert.doesNotMatch(template, /data-raid-action="Pass"|data-raid-action="Load"|�
 assert.match(template, /min-height:48px/);
 assert.match(template, /width:56px; height:56px/);
 assert.match(template, /16×16 레이드 보드/);
+const css = template.slice(template.indexOf("<style>")+7, template.indexOf("</style>"));
+assert.match(css, /\.controls \{[^}]*grid-template-rows:auto 168px 18px;/, "portrait controls reserve one fixed 168px D-pad row");
+assert.match(css, /\.effect-row \{ grid-row:1;/);
+assert.match(css, /\.dpad \{ grid-row:2;/, "the D-pad stays in its fixed row when the effect strip is hidden");
+assert.match(css, /\.feedback \{ grid-row:3;/, "feedback cannot expand into the D-pad row");
+const landscapeCss = css.slice(css.indexOf("@media (orientation:landscape)"), css.indexOf("@media (prefers-reduced-motion:reduce)"));
+assert.match(landscapeCss, /\.controls \{[^}]*grid-template-rows:auto 168px auto;/, "landscape uses the same anchored controls");
 function boardGlyph(name) {
   const start = boardView.indexOf(`private static readonly string[] ${name}`);
   assert.ok(start >= 0, `${name} exists`);
