@@ -285,7 +285,7 @@ function uiHarness(hash="#record=fm1.shared") {
   const elements=Object.fromEntries(ids.map(id=>[id,uiElement(documentObject,id)]));
   elements["join-entry"].hidden=true;elements["status-row"].hidden=true;elements["play-controls"].hidden=true;
   ["menu-dialog","help-dialog","invite-dialog","consent-dialog","clear-dialog","record-dialog"].forEach(id=>{elements[id].tagName="DIALOG";});
-  const actions=[uiElement(documentObject,"up",{onlineAction:"Slide",direction:"Up"}),uiElement(documentObject,"left",{onlineAction:"Slide",direction:"Left"}),uiElement(documentObject,"right",{onlineAction:"Slide",direction:"Right"}),uiElement(documentObject,"down",{onlineAction:"Slide",direction:"Down"}),uiElement(documentObject,"look",{onlineAction:"Express",expression:"Look"}),uiElement(documentObject,"thumb",{onlineAction:"Express",expression:"ThumbsUp"}),uiElement(documentObject,"hand",{onlineAction:"Express",expression:"Handshake"}),uiElement(documentObject,"wait",{onlineAction:"Express",expression:"Waiting"}),uiElement(documentObject,"undo",{onlineAction:"RequestUndo"}),elements["clear-restart"]];
+  const actions=[uiElement(documentObject,"up",{onlineAction:"Slide",direction:"Up"}),uiElement(documentObject,"left",{onlineAction:"Slide",direction:"Left"}),uiElement(documentObject,"right",{onlineAction:"Slide",direction:"Right"}),uiElement(documentObject,"down",{onlineAction:"Slide",direction:"Down"}),uiElement(documentObject,"look",{onlineAction:"Express",expression:"Look"}),uiElement(documentObject,"thumb",{onlineAction:"Express",expression:"ThumbsUp"}),uiElement(documentObject,"hand",{onlineAction:"Express",expression:"Handshake"}),uiElement(documentObject,"wait",{onlineAction:"Express",expression:"Waiting"}),uiElement(documentObject,"undo",{onlineAction:"RequestUndo"}),uiElement(documentObject,"restart",{onlineAction:"RequestRestart"}),elements["clear-restart"]];
   elements["clear-restart"].dataset={onlineAction:"RequestRestart"};
   const boardStage=uiElement(documentObject,"board-stage"); boardStage.tagName="SECTION";boardStage.hidden=true;
   documentObject.body={appendChild(node){documentObject.loader=node;}};
@@ -303,6 +303,20 @@ function uiHarness(hash="#record=fm1.shared") {
 }
 
 async function runUiFixtures() {
+  const zero=uiHarness("");
+  zero.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({joined:true,roomId:"zero-room",seatCode:0,availabilityCode:1,inputEnabled:true,statusCode:"Playing",activeActorCode:"Circle",logicalActionCount:0})));
+  assert.equal(zero.actions[8].disabled,true,"zero moves leaves Undo disabled");
+  assert.equal(zero.actions[9].disabled,false,"Restart can be requested on the first turn");
+  zero.documentObject.loader.onload();zero.unityReady.resolve(zero.instance);await settle();
+  zero.actions[8].listeners.click();assert.equal(zero.sent.length,0,"forced zero-move Undo sends nothing");
+  const inviteCopy=uiHarness("");
+  inviteCopy.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({inviteCode:"INV-NEW",message:"초대 코드에 연결할 저장된 좌석이 없습니다"})));
+  assert.equal(inviteCopy.elements.feedback.textContent,"친구의 초대가 준비됐어요. 참여를 눌러요.","new guest invite gets a next-action hint");
+  inviteCopy.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({inviteCode:"INV-NEW",message:"연결이 끊겼습니다"})));
+  assert.equal(inviteCopy.elements.feedback.textContent,"연결이 끊겼습니다","other connection messages remain visible");
+  inviteCopy.sandbox.location.search="";
+  inviteCopy.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({inviteCode:"INV-NEW",message:"초대 코드에 연결할 저장된 좌석이 없습니다"})));
+  assert.equal(inviteCopy.elements.feedback.textContent,"초대 코드에 연결할 저장된 좌석이 없습니다","without an invite link the original message is preserved");
   const boot=uiHarness("");
   boot.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({transportLocked:true})));
   assert.equal(boot.boardStage.hidden,true,"unjoined lobby hides the empty board");
@@ -446,6 +460,10 @@ async function runUiFixtures() {
   assert.match(ux.elements["turn-label"].innerHTML,/내 차례<small>2번 이동/);
   assert.equal(ux.elements["online-controls"].classList.contains("joined"),true);
   assert.equal(ux.actions[0].disabled,false,"arrived piece is not frozen while the server still allows movement");
+  assert.equal(ux.actions[8].disabled,false,"own turn with prior moves permits undo request");
+  assert.equal(ux.actions[9].disabled,false,"own turn permits restart request");
+  ux.actions[8].listeners.click();assert.equal(ux.sent.at(-1).payload.kind,"RequestUndo");assert.match(ux.sent.at(-1).payload.requestId,/^online-\d+-RequestUndo$/);
+  ux.actions[9].listeners.click();assert.equal(ux.sent.at(-1).payload.kind,"RequestRestart");assert.match(ux.sent.at(-1).payload.requestId,/^online-\d+-RequestRestart$/);
   ux.actions[0].listeners.click();assert.equal(ux.sent.at(-1).payload.kind,"Slide");
   ux.elements["copy-invite-button"].listeners.click();
   assert.equal(ux.elements["invite-dialog"].open,true);
@@ -481,6 +499,9 @@ async function runUiFixtures() {
   ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{authorityRevision:9,logicalActionCount:14,activeActorCode:"Diamond",inputEnabled:false})));
   assert.match(ux.elements["turn-label"].innerHTML,/친구 차례<small>14번 이동/);
   assert.equal(ux.actions[0].disabled,true,"friend turn disables direction input");
+  assert.equal(ux.actions[8].disabled,true,"friend turn cannot request undo");
+  assert.equal(ux.actions[9].disabled,true,"friend turn cannot request restart");
+  const friendRequests=ux.sent.length;ux.actions[8].listeners.click();ux.actions[9].listeners.click();assert.equal(ux.sent.length,friendRequests,"forced friend-turn request clicks send nothing");
   ux.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(Object.assign({},playing,{authorityRevision:10,transportLocked:true,availabilityCode:0})));
   assert.match(ux.elements["turn-label"].innerHTML,/다시 연결 중/);
   assert.equal(ux.actions[0].disabled,true,"stale transport stays locked");
