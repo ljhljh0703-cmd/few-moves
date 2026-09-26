@@ -154,13 +154,13 @@ namespace Nectorial.Editor
 
             RaidDispatchResult directTail = ReplayResult(arena, "RLDR", "feedback-tail");
             if (!HasEvent(directTail, "tail_collected", null)) throw new InvalidOperationException("Raid feedback probe did not reach a direct tail pickup.");
-            AssertFeedback(directTail, "꼬리 조각을 모았습니다", "direct tail feedback");
+            AssertFeedback(directTail, "금빛 조각을 모았습니다", "direct tail feedback");
 
             RaidDispatchResult magnetTail = FindResultWithEvent(arena, "RLDRURLULDR", "tail_magnet_collected", null, "feedback-magnet");
-            AssertFeedback(magnetTail, "자석 획득 · 꼬리 조각 1개 수집", "magnet pickup and tail feedback");
+            AssertFeedback(magnetTail, "자석 획득 · 금빛 조각 1개 수집", "magnet pickup and tail feedback");
 
             RaidDispatchResult slowPickup = FindResultWithEvent(arena, "RLDRURLULDR", "item_collected", "Slow:", "feedback-slow");
-            AssertFeedback(slowPickup, "감속 획득 · 뱀 이동 늦추기", "Slow pickup feedback");
+            AssertFeedback(slowPickup, "모래시계 획득 · 뱀이 잠시 멈춰요", "Slow pickup feedback");
 
             RaidDispatchResult shielded = ReplayResult(arena, "RLDRURLU", "feedback-shielded");
             if (!HasFrameOutcome(shielded, RaidFrameOutcome.Shielded)) throw new InvalidOperationException("Raid feedback probe did not reach a shielded collision.");
@@ -168,7 +168,7 @@ namespace Nectorial.Editor
 
             RaidDispatchResult armed = ReplayResult(arena, "RLDRURLUL", "feedback-armed");
             if (armed.State.Status != RaidRunStatus.Armed) throw new InvalidOperationException("Raid feedback probe Armed state did not persist.");
-            AssertFeedback(armed, "꼬리 조각 3개 완성 · 이제 뱀 몸통에 돌진", "Armed feedback");
+            AssertFeedback(armed, "머리든 몸통이든 부딪히면 잡아요", "Armed feedback");
 
             RaidDispatchResult cleared = ReplayResult(arena, "RLDRURLULDR", "feedback-cleared");
             if (cleared.State.Status != RaidRunStatus.Cleared) throw new InvalidOperationException("Raid feedback probe did not clear.");

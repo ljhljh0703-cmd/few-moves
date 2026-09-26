@@ -691,7 +691,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (result == null) return string.Empty;
             if (result.State != null && result.State.Status == RaidRunStatus.Cleared) return Translate("cleared");
             if (result.State != null && result.State.Status == RaidRunStatus.Failed) return Translate("failed");
-            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "꼬리 조각 3개 완성 · 이제 뱀 몸통에 돌진";
+            // Shown beside the "돌진!" quest line and the full charge pips, so it stays short enough to fit whole on a
+            // 360px phone. Any collision with the snake (head or body) clears an armed run.
+            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "머리든 몸통이든 부딪히면 잡아요";
             if (HasShieldedFrame(result)) return "보호막으로 충돌을 막았습니다";
 
             bool shield = false;
@@ -719,16 +721,16 @@ namespace Nectorial.SlideEscape.Unity.Raid
             int tailCount = directTailCount + magnetTailCount;
             string itemName = ItemName(shield, magnet, slow);
             if (!string.IsNullOrEmpty(itemName) && tailCount > 0)
-                return itemName + " 획득 · 꼬리 조각 " + tailCount.ToString() + "개 수집";
+                return itemName + " 획득 · 금빛 조각 " + tailCount.ToString() + "개 수집";
             if (shield && !magnet && !slow && result.State != null) return "보호막 준비 · 충돌 " + result.State.ShieldCharges.ToString() + "회 방어";
-            if (magnet && !shield && !slow) return "자석 획득 · 주변 조각 수집";
-            if (slow && !shield && !magnet) return "감속 획득 · 뱀 이동 늦추기";
+            if (magnet && !shield && !slow) return "자석 획득 · 주변 금빛 조각 당기기";
+            if (slow && !shield && !magnet) return "모래시계 획득 · 뱀이 잠시 멈춰요";
             if (!string.IsNullOrEmpty(itemName)) return itemName + " 획득";
             if (tailCount > 0)
             {
-                if (magnetTailCount > 0 && directTailCount == 0 && tailCount == 1) return "자석으로 꼬리 조각을 모았습니다";
-                if (tailCount == 1) return "꼬리 조각을 모았습니다";
-                return "꼬리 조각 " + tailCount.ToString() + "개 수집";
+                if (magnetTailCount > 0 && directTailCount == 0 && tailCount == 1) return "자석으로 금빛 조각을 모았습니다";
+                if (tailCount == 1) return "금빛 조각을 모았습니다";
+                return "금빛 조각 " + tailCount.ToString() + "개 수집";
             }
             return Translate(result.Reason);
         }
@@ -745,11 +747,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
         {
             if (shield && !magnet && !slow) return "보호막";
             if (magnet && !shield && !slow) return "자석";
-            if (slow && !shield && !magnet) return "감속";
-            if (shield && magnet && slow) return "보호막·자석·감속";
+            if (slow && !shield && !magnet) return "모래시계";
+            if (shield && magnet && slow) return "보호막·자석·모래시계";
             if (shield && magnet) return "보호막·자석";
-            if (shield && slow) return "보호막·감속";
-            if (magnet && slow) return "자석·감속";
+            if (shield && slow) return "보호막·모래시계";
+            if (magnet && slow) return "자석·모래시계";
             return string.Empty;
         }
 

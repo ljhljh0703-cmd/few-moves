@@ -15,19 +15,22 @@ assert.match(template, /id="record-close"/);
 assert.match(template, /id="menu-dialog"/);
 assert.match(template, /id="help-dialog"/);
 assert.match(template, /금빛 조각 3개를 모아요/);
-assert.match(template, /모래시계: 뱀을 잠깐 멈춰요/);
-assert.match(template, /max-height:690px[\s\S]*?\.topbar h1,\.quickbar \{ display:none; \}/, "short portrait gives the board a single compact top row");
+assert.match(template, /모래시계: 표시된 칸만큼 내가 움직이는 동안 뱀이 멈춰요/, "hourglass is described as a stop measured in cells you slide");
+assert.match(template, /<header class="topbar">\s*<span id="turn-label" class="moves">0번 이동<\/span>\s*<div class="top-actions"><button id="restart-top" class="quick-retry"/, "one HUD row: moves left, retry/help/menu grouped right");
+assert.doesNotMatch(template, /quickbar|small-screen-actions|turn-label-small|restart-small|goal-help|<h1>/, "no duplicate title or second move/retry row");
 assert.doesNotMatch(template, /data-raid-action="Pass"|data-raid-action="Load"|저장한 판 열기/);
 assert.match(template, /min-height:48px/);
 assert.match(template, /width:56px; height:56px/);
 assert.match(template, /16×16 레이드 보드/);
 const css = template.slice(template.indexOf("<style>")+7, template.indexOf("</style>"));
-assert.match(css, /\.controls \{[^}]*grid-template-rows:auto 168px 18px;/, "portrait controls reserve one fixed 168px D-pad row");
+assert.match(css, /\.controls \{[^}]*grid-template-rows:24px 168px;[^}]*gap:16px;/, "portrait controls: fixed 24px effect slot, 16px gap, fixed 168px D-pad");
 assert.match(css, /\.effect-row \{ grid-row:1;/);
 assert.match(css, /\.dpad \{ grid-row:2;/, "the D-pad stays in its fixed row when the effect strip is hidden");
-assert.match(css, /\.feedback \{ grid-row:3;/, "feedback cannot expand into the D-pad row");
+assert.match(css, /\.effect-row\[hidden\] \{ display:flex!important; visibility:hidden; \}/, "an empty effect strip keeps its slot so the board never resizes");
+assert.match(template, /<strong id="tail-count">[^<]*<\/strong><p id="feedback" class="feedback">/, "feedback lives in the quest row, never over the board or the D-pad");
+assert.doesNotMatch(css, /\.feedback \{[^}]*position:absolute/);
 const landscapeCss = css.slice(css.indexOf("@media (orientation:landscape)"), css.indexOf("@media (prefers-reduced-motion:reduce)"));
-assert.match(landscapeCss, /\.controls \{[^}]*grid-template-rows:auto 168px auto;/, "landscape uses the same anchored controls");
+assert.match(landscapeCss, /\.controls \{ grid-column:2; grid-row:1 \/ span 2;/, "landscape keeps the same controls in the side column");
 function boardGlyph(name) {
   const start = boardView.indexOf(`private static readonly string[] ${name}`);
   assert.ok(start >= 0, `${name} exists`);
@@ -88,7 +91,7 @@ function observation(status = "Playing", overrides = {}) {
 
 function createHarness(hash = "#record=fm1.shared") {
   const documentObject = { activeElement: null, listeners: {}, loader: null };
-  const ids = ["unity-canvas","feedback","turn-label","turn-label-small","tail-count","goal-help","shield-count","magnet-count","slow-count","effect-row","shield-effect","magnet-effect","slow-effect","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","restart-top","restart-small","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
+  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","shield-count","magnet-count","slow-count","effect-row","shield-effect","magnet-effect","slow-effect","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","restart-top","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
   const elements = Object.fromEntries(ids.map(id => [id, makeElement(documentObject, id)]));
   for (const id of ["result-dialog","record-dialog","menu-dialog","help-dialog"]) elements[id].tagName = "DIALOG";
   const actions = [makeElement(documentObject,"up",{raidAction:"Slide",direction:"Up"}),makeElement(documentObject,"left",{raidAction:"Slide",direction:"Left"}),makeElement(documentObject,"right",{raidAction:"Slide",direction:"Right"}),makeElement(documentObject,"down",{raidAction:"Slide",direction:"Down"}),elements["save-button"],elements["result-restart"]];
@@ -126,9 +129,8 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{sharedRecordRequestId:firstRequestId})));
   assert.equal(h.sent.filter(item => item.payload.kind === "LoadSharedRecord").length, 1, "one hash is imported exactly once");
   assert.equal(h.elements["tail-count"].textContent, "금빛 조각 3개를 모아요");
-  assert.equal(h.elements["goal-help"].textContent, "3개 남았어요");
+  assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), false, "collecting phase is not styled as armed");
   assert.equal(h.elements["turn-label"].textContent, "2번 이동");
-  assert.equal(h.elements["turn-label-small"].textContent, "2번 이동");
   assert.equal(h.elements["shield-count"].textContent, "1회");
   assert.equal(h.elements["shield-effect"].hidden, false, "shield capacity is visible when positive");
   assert.equal(h.elements["effect-row"].hidden, false);
@@ -137,7 +139,6 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1 })));
   assert.equal(h.elements["tail-count"].textContent, "금빛 조각 2개를 더 모아요");
-  assert.equal(h.elements["goal-help"].textContent, "2개 남았어요");
   assert.equal(h.elements["charge-0"].classList.contains("filled"), true);
   assert.equal(h.elements["charge-1"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:2 })));
@@ -146,21 +147,20 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements["charge-2"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { transitioning:true, tailCount:3 })));
   assert.equal(h.elements["tail-count"].textContent, "멈추면 힘이 생겨요", "count alone does not authorize the armed state");
-  assert.equal(h.elements["goal-help"].textContent, "금빛 조각을 모두 모았어요");
+  assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), false, "mid-slide full count is not yet armed");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Armed", { tailCount:3 })));
-  assert.equal(h.elements["tail-count"].textContent, "이제 뱀에게 부딪혀요!");
+  assert.equal(h.elements["tail-count"].textContent, "돌진! 뱀에 부딪혀요");
+  assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), true, "confirmed Armed state marks the quest row, not only by color");
   assert.equal(h.elements["charge-2"].classList.contains("filled"), true);
   assert.equal(h.elements["charge-2"].classList.contains("armed"), true);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Failed", { tailCount:2, shieldCharges:0 })));
   assert.equal(h.elements["tail-count"].textContent, "뱀에게 잡혔어요");
   assert.equal(h.elements["result-title"].textContent, "뱀에게 잡혔어요");
-  assert.match(h.elements["goal-help"].textContent, /다시/);
+  assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), false, "a failed run drops the armed marker");
   assert.equal(h.elements["result-dialog"].open, true);
   assert.equal(h.elements["result-record"].disabled, false);
   h.elements["restart-top"].listeners.click();
   assert.notEqual(h.sent.at(-1).payload.kind, "Restart", "quick retry behind result is blocked");
-  h.elements["restart-small"].listeners.click();
-  assert.notEqual(h.sent.at(-1).payload.kind, "Restart", "short-screen retry behind result is blocked");
   h.elements["result-restart"].listeners.click();
   assert.equal(h.sent.at(-1).payload.kind, "Restart", "result retry explicitly resets the current arena");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:0, shieldCharges:1 })));
@@ -169,12 +169,12 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
   assert.equal(h.elements["tail-count"].textContent, "금빛 조각 2개를 더 모아요", "restored playing state redraws the confirmed charge");
   assert.equal(h.elements["shield-count"].textContent, "1회");
-  assert.equal(h.elements["magnet-count"].textContent, "작동 중");
-  assert.equal(h.elements["slow-count"].textContent, "작동 중");
+  assert.equal(h.elements["magnet-count"].textContent, "2칸", "magnet shows its remaining cells of player movement");
+  assert.equal(h.elements["slow-count"].textContent, "1칸", "hourglass shows its remaining cells of player movement");
   assert.equal(h.elements["magnet-effect"].hidden, false);
   assert.equal(h.elements["slow-effect"].hidden, false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { shieldCharges:0 })));
-  assert.equal(h.elements["effect-row"].hidden, true, "inactive effect strip gives board space back");
+  assert.equal(h.elements["effect-row"].hidden, true, "inactive effect strip is hidden (its CSS slot stays reserved)");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
 
   h.elements["menu-top"].listeners.click();

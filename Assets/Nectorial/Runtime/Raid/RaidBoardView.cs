@@ -10,7 +10,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
     internal sealed class RaidBoardView : IDisposable
     {
         private const int GlyphPixels = 9;
-        private const float GlyphPixelSize = 0.075f;
+        private const float GlyphPixelSize = 0.09f;
 
         private static readonly Color Floor = new Color32(229, 224, 211, 255);
         private static readonly Color Grid = new Color32(210, 203, 187, 150);
@@ -138,6 +138,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private Transform _playerActor;
         private Transform _playerBlueGlyph;
         private Transform _playerPoweredGlyph;
+        private Transform _playerPowerCorners;
         private RaidArenaDefinition _staticArena;
         private RaidFrame[] _activeFrames;
         private bool _transitionActive;
@@ -214,6 +215,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _playerChargePips.Clear();
             _playerBlueGlyph = null;
             _playerPoweredGlyph = null;
+            _playerPowerCorners = null;
             if (_root != null) Object.Destroy(_root.gameObject);
             if (_whiteSprite != null) Object.Destroy(_whiteSprite);
         }
@@ -282,6 +284,21 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _playerBlueGlyph = AddPixelGlyph(_playerActor, "Player Blue Glyph", PlayerGlyph, Player, GlyphOutline, Color.clear, 8);
             _playerPoweredGlyph = AddPixelGlyph(_playerActor, "Player Powered Glyph", PlayerGlyph, Tail, PlayerPowerOutline, TailHighlight, 8);
             _playerPoweredGlyph.gameObject.SetActive(false);
+            _playerPowerCorners = new GameObject("Player Power Corners").transform;
+            _playerPowerCorners.SetParent(_playerActor, false);
+            for (int x = -1; x <= 1; x += 2)
+            {
+                for (int y = -1; y <= 1; y += 2)
+                {
+                    Transform horizontal = AddActorPrimitive(_playerPowerCorners, "Power Corner Horizontal", Player,
+                        new Vector2(0.18f, 0.055f), 9, 0f);
+                    horizontal.localPosition = new Vector3(x * 0.33f, y * 0.41f, 0f);
+                    Transform vertical = AddActorPrimitive(_playerPowerCorners, "Power Corner Vertical", Player,
+                        new Vector2(0.055f, 0.18f), 9, 0f);
+                    vertical.localPosition = new Vector3(x * 0.41f, y * 0.33f, 0f);
+                }
+            }
+            _playerPowerCorners.gameObject.SetActive(false);
             for (int index = 0; index < 3; index++)
             {
                 Transform pip = AddActorPrimitive(_playerActor, "Player Charge Pip " + index, ChargeEmpty,
@@ -306,8 +323,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _dynamicTiles.Add(link);
                 var renderer = link.AddComponent<SpriteRenderer>();
                 renderer.sprite = _whiteSprite;
-                renderer.color = Snake;
-                renderer.sortingOrder = 7;
+                renderer.color = GlyphOutline;
+                renderer.sortingOrder = 6;
+                AddActorPrimitive(link.transform, "Snake Link Fill", Snake, new Vector2(1f, 0.82f), 7, 0f);
                 _snakeLinks.Add(link.transform);
             }
         }
@@ -360,6 +378,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             bool powered = state.Status == RaidRunStatus.Armed || state.Status == RaidRunStatus.Cleared;
             if (_playerBlueGlyph != null) _playerBlueGlyph.gameObject.SetActive(!powered);
             if (_playerPoweredGlyph != null) _playerPoweredGlyph.gameObject.SetActive(powered);
+            if (_playerPowerCorners != null) _playerPowerCorners.gameObject.SetActive(powered);
             for (int index = 0; index < _playerChargePips.Count; index++)
                 if (_playerChargePips[index] != null) _playerChargePips[index].gameObject.SetActive(!powered);
         }
@@ -495,7 +514,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 Transform link = _snakeLinks[index];
                 link.localPosition = (from + to) * 0.5f;
                 link.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
-                link.localScale = new Vector3(Mathf.Max(0.2f, delta.magnitude * 0.7f), 0.22f, 1f);
+                link.localScale = new Vector3(Mathf.Max(0.2f, delta.magnitude * 0.9f), 0.44f, 1f);
             }
         }
 
