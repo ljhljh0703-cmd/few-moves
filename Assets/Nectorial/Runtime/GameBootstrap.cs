@@ -25,7 +25,7 @@ namespace Nectorial.SlideEscape.Unity
         private GameState _state;
         private List<GameMove> _moves = new List<GameMove>();
         private int _selectedPieceIndex;
-        private GameBoardView _board;
+        private IBoardView _board;
         private TossPlatformAdapter _platform;
         private bool _initialized;
         private bool _restoreBlocked;
@@ -450,7 +450,13 @@ namespace Nectorial.SlideEscape.Unity
                 _room = _rooms[_roomIndex];
                 _state = GameEngine.Create(_room);
                 _selectedPieceIndex = _room.TargetPieceIndex;
-                _board = new GameBoardView(atlas);
+                string boardError;
+                _board = CreateBoardView(atlas, out boardError);
+                if (_board == null)
+                {
+                    FailInitialization("3D 미리보기 자원을 불러올 수 없습니다", boardError);
+                    return;
+                }
 
                 if (_platform != null && _platform.IsTossCandidate)
                 {
@@ -1112,6 +1118,16 @@ namespace Nectorial.SlideEscape.Unity
             }
         }
 
+        // Only the separately built "Few Moves 3D Preview" product uses the 3D board; Few Moves keeps the 2D board.
+        // A preview without its imported meshes fails visibly instead of falling back to 2D.
+        private static IBoardView CreateBoardView(Texture2D atlas, out string error)
+        {
+            error = string.Empty;
+            if (!Board3DView.IsPreviewProduct) return new GameBoardView(atlas);
+            IBoardView view;
+            return Board3DView.TryCreate(out view, out error) ? view : null;
+        }
+
         private static void ConfigureCamera()
         {
             Camera camera = Camera.main;
@@ -1120,6 +1136,12 @@ namespace Nectorial.SlideEscape.Unity
                 var cameraObject = new GameObject("Main Camera");
                 cameraObject.tag = "MainCamera";
                 camera = cameraObject.AddComponent<Camera>();
+            }
+
+            if (Board3DView.IsPreviewProduct)
+            {
+                Preview3DCamera.Configure(camera);
+                return;
             }
 
             camera.orthographic = true;
