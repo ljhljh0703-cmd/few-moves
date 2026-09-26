@@ -16,20 +16,24 @@
     button:disabled { opacity:.36; cursor:default; }
     [hidden] { display:none!important; }
     main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
-    .utility-bar { min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
-    .top-actions { display:flex; align-items:center; flex:none; }
-    .moves { flex:none; font-size:14px; font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .quick-retry { flex:none; min-width:78px; min-height:48px; padding:0 7px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
-    .icon-button { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border-radius:10px; font-size:23px; }
+    .utility-bar { width:min(100%,560px); justify-self:center; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
+    .top-actions { display:flex; align-items:center; flex:none; gap:6px; }
+    .moves { flex:none; padding-left:2px; color:var(--ink); font-size:20px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .quick-retry,.icon-button { min-height:48px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); }
+    .quick-retry:enabled:active,.icon-button:enabled:active { transform:translateY(1px); box-shadow:0 1px 0 var(--line); }
+    .quick-retry { flex:none; min-width:78px; padding:0 10px; font-size:15px; font-weight:800; }
+    .icon-button { min-width:48px; display:grid; place-items:center; padding:0; font-size:21px; }
     .icon-button svg { width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; }
-    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:24px minmax(0,1fr) 220px; gap:4px; }
-    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; min-width:0; margin:0; color:var(--muted); font-size:14px; line-height:20px; font-weight:650; text-align:center; }
+    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:32px minmax(0,1fr) 234px; gap:4px; }
+    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; gap:9px; min-width:0; margin:0; color:var(--ink); font-size:clamp(18px,5.4vw,21px); line-height:1.25; font-weight:800; text-align:center; white-space:nowrap; }
+    .goal-mark { width:14px; height:14px; flex:none; border-radius:50%; background:#669bd3; box-shadow:0 0 0 3px color-mix(in srgb,#669bd3 28%,transparent); }
+    .goal-piece { color:var(--blue); font-weight:850; }
     .board-stage { grid-row:2; position:relative; min-width:0; min-height:0; width:100%; overflow:hidden; display:grid; place-items:center; }
     .game { min-width:0; min-height:0; width:100%; height:100%; display:grid; place-items:center; }
     canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:0; border-radius:0; background:var(--stage); image-rendering:pixelated; }
     .feedback { position:absolute; z-index:2; left:50%; bottom:4px; width:min(calc(100% - 20px),360px); margin:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font-size:14px; line-height:1.3; text-align:center; transform:translateX(-50%); }
     .control-slot { grid-row:3; min-height:0; display:grid; place-items:center; }
-    .play-controls { width:100%; height:220px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:4px; }
+    .play-controls { width:100%; height:234px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:18px; }
     .play-controls[hidden] { display:grid!important; visibility:hidden; pointer-events:none; }
     .piece-row { grid-row:1; width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; }
     .piece-row[hidden] { display:flex!important; visibility:hidden; pointer-events:none; }
@@ -83,7 +87,7 @@
     .result-actions.is-single { grid-template-columns:1fr; }
     .result-actions button { min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
     .result-actions .result-next { border-color:var(--ink); background:var(--ink); color:#fff; }
-    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:24px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; } }
+    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:32px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; } }
     @media (max-height:520px) and (orientation:portrait) { html,body { overflow-y:auto; } main#app { min-height:520px; height:auto; } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
   </style>
@@ -92,11 +96,10 @@
   <main id="app">
     <header class="utility-bar">
       <span id="turn-runline" class="moves">0번 이동</span>
-      <button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button>
-      <div class="top-actions"><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
+      <div class="top-actions"><button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
     </header>
     <section class="play-layout" aria-label="Few Moves">
-      <p class="goal-hint">파란 말을 목표 칸에 넣어요</p>
+      <p class="goal-hint"><span class="goal-mark" aria-hidden="true"></span><span><strong class="goal-piece">파란 말</strong>을 목표 칸에 넣어요</span></p>
       <section class="board-stage" aria-label="게임 보드">
         <section class="game">
           <canvas id="unity-canvas" tabindex="0" aria-label="Few Moves 보드"></canvas>

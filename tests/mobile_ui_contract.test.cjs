@@ -234,7 +234,8 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.doesNotMatch(board.match(/public void AdvanceTransition[\s\S]*?public void CompleteTransition/)[0], /new GameObject/);
   assert.doesNotMatch(board.match(/public void Render[\s\S]*?public bool BeginTransition/)[0], /ClearDynamicTiles/);
   assert.match(template, /--paper:#eee7d8; --surface:#faf5e9; --ink:#293238/);
-  assert.match(template, /grid-template-rows:24px minmax\(0,1fr\) 220px/);
+  assert.match(template, /grid-template-rows:32px minmax\(0,1fr\) 234px/);
+  assert.match(template, /\.play-controls \{[^}]*height:234px;[^}]*grid-template-rows:48px 168px;[^}]*gap:18px;/, "selector row and pad are clearly separated");
   assert.match(template, /\.direction-console \{ grid-row:2; position:relative; width:180px; height:168px/);
   assert.match(template, /\.direction-button \{ position:absolute; z-index:2; width:56px; height:56px/);
   assert.match(template, /\.dpad-base::before \{ left:62px; top:0; width:56px; height:164px; \} \.dpad-base::after \{ left:0; top:56px; width:180px; height:52px; \}/);
@@ -246,11 +247,13 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(template, /\.piece-mark \{[^}]*border-radius:50%/);
   assert.match(template, /data-piece-index="1"\] \.piece-mark \{[^}]*rotate\(45deg\)/);
   assert.match(template, /data-piece-index="2"\] \.piece-mark \{[^}]*background:var\(--teal\)/);
-  assert.match(template, /class="goal-hint">파란 말을 목표 칸에 넣어요/);
+  assert.match(template, /class="goal-hint"><span class="goal-mark" aria-hidden="true"><\/span><span><strong class="goal-piece">파란 말<\/strong>을 목표 칸에 넣어요<\/span>/);
+  assert.match(template, /\.goal-hint \{[^}]*font-size:clamp\(18px,/, "quest line stays at least 18px");
   assert.match(template, /현재 진행을 지우고 첫 번째 판부터 다시 시작해요/);
   assert.match(template, /Math\.floor\(Math\.min\(bounds\.width, bounds\.height, 560\)\)/);
   assert.match(template, /id="turn-runline" class="moves">0번 이동/);
-  assert.match(template, /id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
+  assert.match(template, /class="top-actions"><button id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
+  assert.match(template, /\.utility-bar \{ width:min\(100%,560px\); justify-self:center;/, "HUD stays on the board axis on wide screens");
   assert.match(template, /id="help-toggle"/);
   assert.match(template, /id="help-dialog"/);
   assert.match(template, /\.play-controls\[hidden\] \{ display:grid!important; visibility:hidden; pointer-events:none; \}/);
