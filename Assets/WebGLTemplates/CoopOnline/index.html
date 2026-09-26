@@ -5,273 +5,181 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Few Moves 온라인</title>
   <style>
-    :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --surface:#f0ece2; --ink:#293238; --muted:#6e736f; --floor:#e5e0d3; --grid:#d2cbbb; --charcoal:#313a3b; --edge:#171e1f; --pressed:#151c1d; --focus:#5d8960; --circle:#437491; --diamond:#c88a40; }
+    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --console:#d1c5af; --focus:#5d8960; --circle:#4374b7; --diamond:#d18a37; }
     * { box-sizing:border-box; }
-    html, body { width:100%; min-height:100%; margin:0; overflow-x:hidden; overflow-y:auto; background:var(--surface); }
-    body { min-height:100svh; color:var(--ink); }
-    button { min-width:48px; min-height:48px; border:0; background:transparent; color:inherit; font:inherit; font-weight:700; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
-    button:focus-visible, input:focus-visible, canvas:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
-    button:disabled { opacity:.36; cursor:default; }
-    main#app { width:min(640px,100%); min-height:100svh; height:100svh; margin:0 auto; padding:max(8px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); display:grid; grid-template-rows:64px minmax(0,1fr); gap:8px; }
-    .topbar { position:relative; min-height:64px; display:grid; grid-template-columns:48px 1fr 48px; align-items:center; gap:8px; }
-    .topbar h1 { margin:0; font-size:17px; line-height:1.2; text-align:center; }
-    .topbar small { display:block; margin-top:3px; color:var(--muted); font-size:11px; font-weight:600; }
-    .icon-button { display:grid; place-items:center; border-radius:12px; }
-    .icon-button:enabled:active { background:color-mix(in srgb,var(--charcoal) 9%,transparent); }
-    .online-layout { min-height:0; display:grid; grid-template-rows:minmax(150px,1fr) auto; gap:8px; justify-items:center; }
-    .board-stage { position:relative; width:100%; min-height:0; display:grid; place-items:center; }
-    #unity-canvas { display:block; width:min(100%,560px); height:auto; max-width:100%; max-height:100%; aspect-ratio:1/1; border:1px solid var(--grid); border-radius:6px; background:var(--floor); box-shadow:0 5px 0 color-mix(in srgb,var(--charcoal) 16%,transparent); image-rendering:pixelated; }
-    .expression-bubble { position:absolute; top:12px; left:56px; right:56px; z-index:3; display:flex; align-items:center; justify-content:center; gap:7px; width:auto; max-width:calc(100% - 112px); height:40px; min-height:40px; padding:6px 11px; border:1px solid var(--grid); border-radius:999px; background:color-mix(in srgb,var(--surface) 95%,var(--grid)); box-shadow:0 4px 12px color-mix(in srgb,var(--charcoal) 14%,transparent); font-size:20px; pointer-events:none; overflow:hidden; white-space:nowrap; }
-    .expression-bubble[hidden] { display:none; }
-    .expression-sender { width:12px; height:12px; border-radius:2px; background:var(--circle); }
-    .expression-sender.diamond { border-radius:2px; background:var(--diamond); transform:rotate(45deg); }
-    .expression-name { color:var(--muted); font-size:11px; font-weight:800; }
-    .online-controls { width:min(100%,360px); min-height:0; display:grid; align-content:start; gap:4px; }
-    .room-panel { min-height:48px; display:block; }
-    .room-form { width:100%; display:flex; align-items:center; gap:6px; }
-    .room-form input { flex:1 1 auto; width:0; }
-    .room-form button { flex:0 0 auto; white-space:nowrap; padding-left:9px; padding-right:9px; }
-    .room-panel input { min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:13px; }
-    .room-panel button, .room-action { min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; background:#fffdf7; font-size:12px; }
-    .room-panel .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
-    .room-info { display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:48px; color:var(--muted); font-size:11px; }
-    .room-info > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #invite-code { display:inline-block; max-width:12ch; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom; }
-    .room-info strong { color:var(--ink); font-size:13px; }
-    .invite-link-fallback { width:100%; min-width:0; min-height:48px; padding:0 12px; border:1px solid var(--grid); border-radius:10px; color:var(--ink); background:#fffdf7; font:inherit; font-size:11px; }
-    .room-info[hidden], .room-form[hidden] { display:none; }
-    .status-row { min-height:40px; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:5px; }
-    .goal-chip { display:inline-flex; align-items:center; justify-content:center; gap:5px; color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
-    .goal-chip strong { color:var(--ink); font-size:15px; }
-    .turn-label { display:grid; place-items:center; min-width:106px; min-height:40px; padding:4px 8px; border:1px solid var(--grid); border-radius:9px; background:#fffdf7; font-size:13px; line-height:1.15; text-align:center; }
-    .turn-label small { color:var(--muted); font-size:10px; }
-    .seat-dot { width:12px; height:12px; border-radius:2px; background:var(--circle); }
-    .seat-dot.diamond { border-radius:2px; background:var(--diamond); transform:rotate(45deg); }
-    .dpad { position:relative; width:180px; height:168px; margin:0 auto; }
-    .dpad button { position:absolute; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; color:var(--ink); background:transparent; }
-    .dpad button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--edge); }
-    .dpad button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:linear-gradient(135deg,var(--charcoal),color-mix(in srgb,var(--charcoal) 78%,var(--edge))); }
-    .dpad button:enabled:active::before { background:var(--pressed); }
-    .dpad button span { position:relative; z-index:2; color:var(--surface); font-size:24px; }
+    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--paper); }
+    body { color:var(--ink); }
+    button,a,select,input { min-height:48px; color:inherit; font:inherit; }
+    button,a { min-width:48px; border:0; background:transparent; font-weight:750; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+    a { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
+    button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,canvas:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
+    button:disabled,select:disabled { opacity:.36; cursor:default; }
+    [hidden] { display:none!important; }
+    main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
+    .topbar { position:relative; min-height:48px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--line); }
+    .topbar h1 { margin:0; font-size:14px; font-weight:650; white-space:nowrap; }
+    .topbar small { display:inline; margin-left:6px; color:var(--muted); font-size:12px; font-weight:650; }
+    .top-actions { display:flex; align-items:center; }
+    .icon-button,.top-action { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0 7px; border-radius:10px; }
+    .icon-button { font-size:22px; } .top-action { font-size:13px; }
+    .online-layout { min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; gap:4px; }
+    .online-layout.lobby { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:14px 0; }
+    .lobby-intro { width:min(100%,360px); display:grid; justify-items:center; gap:8px; text-align:center; }
+    .lobby-intro h2 { margin:0; font-size:23px; line-height:1.2; }
+    .lobby-intro p { max-width:26ch; margin:0; color:var(--muted); font-size:14px; line-height:1.45; }
+    .lobby-pair { display:flex; align-items:center; justify-content:center; gap:15px; height:44px; }
+    .lobby-pair .seat-dot { width:22px; height:22px; }
+    .online-controls.lobby { width:min(100%,360px); grid-template-rows:48px 48px minmax(22px,auto); align-content:center; border:0; padding:0; overflow:visible; }
+    .online-controls.lobby .feedback { grid-row:3; white-space:normal; line-height:1.35; }
+    .board-stage { position:relative; width:100%; min-height:0; overflow:hidden; display:grid; place-items:center; }
+    #unity-canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:1px solid var(--line); border-radius:9px; background:var(--floor); image-rendering:pixelated; }
+    .expression-bubble { position:absolute; top:6px; left:50%; z-index:3; display:flex; align-items:center; justify-content:center; gap:7px; min-width:102px; height:40px; padding:5px 12px; transform:translateX(-50%); border:1px solid var(--line); border-radius:999px; background:var(--surface); box-shadow:0 4px 12px color-mix(in srgb,var(--ink) 14%,transparent); font-size:20px; pointer-events:none; white-space:nowrap; }
+    .expression-sender { width:12px; height:12px; border-radius:2px; background:var(--circle); } .expression-sender.diamond { background:var(--diamond); transform:rotate(45deg); }
+    .expression-name { color:var(--muted); font-size:12px; font-weight:800; }
+    .online-controls { min-height:0; width:min(100%,360px); margin:0 auto; display:grid; grid-template-rows:48px 48px 56px 168px 18px; gap:3px; align-content:end; border-top:1px solid var(--line); padding-top:3px; }
+    .online-controls.joined { grid-template-rows:48px 0 56px 168px 18px; }
+    .room-panel { grid-row:1; min-height:0; }
+    .room-form,.room-start,.join-entry,.room-info { width:100%; height:48px; display:grid; align-items:center; gap:5px; }
+    .room-start { grid-template-columns:1fr 1fr; } .join-entry { grid-template-columns:48px minmax(0,1fr) 66px; }
+    .room-start button,.join-entry button,.room-action { min-height:48px; padding:0 8px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; white-space:nowrap; }
+    .room-start .primary,.join-entry .primary { color:#fff; background:var(--ink); border-color:var(--ink); }
+    .join-entry input,.menu-input,.invite-link-fallback,.record-fallback { width:100%; min-width:0; min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; }
+    .room-info { grid-template-columns:minmax(0,1fr) auto; color:var(--muted); font-size:13px; }
+    .room-info>span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .room-info strong { color:var(--ink); font-size:14px; }
+    .room-action { min-width:96px; }
+    .definition-picker { grid-row:2; min-height:48px; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px; }
+    .definition-picker>span { color:var(--muted); font-size:12px; font-weight:750; }
+    .definition-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+    .definition-options button { min-height:48px; padding:0 5px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; }
+    .definition-options button[aria-pressed="true"] { color:#fff; background:var(--ink); border-color:var(--ink); }
+    .status-row { grid-row:3; min-height:56px; display:grid; grid-template-columns:minmax(0,1fr) minmax(118px,1.2fr) minmax(0,1fr); align-items:center; gap:3px; }
+    .goal-chip { min-width:0; display:grid; justify-items:center; align-content:center; gap:1px; color:var(--muted); font-size:11px; text-align:center; white-space:nowrap; }
+    .goal-chip strong { color:var(--ink); font-size:12px; }
+    .goal-chip .mark-name { display:flex; align-items:center; gap:5px; }
+    .turn-label { min-width:0; min-height:54px; display:grid; place-items:center; align-content:center; padding:3px 4px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:16px; font-weight:850; line-height:1.15; text-align:center; }
+    .turn-label small { margin-top:2px; color:var(--muted); font-size:12px; font-weight:650; }
+    .seat-dot { width:11px; height:11px; border-radius:2px; background:var(--circle); } .seat-dot.diamond { background:var(--diamond); transform:rotate(45deg); }
+    .play-controls { grid-row:4; position:relative; width:100%; height:168px; }
+    .dpad { position:absolute; left:50%; top:0; width:180px; height:168px; transform:translateX(-50%); }
+    .dpad button { position:absolute; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; }
+    .dpad button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--line); }
+    .dpad button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:var(--surface); }
+    .dpad button:enabled:active::before { background:var(--console); } .dpad button span { position:relative; z-index:2; color:var(--ink); font-size:24px; }
     .dpad-up { left:62px; top:0; } .dpad-left { left:0; top:56px; } .dpad-right { left:124px; top:56px; } .dpad-down { left:62px; top:112px; }
-    .emoji-row { display:flex; justify-content:center; gap:7px; min-height:48px; }
-    .emoji-button { width:48px; height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--grid); border-radius:10px; background:#fffdf7; font-size:21px; }
-    .action-row { display:flex; justify-content:center; gap:7px; min-height:48px; }
-    .text-button { min-height:48px; padding:0 14px; border:1px solid var(--grid); border-radius:10px; background:transparent; font-size:12px; }
-    .feedback { min-height:22px; margin:0; color:var(--muted); font-size:11px; text-align:center; }
-    dialog { width:min(300px,calc(100% - 32px)); border:1px solid var(--charcoal); border-radius:13px; color:var(--ink); background:var(--surface); box-shadow:0 16px 50px color-mix(in srgb,var(--charcoal) 28%,transparent); }
-    dialog::backdrop { background:color-mix(in srgb,var(--charcoal) 38%,transparent); }
-    .dialog-card { display:grid; gap:12px; padding:18px; }
-    .dialog-title { margin:0; font-size:17px; font-weight:800; }
-    .dialog-copy { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
-    .dialog-actions { display:flex; justify-content:flex-end; gap:7px; }
-    .dialog-actions button { min-height:44px; padding:0 13px; border:1px solid var(--grid); border-radius:9px; }
-    .dialog-actions .primary { color:#fff; background:var(--charcoal); border-color:var(--charcoal); }
-    #clear-dialog { width:min(286px,calc(100% - 36px)); }
-    #clear-dialog .dialog-card { text-align:center; }
-    .clear-title { margin:0; font-size:24px; }
-    .clear-subtitle { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
-    [hidden] { display:none !important; }
+    .emoji-rail { position:absolute; left:0; top:0; width:100px; height:168px; display:grid; grid-template-columns:48px 48px; grid-template-rows:48px 48px; align-content:space-between; gap:4px; }
+    .action-rail { position:absolute; right:0; top:0; display:flex; flex-direction:column; gap:8px; }
+    .emoji-button,.rail-button { width:48px; height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+    .emoji-button { font-size:20px; } .rail-button { font-size:11px; line-height:1.1; text-align:center; }
+    .feedback { grid-row:5; min-height:18px; margin:0; color:var(--muted); font-size:12px; line-height:18px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    dialog { width:min(360px,calc(100% - 24px)); max-height:calc(100dvh - 24px); padding:0; border:1px solid var(--line); border-radius:13px; color:var(--ink); background:var(--surface); box-shadow:0 14px 44px color-mix(in srgb,var(--ink) 28%,transparent); overflow:auto; }
+    dialog::backdrop { background:color-mix(in srgb,var(--ink) 26%,transparent); }
+    #clear-dialog { width:min(296px,calc(100% - 24px)); margin:auto; } #clear-dialog::backdrop { background:transparent; }
+    .clear-head { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center; gap:4px; }
+    .clear-head .dialog-title { font-size:18px; white-space:nowrap; }
+    .clear-corner { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0 3px; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
+    #clear-close { font-size:22px; } #clear-record { font-size:12px; }
+    #clear-dialog .dialog-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .dialog-card { display:grid; gap:10px; padding:13px; }
+    .dialog-title { margin:0; font-size:20px; font-weight:850; text-align:center; }
+    .dialog-copy,.record-note { margin:0; color:var(--muted); font-size:13px; line-height:1.45; text-align:center; }
+    .dialog-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
+    .dialog-actions button,.dialog-actions a { flex:1 1 82px; min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; text-align:center; }
+    .dialog-actions .primary { color:#fff; background:var(--ink); border-color:var(--ink); }
+    .dialog-note { margin:0; color:var(--muted); font-size:12px; line-height:1.4; text-align:center; }
+    .menu-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .menu-actions button,.menu-actions a { min-height:48px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; text-align:center; }
+    .menu-actions .full { grid-column:1/-1; }
+    .invite-code-row { display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); font-size:12px; }
+    .invite-code-row strong { color:var(--ink); font-size:15px; user-select:all; }
+    .record-head { display:grid; grid-template-columns:48px 1fr 48px; align-items:center; } .record-head h2 { margin:0; font-size:18px; text-align:center; }
+    .record-close { border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .record-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .record-card { min-height:86px; padding:10px; border:1px solid var(--line); border-radius:11px; background:var(--surface); }
+    .record-card h3 { margin:0 0 6px; font-size:13px; } .record-value { margin:0; color:var(--ink); font-size:18px; font-weight:850; } .record-meta { min-height:16px; margin:3px 0 0; color:var(--muted); font-size:11px; }
+    .record-compare { min-height:32px; display:grid; place-items:center; margin:0; padding:6px 8px; border-radius:9px; background:var(--floor); font-size:12px; font-weight:750; text-align:center; }
+    @media (orientation:landscape) and (max-height:520px) { main#app { width:100%; } .online-layout { grid-template-columns:minmax(0,1fr) minmax(320px,360px); grid-template-rows:minmax(0,1fr); gap:6px; } .online-controls { width:100%; align-content:start; overflow-y:auto; padding:0 2px 4px 6px; border-top:0; border-left:1px solid var(--line); } }
+    @media (prefers-reduced-motion:reduce) { * { animation:none!important; transition:none!important; } }
   </style>
 </head>
 <body>
   <main id="app">
-    <header class="topbar">
-      <button id="leave-button" class="icon-button" type="button" disabled aria-label="온라인 방 나가기"><span aria-hidden="true">×</span></button>
-      <h1>Few Moves<small id="connection-label">온라인 방</small></h1>
-      <span aria-hidden="true"></span>
-      <p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden><span id="expression-sender" class="expression-sender" aria-hidden="true"></span><span id="expression-icon" aria-hidden="true"></span><span id="expression-name" class="expression-name"></span></p>
-    </header>
-    <section class="online-layout" aria-label="Few Moves 온라인 협력">
-      <section class="board-stage" aria-label="온라인 협력 보드"><canvas id="unity-canvas" tabindex="0" aria-label="사각형과 마름모 온라인 협력 보드"></canvas></section>
-      <section class="online-controls" aria-label="온라인 조작">
-        <section class="room-panel" aria-label="방 연결">
-          <div id="room-form" class="room-form">
-            <button id="create-button" class="primary" type="button">방 만들기</button>
-            <input id="invite-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="초대 코드" aria-label="초대 코드">
-            <button id="join-button" type="button">참여</button>
-            <button id="resume-button" type="button">저장된 방</button>
-          </div>
-          <div id="room-info" class="room-info" hidden><span><strong id="room-status">대기 중</strong> · 코드 <strong id="invite-code">—</strong></span><button id="copy-invite-button" class="room-action" type="button">초대 링크 복사</button></div>
-          <input id="invite-link-fallback" class="invite-link-fallback" type="text" readonly hidden aria-label="복사할 초대 링크">
-        </section>
-        <div class="status-row">
-          <span class="goal-chip"><span class="seat-dot" aria-hidden="true"></span><strong id="circle-progress">사각형</strong><span id="circle-goal">진행 중</span></span>
-          <span id="turn-label" class="turn-label">온라인 대기<small>행동 0</small></span>
-          <span class="goal-chip"><span class="seat-dot diamond" aria-hidden="true"></span><strong id="diamond-progress">마름모</strong><span id="diamond-goal">진행 중</span></span>
-        </div>
-        <div class="dpad" aria-label="방향 조작">
-          <button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="사각형 또는 마름모를 위로 이동"><span aria-hidden="true">▲</span></button>
-          <button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="사각형 또는 마름모를 왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
-          <button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="사각형 또는 마름모를 오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
-          <button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="사각형 또는 마름모를 아래로 이동"><span aria-hidden="true">▼</span></button>
-        </div>
-        <div class="emoji-row" role="group" aria-label="고정 표현">
-          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button>
-          <button class="emoji-button" type="button" data-online-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요">👍</button>
-          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Handshake" disabled aria-label="협력">🤝</button>
-          <button class="emoji-button" type="button" data-online-action="Express" data-expression="Waiting" disabled aria-label="기다리기">⏳</button>
-        </div>
-        <div class="action-row"><button class="text-button" type="button" data-online-action="RequestUndo" disabled>되돌림 동의</button><button class="text-button" type="button" data-online-action="RequestRestart" disabled>다시 시작</button></div>
+    <header class="topbar"><h1>Few Moves<small id="connection-label">온라인 협력</small></h1><div class="top-actions"><button id="record-top" class="top-action" type="button" disabled>기록</button><button id="help-top" class="icon-button" type="button" aria-label="게임 도움말">?</button><button id="menu-top" class="icon-button" type="button" aria-label="메뉴 열기">☰</button></div></header>
+    <section id="online-layout" class="online-layout lobby" aria-label="Few Moves 온라인 협력">
+      <section id="lobby-intro" class="lobby-intro"><div class="lobby-pair" aria-hidden="true"><span class="seat-dot"></span><span class="seat-dot diamond"></span></div><h2>친구와 함께 탈출해요</h2><p>판을 고르고 방을 만들거나, 친구의 초대로 참여하세요.</p></section>
+      <section class="board-stage" hidden aria-label="온라인 협력 보드"><canvas id="unity-canvas" tabindex="0" aria-label="파란 사각형과 주황 마름모 온라인 협력 보드"></canvas><p id="expression-bubble" class="expression-bubble" role="status" aria-live="polite" hidden><span id="expression-sender" class="expression-sender" aria-hidden="true"></span><span id="expression-icon" aria-hidden="true"></span><span id="expression-name" class="expression-name"></span></p></section>
+      <section id="online-controls" class="online-controls lobby" aria-label="온라인 조작">
+        <section class="room-panel" aria-label="방 연결"><div id="room-form" class="room-form"><div id="room-start" class="room-start"><button id="create-button" class="primary" type="button" disabled>방 만들기</button><button id="join-open" type="button" disabled>초대받고 참여</button></div><div id="join-entry" class="join-entry" hidden><button id="join-back" type="button" disabled aria-label="방 선택으로 돌아가기">←</button><input id="invite-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="초대 코드" aria-label="초대 코드"><button id="join-button" class="primary" type="button" disabled>참여</button></div></div><div id="room-info" class="room-info" hidden><span id="room-status">친구 기다리는 중</span><button id="copy-invite-button" class="room-action" type="button">친구 초대</button></div></section>
+        <section id="definition-picker" class="definition-picker" aria-label="협력 판 선택"><span>함께 할 판</span><div id="definition-options" class="definition-options"></div></section>
+        <div class="status-row" aria-live="polite" hidden><span class="goal-chip"><span class="mark-name"><span class="seat-dot" aria-hidden="true"></span><strong>사각형</strong></span><span id="circle-goal">진행 중</span></span><span id="turn-label" class="turn-label">친구와 연결<small>0번 이동</small></span><span class="goal-chip"><span class="mark-name"><span class="seat-dot diamond" aria-hidden="true"></span><strong>마름모</strong></span><span id="diamond-goal">진행 중</span></span></div>
+        <div class="play-controls" hidden><div class="emoji-rail" role="group" aria-label="친구에게 표현하기"><button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요">👍</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Handshake" disabled aria-label="협력">🤝</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Waiting" disabled aria-label="기다리기">⏳</button></div><div class="dpad" aria-label="방향 조작"><button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button><button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button><button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button><button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button></div><div class="action-rail"><button class="rail-button" type="button" data-online-action="RequestUndo" disabled>되돌리기<br>요청</button><button class="rail-button" type="button" data-online-action="RequestRestart" disabled>다시하기<br>요청</button></div></div>
         <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
       </section>
     </section>
   </main>
-  <dialog id="consent-dialog" aria-labelledby="consent-title"><div class="dialog-card"><p id="consent-title" class="dialog-title">동의가 필요합니다</p><p id="consent-copy" class="dialog-copy">상대 좌석의 확인을 기다리고 있습니다.</p><div class="dialog-actions"><button id="consent-reject" type="button">거절</button><button id="consent-approve" class="primary" type="button">동의</button></div></div></dialog>
-  <dialog id="clear-dialog" aria-labelledby="clear-title"><div class="dialog-card"><p id="clear-title" class="clear-title">둘 다 도착</p><p id="clear-copy" class="clear-subtitle">두 말이 목표에 도착했습니다.</p><div class="dialog-actions"><button id="clear-restart" class="primary" type="button" data-online-action="RequestRestart">다시하기</button></div></div></dialog>
+  <dialog id="menu-dialog" aria-labelledby="menu-title"><div class="dialog-card"><p id="menu-title" class="dialog-title">메뉴</p><p class="dialog-note">방은 자동으로 이어집니다. 같은 기기에서는 기존 방을 다시 열 수 있어요.</p><input id="resume-invite-input" class="menu-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="방이 여러 개면 초대 코드 입력" aria-label="기존 방 초대 코드"><div class="menu-actions"><button id="resume-button" type="button" disabled>기존 방 이어하기</button><button id="leave-button" type="button" disabled>방 나가기</button><button id="menu-record" type="button" disabled>기록 보기</button><a href="../index.html">다른 모드</a><button id="menu-close" class="full" type="button">닫기</button></div></div></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-card"><p id="help-title" class="dialog-title">함께 움직여요</p><p class="dialog-copy">파란 사각형과 주황 마름모를 각각 같은 색의 작은 동그라미에 보내세요. 내 차례에 방향키로 움직이고, 친구 차례에는 기다려요.</p><p class="dialog-copy">도착한 말도 계속 움직일 수 있어요. 되돌리기와 다시하기는 친구의 동의가 필요해요.</p><div class="dialog-actions"><button id="help-close" class="primary" type="button">알겠어요</button></div></div></dialog>
+  <dialog id="invite-dialog" aria-labelledby="invite-title"><div class="dialog-card"><p id="invite-title" class="dialog-title">친구 초대</p><p class="dialog-copy">아래 링크를 친구에게 보내세요. 복사가 안 되면 직접 선택해 복사할 수 있어요.</p><input id="invite-link-fallback" class="invite-link-fallback" type="text" readonly aria-label="복사할 초대 링크"><p class="invite-code-row">초대 코드 <strong id="invite-code">—</strong></p><div class="dialog-actions"><button id="invite-copy" class="primary" type="button">링크 복사</button><button id="invite-close" type="button">닫기</button></div></div></dialog>
+  <dialog id="consent-dialog" aria-labelledby="consent-title"><div class="dialog-card"><p id="consent-title" class="dialog-title">친구의 요청</p><p id="consent-copy" class="dialog-copy">친구가 확인을 기다리고 있어요.</p><div class="dialog-actions"><button id="consent-reject" type="button">거절</button><button id="consent-approve" class="primary" type="button">동의</button></div></div></dialog>
+  <dialog id="clear-dialog" aria-labelledby="clear-title"><div class="dialog-card"><header class="clear-head"><button id="clear-close" class="clear-corner" type="button" aria-label="판 보기">×</button><p id="clear-title" class="dialog-title">둘 다 도착!</p><button id="clear-record" class="clear-corner" type="button" aria-label="기록 보기와 공유">기록</button></header><p id="clear-copy" class="dialog-copy">두 말이 목표에 도착했어요.</p><div class="dialog-actions"><button id="clear-restart" class="primary" type="button" data-online-action="RequestRestart">다시하기 요청</button><a href="../index.html">다른 모드</a></div></div></dialog>
+  <dialog id="record-dialog" aria-labelledby="record-title"><div class="dialog-card"><header class="record-head"><span></span><h2 id="record-title">협력 기록</h2><button id="record-close" class="record-close" type="button">닫기</button></header><div class="record-grid"><section class="record-card"><h3>내 최고</h3><p id="mine-value" class="record-value">기록 없음</p><p id="mine-meta" class="record-meta"></p></section><section class="record-card"><h3>공유 기록</h3><p id="shared-value" class="record-value">기록 없음</p><p id="shared-meta" class="record-meta"></p></section></div><p id="record-compare" class="record-compare">비교할 공유 기록이 없습니다.</p><p id="record-note" class="record-note" role="status" aria-live="polite">완주한 방의 기록만 가져올 수 있습니다.</p><div class="dialog-actions"><button id="record-get" type="button">완주 기록 가져오기</button><button id="record-share" type="button" disabled>완주 기록 공유</button><button id="record-challenge" class="primary" type="button" disabled>이 판 선택</button></div><input id="record-fallback" class="record-fallback" type="text" readonly hidden aria-label="복사할 협력 기록 링크"></div></dialog>
   <script>
-    (function () {
+    (function(){
       "use strict";
-      var canvas = document.querySelector("#unity-canvas");
-      var unityInstance = null;
-      var currentState = null;
-      var currentConsent = null;
-      var stateRevision = 0;
-      var boardStage = document.querySelector(".board-stage");
-      var expressionBubble = document.querySelector("#expression-bubble");
-      var expressionSender = document.querySelector("#expression-sender");
-      var expressionIcon = document.querySelector("#expression-icon");
-      var expressionName = document.querySelector("#expression-name");
-      var lastExpressionSequence = 0;
-      var expressionTimer = null;
-      var expressionCooldownUntil = 0;
-      var expressionIcons = { Look:"👀", ThumbsUp:"👍", Handshake:"🤝", Waiting:"⏳" };
-      var feedback = document.querySelector("#feedback");
-      var connectionLabel = document.querySelector("#connection-label");
-      var roomForm = document.querySelector("#room-form");
-      var roomInfo = document.querySelector("#room-info");
-      var inviteInput = document.querySelector("#invite-input");
-      var inviteCode = document.querySelector("#invite-code");
-      var resumeButton = document.querySelector("#resume-button");
-      var copyInviteButton = document.querySelector("#copy-invite-button");
-      var inviteLinkFallback = document.querySelector("#invite-link-fallback");
-      var roomStatus = document.querySelector("#room-status");
-      var turnLabel = document.querySelector("#turn-label");
-      var circleGoal = document.querySelector("#circle-goal");
-      var diamondGoal = document.querySelector("#diamond-goal");
-      var leaveButton = document.querySelector("#leave-button");
-      var consentDialog = document.querySelector("#consent-dialog");
-      var consentCopy = document.querySelector("#consent-copy");
-      var consentReject = document.querySelector("#consent-reject");
-      var consentApprove = document.querySelector("#consent-approve");
-      var clearDialog = document.querySelector("#clear-dialog");
-      var clearCopy = document.querySelector("#clear-copy");
-      function text(value, fallback) { return typeof value === "string" && value.length ? value : (fallback || ""); }
-      function validState(state) { return state && typeof state.initialized === "boolean" && typeof state.joined === "boolean" && typeof state.inputEnabled === "boolean" && typeof state.transportLocked === "boolean" && typeof state.authorityRevision === "number" && typeof state.expressionSequence === "number"; }
-      function open(dialog) { if (!dialog || dialog.open) return; try { dialog.showModal(); } catch (error) { dialog.setAttribute("open", ""); } }
-      function close(dialog) { if (!dialog || !dialog.open) return; if (dialog.close) dialog.close(); else dialog.removeAttribute("open"); }
-      function send(command) { if (!unityInstance || !currentState) return false; unityInstance.SendMessage("CoopOnlineBootstrap", "HandleOnlineCommand", JSON.stringify(command)); return true; }
-      function activeLabel(state) { return state.activeActorCode === "Diamond" ? "마름모 차례" : "사각형 차례"; }
-      function allowed(button) {
-        if (!currentState || !currentState.initialized || currentState.transportLocked || currentState.transitioning) return false;
-        if (currentState.pendingConsent && currentState.pendingConsent.active === true) return false;
-        var action = button.dataset.onlineAction;
-        if (action === "Slide") return currentState.inputEnabled && currentState.availabilityCode === 1;
-        if (action === "Express") return currentState.availabilityCode === 1 && Date.now() >= expressionCooldownUntil;
-        if (action === "RequestRestart" && currentState.statusCode === "Cleared") {
-          return currentState.availabilityCode === 1 && currentState.seatCode >= 0 && currentState.activeActorCode === (currentState.seatCode === 1 ? "Diamond" : "Circle");
-        }
-        return currentState.availabilityCode === 1 && currentState.statusCode === "Playing";
-      }
-      function renderButtons() { Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.disabled = !allowed(button); }); leaveButton.disabled = !currentState || !currentState.joined; resumeButton.disabled = !currentState || !currentState.initialized || currentState.joined; copyInviteButton.disabled = !currentState || !currentState.joined || !currentState.inviteCode; }
-      function renderExpression(state) {
-        if (state.expressionSequence <= lastExpressionSequence || !expressionIcons[state.expression]) return;
-        lastExpressionSequence = state.expressionSequence;
-        expressionSender.className = "expression-sender" + (state.expressionSender === "Diamond" ? " diamond" : "");
-        expressionIcon.textContent = expressionIcons[state.expression];
-        expressionName.textContent = state.expressionSender === "Diamond" ? "마름모" : "사각형";
-        expressionBubble.hidden = false;
-        if (expressionTimer) clearTimeout(expressionTimer);
-        expressionTimer = setTimeout(function () { expressionBubble.hidden = true; }, 2500);
-      }
-      function renderConsent(state) {
-        var consent = state.pendingConsent;
-        if (!consent || consent.active !== true || !consent.requestId) { currentConsent = null; consentReject.disabled = true; consentApprove.disabled = true; close(consentDialog); return; }
-        currentConsent = consent;
-        var requester = consent.requesterCode === state.seatCode;
-        consentReject.disabled = requester;
-        consentApprove.disabled = requester;
-        consentCopy.textContent = requester ? "상대 좌석의 동의를 기다리고 있습니다." : (consent.kind === "Restart" ? "다시 시작하려면 상대 좌석의 동의가 필요합니다." : "되돌리려면 상대 좌석의 동의가 필요합니다.");
-        open(consentDialog);
-      }
-      function renderClear(state) {
-        var consent = state.pendingConsent;
-        if (state.statusCode !== "Cleared" || (consent && consent.active === true && consent.requestId)) { close(clearDialog); return; }
-        var activeSeat = state.seatCode >= 0 && state.activeActorCode === (state.seatCode === 1 ? "Diamond" : "Circle");
-        clearCopy.textContent = activeSeat ? "다시하기를 요청하면 상대 좌석의 동의를 기다립니다." : "상대 좌석의 다시하기 요청을 기다리고 있습니다.";
-        open(clearDialog);
-      }
-      function renderState(state) {
-        if (!validState(state)) return;
-        currentState = state;
-        roomForm.hidden = state.joined; roomInfo.hidden = !state.joined;
-        if (!state.joined) inviteLinkFallback.hidden = true;
-        if (!state.joined && state.inviteCode) inviteInput.value = state.inviteCode;
-        inviteCode.textContent = state.inviteCode || "—";
-        roomStatus.textContent = state.availabilityStatus || "대기 중";
-        connectionLabel.textContent = state.seatCode === 1 ? "마름모 좌석 · 온라인" : (state.seatCode === 0 ? "사각형 좌석 · 온라인" : "온라인 방");
-        turnLabel.innerHTML = activeLabel(state) + "<small>행동 " + state.logicalActionCount + "</small>";
-        circleGoal.textContent = state.circleAtGoal ? "도착" : "진행 중";
-        diamondGoal.textContent = state.diamondAtGoal ? "도착" : "진행 중";
-        feedback.textContent = text(state.message, text(state.error, ""));
-        renderConsent(state); renderClear(state); renderExpression(state); renderButtons();
-      }
-      function receiveState(json) { try { var state = JSON.parse(json); if (!validState(state)) return; var roomChanged = currentState && state.roomId !== currentState.roomId; var lockState = state.transportLocked || !state.joined; if (currentState && !roomChanged && !lockState && (state.authorityRevision < currentState.authorityRevision || (state.authorityRevision === currentState.authorityRevision && state.logicalActionCount < currentState.logicalActionCount))) return; renderState(state); } catch (error) { feedback.textContent = "온라인 상태를 확인할 수 없습니다."; } }
-      function action(button) {
-        if (!allowed(button)) return;
-        var kind = button.dataset.onlineAction;
-        var command = { kind: kind, expectedRevision: currentState.authorityRevision, hasExpectedRevision: true, seat: currentState.seatCode };
-        if (kind === "Slide") command.direction = button.dataset.direction;
-        if (kind === "Express") { command.expression = button.dataset.expression; expressionCooldownUntil = Date.now() + 2000; renderButtons(); setTimeout(renderButtons, 2000); }
-        if (kind === "RequestUndo" || kind === "RequestRestart") command.requestId = "online-" + stateRevision + "-" + kind;
-        if (kind === "RequestRestart") close(clearDialog);
-        send(command);
-      }
-      function resizeCanvasToStage() {
-        if (!boardStage || !canvas) return;
-        var rect = boardStage.getBoundingClientRect();
-        var side = Math.floor(Math.min(rect.width, rect.height));
-        if (side <= 0) return;
-        canvas.style.width = side + "px";
-        canvas.style.height = side + "px";
-      }
-      if (typeof ResizeObserver === "function") new ResizeObserver(resizeCanvasToStage).observe(boardStage);
-      window.addEventListener("resize", resizeCanvasToStage);
-      resizeCanvasToStage();
-      Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function (button) { button.addEventListener("click", function () { action(button); }); });
-      document.querySelector("#create-button").addEventListener("click", function () { send({ kind:"Create" }); });
-      document.querySelector("#join-button").addEventListener("click", function () { send({ kind:"Join", inviteCode: inviteInput.value.trim() }); });
-      resumeButton.addEventListener("click", function () { send({ kind:"Resume", inviteCode: inviteInput.value.trim() }); });
-      document.querySelector("#leave-button").addEventListener("click", function () { send({ kind:"Leave" }); });
-      function inviteLink() {
-        if (!currentState || !currentState.inviteCode || typeof location === "undefined") return "";
-        return location.origin + location.pathname + "?invite=" + encodeURIComponent(currentState.inviteCode);
-      }
-      function showInviteLinkFallback(link) {
-        inviteLinkFallback.hidden = false;
-        inviteLinkFallback.value = link;
-        inviteLinkFallback.focus();
-        inviteLinkFallback.select();
-        feedback.textContent = "링크를 선택했습니다. 복사해 친구에게 보내세요.";
-      }
-      copyInviteButton.addEventListener("click", function () {
-        var link = inviteLink();
-        if (!link) return;
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-          navigator.clipboard.writeText(link).then(function () {
-            inviteLinkFallback.hidden = true;
-            feedback.textContent = "초대 링크를 복사했습니다.";
-          }).catch(function () { showInviteLinkFallback(link); });
-        } else showInviteLinkFallback(link);
-      });
-      function canResolveConsent() { return currentState && currentConsent && currentConsent.requesterCode !== currentState.seatCode; }
-      consentApprove.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:true, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
-      consentReject.addEventListener("click", function () { if (canResolveConsent()) { send({ kind:currentConsent.kind === "Undo" ? "ResolveUndo" : "ResolveRestart", requestId:currentConsent.requestId, approve:false, expectedRevision:currentState.authorityRevision, hasExpectedRevision:true }); close(consentDialog); } });
-      window.__nectorialOnline = { state:null, receiveState:receiveState };
-      var loader = document.createElement("script"); loader.src = "Build/{{{ LOADER_FILENAME }}}";
-      loader.onload = function () { createUnityInstance(canvas, { dataUrl:"Build/{{{ DATA_FILENAME }}}", frameworkUrl:"Build/{{{ FRAMEWORK_FILENAME }}}", codeUrl:"Build/{{{ CODE_FILENAME }}}", streamingAssetsUrl:"StreamingAssets", companyName:"Independent", productName:"Few Moves Online Pilot", productVersion:"0.0.1-online", matchWebGLToCanvasSize:true, devicePixelRatio:1 }, function (progress) { feedback.textContent = "온라인 보드를 불러오는 중 " + Math.round(progress * 100) + "%"; }).then(function (instance) { unityInstance = instance; }).catch(function () { feedback.textContent = "온라인 보드를 시작할 수 없습니다."; }); };
-      loader.onerror = function () { feedback.textContent = "온라인 빌드 파일을 불러올 수 없습니다."; };
-      document.body.appendChild(loader);
+      var canvas=document.querySelector("#unity-canvas"),boardStage=document.querySelector(".board-stage"),unityInstance=null,currentState=null,currentConsent=null,stateRevision=0;
+      var layout=document.querySelector("#online-layout"),lobbyIntro=document.querySelector("#lobby-intro"),statusRow=document.querySelector(".status-row"),playControls=document.querySelector(".play-controls"),createButton=document.querySelector("#create-button"),joinOpenButton=document.querySelector("#join-open"),joinButton=document.querySelector("#join-button"),joinBackButton=document.querySelector("#join-back"),controls=document.querySelector("#online-controls"),roomStart=document.querySelector("#room-start"),joinEntry=document.querySelector("#join-entry"),menuDialog=document.querySelector("#menu-dialog"),helpDialog=document.querySelector("#help-dialog"),inviteDialog=document.querySelector("#invite-dialog"),resumeInviteInput=document.querySelector("#resume-invite-input"),inviteCopy=document.querySelector("#invite-copy"),clearClose=document.querySelector("#clear-close"),menuRecord=document.querySelector("#menu-record"),menuTop=document.querySelector("#menu-top"),helpTop=document.querySelector("#help-top"),feedback=document.querySelector("#feedback"),connectionLabel=document.querySelector("#connection-label"),roomForm=document.querySelector("#room-form"),roomInfo=document.querySelector("#room-info"),inviteInput=document.querySelector("#invite-input"),inviteCode=document.querySelector("#invite-code"),resumeButton=document.querySelector("#resume-button"),copyInviteButton=document.querySelector("#copy-invite-button"),inviteFallback=document.querySelector("#invite-link-fallback"),roomStatus=document.querySelector("#room-status"),turnLabel=document.querySelector("#turn-label"),circleGoal=document.querySelector("#circle-goal"),diamondGoal=document.querySelector("#diamond-goal"),leaveButton=document.querySelector("#leave-button");
+      var expressionBubble=document.querySelector("#expression-bubble"),expressionSender=document.querySelector("#expression-sender"),expressionIcon=document.querySelector("#expression-icon"),expressionName=document.querySelector("#expression-name"),lastExpressionSequence=0,expressionTimer=null,expressionCooldownUntil=0,expressionIcons={Look:"👀",ThumbsUp:"👍",Handshake:"🤝",Waiting:"⏳"};
+      var definitionPicker=document.querySelector("#definition-picker"),definitionOptions=document.querySelector("#definition-options"),consentDialog=document.querySelector("#consent-dialog"),consentCopy=document.querySelector("#consent-copy"),consentReject=document.querySelector("#consent-reject"),consentApprove=document.querySelector("#consent-approve"),clearDialog=document.querySelector("#clear-dialog"),clearCopy=document.querySelector("#clear-copy");
+      var recordDialog=document.querySelector("#record-dialog"),recordTop=document.querySelector("#record-top"),recordNote=document.querySelector("#record-note"),recordGet=document.querySelector("#record-get"),recordShare=document.querySelector("#record-share"),recordChallenge=document.querySelector("#record-challenge"),recordFallback=document.querySelector("#record-fallback"),mineValue=document.querySelector("#mine-value"),mineMeta=document.querySelector("#mine-meta"),sharedValue=document.querySelector("#shared-value"),sharedMeta=document.querySelector("#shared-meta"),recordCompare=document.querySelector("#record-compare");
+      var pendingRecordCapsule="",pendingRecordRequestId="",lastImportedRecordHash="",lastAcceptedRecordRequestId="",acceptedRecordView=null,recordImportSequence=0,observedInitialized=false,recordImportPending=false,recordImportAwaitingObservation=false,recordImportMessage="",suppressedClearKey="",shareAttempt=0,inviteShareAttempt=0,recordShareMessage="",recordShareContext="";
+      function text(value,fallback){return typeof value==="string"&&value.length?value:(fallback||"");}
+      function validState(state){return state&&typeof state.initialized==="boolean"&&typeof state.joined==="boolean"&&typeof state.inputEnabled==="boolean"&&typeof state.transportLocked==="boolean"&&typeof state.authorityRevision==="number"&&typeof state.expressionSequence==="number";}
+      function usable(summary){return summary&&typeof summary.modeId==="string"&&summary.modeId&&typeof summary.definitionId==="string"&&summary.definitionId&&typeof summary.rulesVersion==="string"&&summary.rulesVersion&&typeof summary.contentVersion==="string"&&summary.contentVersion&&typeof summary.definitionFingerprint==="string"&&summary.definitionFingerprint&&summary.statusCode==="Cleared"&&Number.isInteger(summary.effectiveActionCount)&&summary.effectiveActionCount>0&&Number.isInteger(summary.logicalActionCount)&&summary.logicalActionCount>=0;}
+      function sameIdentity(a,b){return usable(a)&&usable(b)&&a.modeId===b.modeId&&a.definitionId===b.definitionId&&a.rulesVersion===b.rulesVersion&&a.contentVersion===b.contentVersion&&a.definitionFingerprint===b.definitionFingerprint;}
+      function recordContextKey(state){function part(summary){return usable(summary)?[summary.modeId,summary.definitionId,summary.rulesVersion,summary.contentVersion,summary.definitionFingerprint,summary.effectiveActionCount,summary.logicalActionCount,summary.hits].join("|"):"";}return state?[typeof state.recordCapsule==="string"?state.recordCapsule:"",state.hasMine===true?part(state.mine):"",state.hasShared===true?part(state.shared):""].join("::"):"";}
+      function captureRecordView(state){return{recordStatus:state.recordStatus,recordCapsule:state.recordCapsule,recordError:state.recordError,hasShared:state.hasShared===true,shared:state.shared};}
+      function visibleRecordView(){return acceptedRecordView||currentState||{};}
+      function visibleRecordContext(){var source=visibleRecordView();return recordContextKey(Object.assign({},currentState||{},{recordStatus:source.recordStatus,recordCapsule:source.recordCapsule,recordError:source.recordError,hasShared:source.hasShared,shared:source.shared}));}
+      function observeRecordResult(state){var responseId=typeof state.sharedRecordRequestId==="string"?state.sharedRecordRequestId:"";if(recordImportPending){if(!recordImportAwaitingObservation||responseId!==pendingRecordRequestId)return;recordImportAwaitingObservation=false;recordImportPending=false;recordImportMessage="";lastAcceptedRecordRequestId=responseId;acceptedRecordView=captureRecordView(state);return;}if(responseId&&responseId===lastAcceptedRecordRequestId){acceptedRecordView=captureRecordView(state);return;}if(!responseId&&!lastAcceptedRecordRequestId&&!pendingRecordCapsule)acceptedRecordView=captureRecordView(state);}
+      function open(dialog){if(!dialog||dialog.open)return;try{if(dialog.showModal)dialog.showModal();else dialog.setAttribute("open","");}catch(error){dialog.setAttribute("open","");}}
+      function close(dialog){if(!dialog||!dialog.open)return;if(dialog.close)dialog.close();else dialog.removeAttribute("open");}
+      function hasBlockingFocus(){var active=document.activeElement;return!!document.querySelector("dialog[open]")||!!(active&&(active.tagName==="INPUT"||active.tagName==="TEXTAREA"||active.tagName==="SELECT"||active.isContentEditable));}
+      function send(command){if(!unityInstance||!currentState)return false;unityInstance.SendMessage("CoopOnlineBootstrap","HandleOnlineCommand",JSON.stringify(command));return true;}
+      function myActor(state){return state.seatCode===1?"Diamond":"Circle";}
+      function activeLabel(state){if(!state.joined)return "친구와 연결";if(state.transportLocked)return "다시 연결 중";if(state.availabilityCode!==1)return "친구 기다리는 중";if(state.statusCode==="Cleared")return "둘 다 도착!";return state.activeActorCode===myActor(state)?"내 차례":"친구 차례";}
+      function definitionLabel(id){return {"coop-c1":"첫 번째 판","coop-c2":"두 번째 판","coop-c3":"세 번째 판"}[id]||"다른 판";}
+      function canUseRoom(){return!!(currentState&&currentState.initialized&&!currentState.transitioning&&!currentState.transportLocked);}
+      function canUseLobby(){return!!(currentState&&currentState.initialized&&!currentState.transitioning&&!currentState.joined);}
+      function allowed(button){if(!currentState||!currentState.initialized||currentState.transportLocked||currentState.transitioning)return false;if(currentState.pendingConsent&&currentState.pendingConsent.active===true)return false;var action=button.dataset.onlineAction,myTurn=currentState.joined&&currentState.seatCode>=0&&currentState.activeActorCode===myActor(currentState);if(action==="Slide")return currentState.statusCode==="Playing"&&currentState.inputEnabled&&currentState.availabilityCode===1;if(action==="Express")return currentState.joined&&currentState.availabilityCode===1&&Date.now()>=expressionCooldownUntil;if(action==="RequestUndo")return myTurn&&currentState.statusCode==="Playing"&&currentState.availabilityCode===1&&currentState.logicalActionCount>0;if(action==="RequestRestart")return myTurn&&currentState.availabilityCode===1&&(currentState.statusCode==="Playing"||currentState.statusCode==="Cleared");return false;}
+      function renderDefinitions(state){definitionPicker.hidden=state.joined===true;var defs=Array.isArray(state.definitions)?state.definitions:[],wanted={"coop-c1":true,"coop-c2":true,"coop-c3":true};while(definitionOptions.firstChild)definitionOptions.removeChild(definitionOptions.firstChild);definitionOptions.textContent="";defs.filter(function(item){return item&&wanted[item.definitionId]===true;}).forEach(function(item){var button=document.createElement("button");button.type="button";button.dataset.definitionId=item.definitionId;button.textContent=definitionLabel(item.definitionId);button.setAttribute("aria-pressed",item.definitionId===state.selectedDefinitionId?"true":"false");button.disabled=!canUseLobby();button.addEventListener("click",function(){if(!canUseLobby()||hasBlockingFocus())return;send({kind:"SelectDefinition",definitionId:item.definitionId});});definitionOptions.appendChild(button);});}
+      function renderButtons(){Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function(button){button.disabled=!allowed(button);});createButton.disabled=!canUseLobby();joinOpenButton.disabled=!canUseLobby();joinButton.disabled=!canUseLobby();joinBackButton.disabled=!canUseLobby();leaveButton.disabled=!currentState||!currentState.initialized||!currentState.joined;resumeButton.disabled=!canUseLobby();copyInviteButton.disabled=!currentState||!currentState.joined||!currentState.inviteCode;recordTop.disabled=!currentState||!currentState.initialized;menuRecord.disabled=recordTop.disabled;}
+      function renderExpression(state){if(state.expressionSequence<=lastExpressionSequence||!expressionIcons[state.expression])return;lastExpressionSequence=state.expressionSequence;expressionSender.className="expression-sender"+(state.expressionSender==="Diamond"?" diamond":"");expressionIcon.textContent=expressionIcons[state.expression];expressionName.textContent=state.expressionSender==="Diamond"?"마름모":"사각형";expressionBubble.hidden=false;if(expressionTimer)clearTimeout(expressionTimer);expressionTimer=setTimeout(function(){expressionBubble.hidden=true;},2500);}
+      function renderConsent(state){var consent=state.pendingConsent;if(!consent||consent.active!==true||!consent.requestId){currentConsent=null;consentReject.disabled=true;consentApprove.disabled=true;close(consentDialog);return;}currentConsent=consent;var requester=consent.requesterCode===state.seatCode,ready=state.joined&&!state.transportLocked&&!state.transitioning;consentReject.disabled=requester||!ready;consentApprove.disabled=requester||!ready;if(requester){close(consentDialog);return;}consentCopy.textContent=consent.kind==="Restart"?"친구가 다시하기를 요청했어요. 함께 새로 시작할까요?":"친구가 되돌리기를 요청했어요. 함께 되돌릴까요?";close(menuDialog);close(helpDialog);close(inviteDialog);close(recordDialog);close(clearDialog);open(consentDialog);}
+      function clearKey(state){return state.statusCode==="Cleared"?[state.roomId,state.activeDefinitionId,state.logicalActionCount].join("|"):"";}
+      function renderClear(state){var consent=state.pendingConsent,key=clearKey(state);if(!key||state.transportLocked||(consent&&consent.active===true&&consent.requestId)){close(clearDialog);if(!key)suppressedClearKey="";return;}if(recordDialog.open||menuDialog.open||helpDialog.open||inviteDialog.open||consentDialog.open){suppressedClearKey=key;return;}if(suppressedClearKey===key)return;var activeSeat=state.seatCode>=0&&state.activeActorCode===(state.seatCode===1?"Diamond":"Circle");clearCopy.textContent=activeSeat?String(state.logicalActionCount)+"번 이동했어요. 다시하기는 친구의 동의가 필요해요.":String(state.logicalActionCount)+"번 이동했어요. 친구의 다시하기 요청을 기다려요.";open(clearDialog);}
+      function renderRecord(state){var source=acceptedRecordView||state,context=recordContextKey(Object.assign({},state,{recordStatus:source.recordStatus,recordCapsule:source.recordCapsule,recordError:source.recordError,hasShared:source.hasShared,shared:source.shared}));if(recordShareContext&&recordShareContext!==context){recordShareContext="";recordShareMessage="";recordFallback.hidden=true;}var mine=state.hasMine===true&&usable(state.mine)?state.mine:null,shared=!recordImportPending&&source.hasShared===true&&usable(source.shared)?source.shared:null;mineValue.textContent=mine?String(mine.effectiveActionCount)+"수":"기록 없음";mineMeta.textContent=mine?definitionLabel(mine.definitionId):"완주 기록을 가져오면 남습니다.";sharedValue.textContent=recordImportPending?"확인 중":shared?String(shared.effectiveActionCount)+"수":"기록 없음";sharedMeta.textContent=recordImportPending?"":shared?definitionLabel(shared.definitionId):"기록 링크를 열면 표시됩니다.";if(recordImportPending)recordCompare.textContent="새 링크의 기록을 확인하고 있습니다.";else if(mine&&shared&&sameIdentity(mine,shared)){var delta=mine.effectiveActionCount-shared.effectiveActionCount;recordCompare.textContent=delta===0?"행동 수가 같습니다.":(delta<0?"내 최고가 공유 기록보다 "+String(-delta)+"수 적습니다.":"내 최고가 공유 기록보다 "+String(delta)+"수 많습니다.");}else recordCompare.textContent=mine&&shared?"같은 판의 기록만 비교할 수 있습니다.":"비교할 두 기록이 아직 없습니다.";var capsule=typeof source.recordCapsule==="string"?source.recordCapsule:"";recordGet.disabled=!state.joined||state.transportLocked||state.transitioning||state.statusCode!=="Cleared";recordShare.disabled=!capsule||source.recordStatus!=="ready"||state.transitioning;recordChallenge.disabled=!shared||!canUseLobby();if(recordImportPending)recordNote.textContent=recordImportMessage;else if(state.joined&&shared)recordNote.textContent="방을 나간 뒤 이 판을 선택하고 새 방을 만드세요.";else if(source.recordError)recordNote.textContent="기록을 확인할 수 없습니다.";else if(shared)recordNote.textContent="검증된 공유 기록입니다. 이 판을 선택할 수 있습니다.";else if(capsule&&source.recordStatus==="ready")recordNote.textContent="현재 완주 기록을 공유할 수 있습니다.";else recordNote.textContent="완주한 방의 기록만 가져올 수 있습니다.";if(!capsule)recordFallback.hidden=true;if(!recordImportPending&&recordShareMessage&&recordShareContext===context)recordNote.textContent=recordShareMessage;}
+      function renderState(state){if(!validState(state))return;currentState=state;observedInitialized=state.initialized===true;window.__nectorialOnline.state=state;roomForm.hidden=state.joined;roomInfo.hidden=!state.joined;layout.classList.toggle("lobby",!state.joined);controls.classList.toggle("lobby",!state.joined);controls.classList.toggle("joined",state.joined);lobbyIntro.hidden=state.joined;boardStage.hidden=!state.joined;statusRow.hidden=!state.joined;playControls.hidden=!state.joined;if(state.joined)resizeCanvasToStage();if(!state.joined)close(inviteDialog);if(!state.joined&&state.inviteCode){if(!inviteInput.value)inviteInput.value=state.inviteCode;if(!resumeInviteInput.value)resumeInviteInput.value=state.inviteCode;if(typeof location!=="undefined"&&/(?:^\?|&)invite=/.test(location.search||"")){roomStart.hidden=true;joinEntry.hidden=false;}}inviteCode.textContent=state.inviteCode||"—";roomStatus.textContent=state.transportLocked?"연결을 다시 확인하고 있어요":state.availabilityCode===1?"친구와 연결됐어요":"친구를 기다리고 있어요";connectionLabel.textContent=state.joined?(state.transportLocked?"다시 연결 중":state.availabilityCode===1?"친구와 함께":"친구 기다리는 중"):"온라인 협력";turnLabel.innerHTML=activeLabel(state)+"<small>"+String(state.logicalActionCount)+"번 이동</small>";circleGoal.textContent=state.circleAtGoal?"도착":"진행 중";diamondGoal.textContent=state.diamondAtGoal?"도착":"진행 중";feedback.textContent=state.pendingConsent&&state.pendingConsent.active===true&&state.pendingConsent.requesterCode===state.seatCode?"친구의 확인을 기다리고 있어요":!state.joined&&!!state.inviteCode&&typeof location!=="undefined"&&/(?:^\?|&)invite=/.test(location.search||"")&&!state.error&&state.message==="초대 코드에 연결할 저장된 좌석이 없습니다"?"친구의 초대가 준비됐어요. 참여를 눌러요.":text(state.message,text(state.error,""));renderDefinitions(state);renderConsent(state);renderExpression(state);renderRecord(state);renderButtons();renderClear(state);flushRecordImport();}
+      function receiveState(json){try{var state=JSON.parse(json);if(!validState(state))return;var roomChanged=currentState&&state.roomId!==currentState.roomId,lockState=state.transportLocked||!state.joined;if(currentState&&!roomChanged&&!lockState&&(state.authorityRevision<currentState.authorityRevision||(state.authorityRevision===currentState.authorityRevision&&state.logicalActionCount<currentState.logicalActionCount)))return;observeRecordResult(state);renderState(state);}catch(error){feedback.textContent="온라인 상태를 확인할 수 없습니다.";}}
+      function queueRecordHash(){var capsule=typeof location!=="undefined"&&location.hash.indexOf("#record=")===0?location.hash.slice(8):"";if(!capsule){pendingRecordCapsule="";pendingRecordRequestId="";recordImportPending=false;recordImportAwaitingObservation=false;recordImportMessage="";if(currentState)renderRecord(currentState);return;}if(capsule===pendingRecordCapsule&&(recordImportPending||capsule===lastImportedRecordHash))return;pendingRecordCapsule=capsule;pendingRecordRequestId="record-hash-"+String(++recordImportSequence);recordImportPending=true;recordImportAwaitingObservation=false;recordImportMessage="공유 기록을 확인하는 중입니다.";shareAttempt+=1;recordShareMessage="";recordShareContext="";recordFallback.hidden=true;if(currentState)renderRecord(currentState);flushRecordImport();}
+      function flushRecordImport(){if(!pendingRecordCapsule||pendingRecordCapsule===lastImportedRecordHash||!unityInstance||!observedInitialized)return;lastImportedRecordHash=pendingRecordCapsule;if(pendingRecordCapsule.length>4096){recordImportMessage="기록 링크가 너무 깁니다.";if(currentState)renderRecord(currentState);return;}recordImportAwaitingObservation=true;send({kind:"LoadSharedRecord",capsule:pendingRecordCapsule,requestId:pendingRecordRequestId});}
+      function action(button){if(!allowed(button))return;var kind=button.dataset.onlineAction,blockingDialog=document.querySelector("dialog[open]");if(blockingDialog&&!(kind==="RequestRestart"&&blockingDialog===clearDialog&&button===document.querySelector("#clear-restart")))return;var command={kind:kind,expectedRevision:currentState.authorityRevision,hasExpectedRevision:true,seat:currentState.seatCode};if(kind==="Slide")command.direction=button.dataset.direction;if(kind==="Express"){command.expression=button.dataset.expression;expressionCooldownUntil=Date.now()+2000;renderButtons();setTimeout(renderButtons,2000);}if(kind==="RequestUndo"||kind==="RequestRestart")command.requestId="online-"+(++stateRevision)+"-"+kind;if(kind==="RequestRestart"){suppressedClearKey=clearKey(currentState);close(clearDialog);}send(command);}
+      function resizeCanvasToStage(){var rect=boardStage.getBoundingClientRect(),side=Math.floor(Math.min(rect.width,rect.height));if(side>0){canvas.style.width=side+"px";canvas.style.height=side+"px";}}
+      function inviteLink(){return currentState&&currentState.inviteCode&&typeof location!=="undefined"?location.origin+location.pathname+"?invite="+encodeURIComponent(currentState.inviteCode):"";}
+      function recordLink(capsule){return capsule&&typeof location!=="undefined"?location.origin+location.pathname+"#record="+capsule:"";}
+      function showInviteFallback(link,token){if(token!==inviteShareAttempt||!currentState||!currentState.joined||!inviteDialog.open)return;inviteFallback.value=link;inviteFallback.focus();inviteFallback.select();feedback.textContent="초대 링크를 선택했어요. 직접 복사할 수 있어요.";}
+      function showRecordLink(link,token,capsule,message,selectLink){if(token!==shareAttempt||!recordDialog.open||visibleRecordView().recordCapsule!==capsule)return;recordFallback.hidden=false;recordFallback.value=link;if(selectLink){recordFallback.focus();recordFallback.select();}recordShareContext=visibleRecordContext();recordShareMessage=message;recordNote.textContent=message;}
+      function openRecord(){if(!currentState||!currentState.initialized||consentDialog.open)return;var activeDialog=document.querySelector("dialog[open]");if(activeDialog&&activeDialog!==clearDialog&&activeDialog!==menuDialog)return;if(currentState)suppressedClearKey=clearKey(currentState);close(clearDialog);close(menuDialog);close(helpDialog);close(inviteDialog);shareAttempt+=1;recordShareMessage="";recordShareContext="";recordFallback.hidden=true;open(recordDialog);}
+      if(typeof ResizeObserver==="function")new ResizeObserver(resizeCanvasToStage).observe(boardStage);window.addEventListener("resize",resizeCanvasToStage);resizeCanvasToStage();
+      Array.from(document.querySelectorAll("button[data-online-action]")).forEach(function(button){button.addEventListener("click",function(){action(button);});});
+      document.querySelector("#create-button").addEventListener("click",function(){if(!canUseLobby()||hasBlockingFocus())return;send({kind:"Create",definitionId:currentState.selectedDefinitionId});});document.querySelector("#join-open").addEventListener("click",function(){if(!canUseLobby()||hasBlockingFocus())return;roomStart.hidden=true;joinEntry.hidden=false;inviteInput.focus();});document.querySelector("#join-back").addEventListener("click",function(){if(!canUseLobby()||document.querySelector("dialog[open]"))return;joinEntry.hidden=true;roomStart.hidden=false;});document.querySelector("#join-button").addEventListener("click",function(){if(!canUseLobby()||document.querySelector("dialog[open]"))return;var code=inviteInput.value.trim();if(!code){feedback.textContent="초대 코드를 입력해 주세요.";return;}send({kind:"Join",inviteCode:code});});resumeButton.addEventListener("click",function(){if(!canUseLobby()||document.querySelector("dialog[open]")!==menuDialog)return;send({kind:"Resume",inviteCode:resumeInviteInput.value.trim()||inviteInput.value.trim()});close(menuDialog);});leaveButton.addEventListener("click",function(){if(!currentState||!currentState.joined||document.querySelector("dialog[open]")!==menuDialog)return;suppressedClearKey=clearKey(currentState);close(clearDialog);close(menuDialog);send({kind:"Leave"});});
+      copyInviteButton.addEventListener("click",function(){if(!currentState||!currentState.joined||!currentState.inviteCode||hasBlockingFocus())return;inviteFallback.value=inviteLink();open(inviteDialog);});inviteCopy.addEventListener("click",function(){if(document.querySelector("dialog[open]")!==inviteDialog||!currentState||!currentState.joined)return;var link=inviteLink();if(!link)return;inviteFallback.value=link;var token=++inviteShareAttempt;if(navigator.clipboard&&typeof navigator.clipboard.writeText==="function")navigator.clipboard.writeText(link).then(function(){if(token!==inviteShareAttempt||!inviteDialog.open)return;feedback.textContent="초대 링크를 복사했어요.";}).catch(function(){showInviteFallback(link,token);});else showInviteFallback(link,token);});document.querySelector("#invite-close").addEventListener("click",function(){if(document.querySelector("dialog[open]")!==inviteDialog)return;inviteShareAttempt++;close(inviteDialog);canvas.focus();});
+      function canResolveConsent(){return!!(currentState&&currentState.joined&&!currentState.transportLocked&&!currentState.transitioning&&currentConsent&&currentState.pendingConsent&&currentState.pendingConsent.active===true&&currentState.pendingConsent.requestId===currentConsent.requestId&&currentConsent.requesterCode!==currentState.seatCode&&document.querySelector("dialog[open]")===consentDialog);}
+      consentApprove.addEventListener("click",function(){if(canResolveConsent()){send({kind:currentConsent.kind==="Undo"?"ResolveUndo":"ResolveRestart",requestId:currentConsent.requestId,approve:true,expectedRevision:currentState.authorityRevision,hasExpectedRevision:true});close(consentDialog);}});consentReject.addEventListener("click",function(){if(canResolveConsent()){send({kind:currentConsent.kind==="Undo"?"ResolveUndo":"ResolveRestart",requestId:currentConsent.requestId,approve:false,expectedRevision:currentState.authorityRevision,hasExpectedRevision:true});close(consentDialog);}});
+      recordTop.addEventListener("click",function(){if(!recordTop.disabled&&!hasBlockingFocus())openRecord();});menuRecord.addEventListener("click",function(){if(document.querySelector("dialog[open]")!==menuDialog||menuRecord.disabled)return;openRecord();});document.querySelector("#clear-record").addEventListener("click",function(){if(document.querySelector("dialog[open]")===clearDialog)openRecord();});document.querySelector("#record-close").addEventListener("click",function(){if(document.querySelector("dialog[open]")!==recordDialog)return;shareAttempt+=1;recordShareMessage="";recordShareContext="";recordFallback.hidden=true;close(recordDialog);canvas.focus();});recordGet.addEventListener("click",function(){if(document.querySelector("dialog[open]")!==recordDialog||recordGet.disabled||!canUseRoom())return;send({kind:"GetRecord"});});recordChallenge.addEventListener("click",function(){var source=visibleRecordView();if(document.querySelector("dialog[open]")!==recordDialog||recordChallenge.disabled||!canUseLobby()||source.hasShared!==true||!usable(source.shared))return;send({kind:"Challenge"});close(recordDialog);});recordShare.addEventListener("click",function(){if(document.querySelector("dialog[open]")!==recordDialog||recordShare.disabled)return;var source=visibleRecordView(),capsule=typeof source.recordCapsule==="string"?source.recordCapsule:"",link=recordLink(capsule);if(!link||source.recordStatus!=="ready")return;var token=++shareAttempt;if(navigator.clipboard&&typeof navigator.clipboard.writeText==="function")navigator.clipboard.writeText(link).then(function(){showRecordLink(link,token,capsule,"기록 링크를 복사했습니다.",false);}).catch(function(){showRecordLink(link,token,capsule,"자동 복사가 되지 않았습니다. 링크를 선택해 복사하세요.",true);});else showRecordLink(link,token,capsule,"자동 복사가 되지 않았습니다. 링크를 선택해 복사하세요.",true);});
+      menuTop.addEventListener("click",function(){if(hasBlockingFocus()||consentDialog.open)return;close(clearDialog);open(menuDialog);});helpTop.addEventListener("click",function(){if(hasBlockingFocus()||consentDialog.open)return;close(clearDialog);open(helpDialog);});document.querySelector("#menu-close").addEventListener("click",function(){if(document.querySelector("dialog[open]")!==menuDialog)return;close(menuDialog);canvas.focus();});document.querySelector("#help-close").addEventListener("click",function(){if(document.querySelector("dialog[open]")!==helpDialog)return;close(helpDialog);canvas.focus();});clearClose.addEventListener("click",function(){if(document.querySelector("dialog[open]")!==clearDialog)return;suppressedClearKey=clearKey(currentState||{});close(clearDialog);canvas.focus();});[menuDialog,helpDialog,inviteDialog,recordDialog,clearDialog].forEach(function(dialog){dialog.addEventListener("close",function(){canvas.focus();});});
+      document.addEventListener("keydown",function(event){if(event.repeat||event.ctrlKey||event.metaKey||event.altKey||hasBlockingFocus())return;var direction={ArrowUp:"Up",ArrowDown:"Down",ArrowLeft:"Left",ArrowRight:"Right"}[event.key];if(!direction||!allowed({dataset:{onlineAction:"Slide"}}))return;event.preventDefault();send({kind:"Slide",direction:direction,expectedRevision:currentState.authorityRevision,hasExpectedRevision:true,seat:currentState.seatCode});});
+      window.__nectorialOnline={state:null,receiveState:receiveState};window.addEventListener("hashchange",queueRecordHash);queueRecordHash();
+      var loader=document.createElement("script");loader.src="Build/{{{ LOADER_FILENAME }}}";loader.onload=function(){createUnityInstance(canvas,{dataUrl:"Build/{{{ DATA_FILENAME }}}",frameworkUrl:"Build/{{{ FRAMEWORK_FILENAME }}}",codeUrl:"Build/{{{ CODE_FILENAME }}}",streamingAssetsUrl:"StreamingAssets",companyName:"Independent",productName:"Few Moves Online Pilot",productVersion:"0.0.1-online",matchWebGLToCanvasSize:true,devicePixelRatio:1},function(progress){if(!currentState)feedback.textContent="온라인 보드를 불러오는 중 "+Math.round(progress*100)+"%";}).then(function(instance){unityInstance=instance;resizeCanvasToStage();flushRecordImport();}).catch(function(){if(!currentState)feedback.textContent="온라인 보드를 시작할 수 없습니다.";});};loader.onerror=function(){if(!currentState)feedback.textContent="온라인 빌드 파일을 불러올 수 없습니다.";};document.body.appendChild(loader);
     }());
   </script>
 </body>

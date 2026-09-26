@@ -225,6 +225,39 @@ mergeInto(LibraryManager.library, {
       var reportedInvite = session && session.inviteCode ? session.inviteCode : (inviteCode || "");
       NectorialOnlineBridge.report({ ok: true, op: "resume", inviteCode: reportedInvite, seat: session ? session.seat : -1 });
       if (session) NectorialOnlineBridge.startPoll();
+    },
+
+    createRoom: function (definitionId) {
+      NectorialOnlineBridge.stopPoll();
+      NectorialOnlineBridge.disconnectSession();
+      if (typeof definitionId !== "string" || definitionId.length === 0 || definitionId.length > 64) {
+        NectorialOnlineBridge.report({ ok: false, op: "created", error: { code: "definition_id_invalid" } });
+        return;
+      }
+      var retryScope = definitionId === "coop-c1" ? "create" : "create|" + definitionId;
+      var requestId = NectorialOnlineBridge.retrySecret(retryScope);
+      if (!requestId) {
+        NectorialOnlineBridge.report({ ok: false, op: "created", error: { code: "secure_random_unavailable" } });
+        return;
+      }
+      var generation = ++NectorialOnlineBridge.generation;
+      NectorialOnlineBridge.request(NectorialOnlineBridge.basePath + "/rooms", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+        body: JSON.stringify({ createRequestId: requestId, definitionId: definitionId })
+      }, "created", function (body) {
+        if (body.ok && body.room && body.seatToken) {
+          var stored = NectorialOnlineBridge.writeSession({ roomId: body.room.roomId, seat: body.seat, seatToken: body.seatToken, inviteCode: body.inviteCode || "" });
+          if (stored) {
+            NectorialOnlineBridge.clearRetry(retryScope);
+            NectorialOnlineBridge.startPoll();
+          } else {
+            body = { ok: false, error: { code: "storage_unavailable" } };
+          }
+        }
+        var safe = NectorialOnlineBridge.sanitizedCopy(body);
+        safe.op = "created";
+        NectorialOnlineBridge.report(safe);
+      }, generation);
     }
   },
 
@@ -241,29 +274,31 @@ mergeInto(LibraryManager.library, {
 
   NectorialOnlineCreate__deps: ["$NectorialOnlineBridge"],
   NectorialOnlineCreate: function () {
-    NectorialOnlineBridge.stopPoll();
-    NectorialOnlineBridge.disconnectSession();
-    var requestId = NectorialOnlineBridge.retrySecret("create");
-    if (!requestId) {
-      NectorialOnlineBridge.report({ ok: false, op: "created", error: { code: "secure_random_unavailable" } });
+    NectorialOnlineBridge.createRoom("coop-c1");
+  },
+
+  NectorialOnlineCreateDefinition__deps: ["$NectorialOnlineBridge"],
+  NectorialOnlineCreateDefinition: function (definitionIdPointer) {
+    NectorialOnlineBridge.createRoom(UTF8ToString(definitionIdPointer) || "");
+  },
+
+  NectorialOnlineGetRecord__deps: ["$NectorialOnlineBridge"],
+  NectorialOnlineGetRecord: function (recordRequestIdPointer) {
+    var session = NectorialOnlineBridge.readSession();
+    var recordRequestId = UTF8ToString(recordRequestIdPointer) || "";
+    if (!session) {
+      NectorialOnlineBridge.report({ ok: false, op: "record", recordRequestId: recordRequestId, error: { code: "seat_session_missing" } });
       return;
     }
-    var generation = ++NectorialOnlineBridge.generation;
-    NectorialOnlineBridge.request(NectorialOnlineBridge.basePath + "/rooms", {
-      method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-      body: JSON.stringify({ createRequestId: requestId })
-    }, "created", function (body) {
-      if (body.ok && body.room && body.seatToken) {
-        var stored = NectorialOnlineBridge.writeSession({ roomId: body.room.roomId, seat: body.seat, seatToken: body.seatToken, inviteCode: body.inviteCode || "" });
-        if (stored) {
-          NectorialOnlineBridge.clearRetry("create");
-          NectorialOnlineBridge.startPoll();
-        } else {
-          body = { ok: false, error: { code: "storage_unavailable" } };
-        }
-      }
+    var generation = NectorialOnlineBridge.generation;
+    NectorialOnlineBridge.request(NectorialOnlineBridge.basePath + "/rooms/" + encodeURIComponent(session.roomId) + "/record", {
+      method: "POST", headers: NectorialOnlineBridge.authHeaders(session), credentials: "same-origin", body: "{}"
+    }, "record", function (body) {
+      if (!body.ok && NectorialOnlineBridge.terminalSessionFailure(body)) NectorialOnlineBridge.disconnectSession();
       var safe = NectorialOnlineBridge.sanitizedCopy(body);
-      safe.op = "created";
+      safe.op = "record";
+      safe.seat = session.seat;
+      safe.recordRequestId = recordRequestId;
       NectorialOnlineBridge.report(safe);
     }, generation);
   },

@@ -13,6 +13,7 @@ using FewMoves.Coop.Server;
 using Microsoft.AspNetCore.Builder;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Coop;
+using Nectorial.SlideEscape.Record;
 
 internal static class Program
 {
@@ -22,6 +23,8 @@ internal static class Program
     private static async Task<int> Main()
     {
         await Run("http_lifecycle_auth_static_and_secret_boundary", CheckLifecycleAuthStaticAndSecretBoundary);
+        await Run("http_catalog_allowlist_and_create_definition_binding", CheckCatalogDefinitionBinding);
+        await Run("http_completed_record_capsule_uses_effective_action_stack", CheckCompletedRecordCapsule);
         await Run("http_command_race_idempotency_stale_and_public_pass", CheckCommands);
         await Run("http_consent_expression_cooldown_and_reconnect", CheckConsentExpressionAndReconnect);
         await Run("http_atomic_persistence_restart_and_corrupt_fail_closed", CheckPersistenceRestartAndCorruption);
@@ -95,6 +98,109 @@ internal static class Program
             Assert(!privateState.Contains(session.InviteCode, StringComparison.Ordinal), "private state must not retain invite raw value");
             HttpResponse privatePath = await harness.SendAsync(HttpMethod.Get, "/rooms.v1.json", null, null);
             Assert(privatePath.StatusCode == 404, "private state cannot be reached through static root");
+        }
+    }
+
+    private static async Task CheckCatalogDefinitionBinding()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            HttpResponse definitions = await harness.SendAsync(HttpMethod.Get, "/api/coop/v1/definitions", null, null);
+            AssertStatus(definitions, 200, "definition catalog");
+            JsonElement list = definitions.Root.GetProperty("definitions");
+            AssertEqual(3, list.GetArrayLength(), "definition catalog has fixed allowlist count");
+            AssertEqual("coop-c1", list[0].GetProperty("definitionId").GetString(), "C1 catalog identity");
+            AssertEqual("coop-c2", list[1].GetProperty("definitionId").GetString(), "C2 catalog identity");
+            AssertEqual("coop-c3", list[2].GetProperty("definitionId").GetString(), "C3 catalog identity");
+
+            const string createId = "create-catalog-c2-abcdefghijklmnopqrstuvwxyz";
+            HttpResponse c2 = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c2"), null);
+            AssertStatus(c2, 201, "C2 create");
+            AssertEqual("coop-c2", c2.Root.GetProperty("room").GetProperty("definitionId").GetString(), "C2 room binds definition identity");
+            AssertEqual("CoopRooms/coop-c2", c2.Root.GetProperty("room").GetProperty("roomResource").GetString(), "C2 room resource projection");
+            HttpResponse c2Retry = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c2"), null);
+            AssertStatus(c2Retry, 200, "same definition create retry");
+            HttpResponse c2Conflict = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c1"), null);
+            AssertStatus(c2Conflict, 409, "different definition create retry conflicts");
+            AssertEqual("create_request_payload_conflict", ErrorCode(c2Conflict), "definition retry conflict code");
+            HttpResponse unknown = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-unknown-definition-abcdefgh", "coop-unknown"), null);
+            AssertStatus(unknown, 400, "unknown definition rejects");
+            AssertEqual("definition_not_allowed", ErrorCode(unknown), "unknown definition error code");
+        }
+
+        await using (ServerHarness legacy = await ServerHarness.StartAsync())
+        {
+            SessionInfo session = await CreateAndJoin(legacy);
+            await legacy.StopAsync();
+            JsonObject state = JsonNode.Parse(File.ReadAllText(legacy.StateFilePath)).AsObject();
+            JsonObject room = state["rooms"].AsArray()[0].AsObject();
+            room.Remove("definitionId");
+            room.Remove("createPayloadHash");
+            File.WriteAllText(legacy.StateFilePath, state.ToJsonString());
+            await legacy.RestartAsync();
+            HttpResponse restored = await legacy.SendAsync(HttpMethod.Get, StatePath(session.RoomId), null, session.CircleToken);
+            AssertStatus(restored, 200, "legacy C1 room restores");
+            AssertEqual("coop-c1", restored.Root.GetProperty("room").GetProperty("definitionId").GetString(), "legacy C1 infers only C1 identity");
+            HttpResponse legacyRetry = await legacy.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-primary-abcdefghijklmnopqrstuvwxyz"), null);
+            AssertStatus(legacyRetry, 200, "legacy C1 create retry remains compatible");
+            HttpResponse legacySwitch = await legacy.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-primary-abcdefghijklmnopqrstuvwxyz", "coop-c2"), null);
+            AssertStatus(legacySwitch, 409, "legacy C1 retry cannot switch definition");
+            AssertEqual("create_request_payload_conflict", ErrorCode(legacySwitch), "legacy definition switch code");
+        }
+    }
+
+    private static async Task CheckCompletedRecordCapsule()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            SessionInfo session = await CreateAndJoin(harness);
+            HttpResponse beforeClear = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.CircleToken);
+            AssertStatus(beforeClear, 409, "record before clear");
+            AssertEqual("record_not_cleared", ErrorCode(beforeClear), "record before clear code");
+            HttpResponse unauthenticated = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", null);
+            AssertStatus(unauthenticated, 401, "record requires bearer");
+
+            CoopCommand[] trace = NoPassTrace();
+            long revision = 0;
+            HttpResponse first = await SendSlide(harness, session, "record-undo-seed", revision, trace[0].Seat, trace[0].Direction);
+            revision = Revision(first);
+            int requester = ActiveActor(first);
+            HttpResponse undoRequest = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ConsentBody("record-undo-request", revision, CoopCommandKind.RequestUndo, "record-undo-request-id-abcdef"), TokenFor(session, requester));
+            AssertStatus(undoRequest, 200, "record undo request");
+            revision = Revision(undoRequest);
+            HttpResponse undoApproval = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("record-undo-approve", revision, CoopCommandKind.ResolveUndo, "record-undo-request-id-abcdef", true), TokenFor(session, 1 - requester));
+            AssertStatus(undoApproval, 200, "record undo approval");
+            revision = Revision(undoApproval);
+
+            HttpResponse restartSeed = await SendSlide(harness, session, "record-restart-seed", revision, trace[0].Seat, trace[0].Direction);
+            revision = Revision(restartSeed);
+            requester = ActiveActor(restartSeed);
+            HttpResponse restartRequest = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ConsentBody("record-restart-request", revision, CoopCommandKind.RequestRestart, "record-restart-request-id-abc"), TokenFor(session, requester));
+            AssertStatus(restartRequest, 200, "record restart request");
+            revision = Revision(restartRequest);
+            HttpResponse restartApproval = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("record-restart-approve", revision, CoopCommandKind.ResolveRestart, "record-restart-request-id-abc", true), TokenFor(session, 1 - requester));
+            AssertStatus(restartApproval, 200, "record restart approval");
+            revision = Revision(restartApproval);
+
+            for (int index = 0; index < trace.Length; index++)
+            {
+                HttpResponse slide = await SendSlide(harness, session, "record-final-" + index.ToString(), revision, trace[index].Seat, trace[index].Direction);
+                revision = Revision(slide);
+            }
+            HttpResponse record = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.CircleToken);
+            AssertStatus(record, 200, "completed record");
+            Assert(record.Root.GetProperty("ok").GetBoolean(), "completed record reports success");
+            string capsuleText = record.Root.GetProperty("capsule").GetString();
+            RecordCapsule capsule;
+            string decodeError;
+            Assert(RecordCapsuleCodec.TryDecode(capsuleText, out capsule, out decodeError), "record capsule decodes: " + decodeError);
+            AssertEqual(Directions(trace), capsule.InputSequence, "undo/restart actions are absent from record capsule");
+            JsonElement verification = record.Root.GetProperty("verification");
+            AssertEqual("Cleared", verification.GetProperty("statusCode").GetString(), "record verification clears");
+            AssertEqual(trace.Length, verification.GetProperty("logicalActionCount").GetInt32(), "record logical count is derived from replay");
+            HttpResponse duplicateRecord = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.DiamondToken);
+            AssertStatus(duplicateRecord, 200, "same cleared room record remains available to peer");
+            AssertEqual(capsuleText, duplicateRecord.Root.GetProperty("capsule").GetString(), "record capsule is deterministic across seats");
         }
     }
 
@@ -400,9 +506,11 @@ internal static class Program
     }
 
     private static string CreateBody(string createId) { return "{\"createRequestId\":\"" + createId + "\"}"; }
+    private static string CreateBody(string createId, string definitionId) { return "{\"createRequestId\":\"" + createId + "\",\"definitionId\":\"" + definitionId + "\"}"; }
     private static string JoinBody(string inviteCode, string joinId) { return "{\"inviteCode\":\"" + inviteCode + "\",\"joinRequestId\":\"" + joinId + "\"}"; }
     private static string StatePath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/state"; }
     private static string CommandPath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/commands"; }
+    private static string RecordPath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/record"; }
     private static string CommandBody(string commandId, long revision, CoopCommandKind kind, GameCommand direction)
     {
         return "{\"commandId\":\"" + commandId + "\",\"expectedRevision\":" + revision + ",\"kind\":" + (int)kind + ",\"direction\":" + (int)direction + "}";
@@ -418,6 +526,28 @@ internal static class Program
     private static string ExpressionBody(string commandId, long revision, int expression)
     {
         return "{\"commandId\":\"" + commandId + "\",\"expectedRevision\":" + revision + ",\"kind\":6,\"expression\":" + expression + "}";
+    }
+
+    private static async Task<HttpResponse> SendSlide(ServerHarness harness, SessionInfo session, string commandId, long revision, CoopActor actor, GameCommand direction)
+    {
+        HttpResponse response = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody(commandId, revision, CoopCommandKind.Slide, direction), TokenFor(session, (int)actor));
+        AssertStatus(response, 200, "record slide " + commandId);
+        Assert(response.Root.GetProperty("accepted").GetBoolean(), "record slide accepted " + commandId);
+        return response;
+    }
+
+    private static string TokenFor(SessionInfo session, int actor) { return actor == 0 ? session.CircleToken : session.DiamondToken; }
+    private static long Revision(HttpResponse response) { return response.Root.GetProperty("state").GetProperty("authorityRevision").GetInt64(); }
+    private static int ActiveActor(HttpResponse response) { return response.Root.GetProperty("state").GetProperty("activeActor").GetInt32(); }
+
+    private static string Directions(CoopCommand[] commands)
+    {
+        var values = new char[commands.Length];
+        for (int index = 0; index < commands.Length; index++)
+        {
+            values[index] = commands[index].Direction == GameCommand.Up ? 'U' : commands[index].Direction == GameCommand.Down ? 'D' : commands[index].Direction == GameCommand.Left ? 'L' : 'R';
+        }
+        return new string(values);
     }
 
     private static void AssertStatus(HttpResponse response, int expected, string label)
@@ -517,6 +647,8 @@ internal static class Program
             string root = Path.Combine(Path.GetTempPath(), "few-moves-coop-serverchecks-" + Guid.NewGuid().ToString("N"));
             string publicRoot = Path.Combine(root, "public");
             string stateRoot = Path.Combine(root, "private-state");
+            string roomPath = FindRoomPath();
+            string catalogRoot = Path.GetDirectoryName(roomPath);
             Directory.CreateDirectory(publicRoot);
             File.WriteAllText(Path.Combine(publicRoot, "index.html"), "<!doctype html><title>few-moves-online-check</title>");
             File.WriteAllBytes(Path.Combine(publicRoot, "game.wasm"), new byte[] { 0, 97, 115, 109 });
@@ -524,7 +656,8 @@ internal static class Program
             {
                 PublicRoot = publicRoot,
                 StateRoot = stateRoot,
-                RoomPath = FindRoomPath(),
+                RoomPath = roomPath,
+                RoomCatalogRoot = catalogRoot,
                 ListenUrl = "http://127.0.0.1:" + FindFreePort().ToString(),
                 BuildId = "server-check"
             };
@@ -600,5 +733,6 @@ internal static class Program
                 return ((IPEndPoint)listener.LocalEndpoint).Port;
             }
         }
+
     }
 }

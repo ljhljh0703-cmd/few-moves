@@ -1,0 +1,33 @@
+{
+  "Id": "coop-c2",
+  "Width": 8,
+  "Height": 8,
+  "Rows": [
+    "########",
+    "#......#",
+    "#......#",
+    "#......#",
+    "#...#..#",
+    "#...#..#",
+    "#.##.#.#",
+    "########"
+  ],
+  "CircleStart": {
+    "X": 2,
+    "Y": 3
+  },
+  "DiamondStart": {
+    "X": 2,
+    "Y": 1
+  },
+  "CircleGoal": {
+    "X": 1,
+    "Y": 1
+  },
+  "DiamondGoal": {
+    "X": 6,
+    "Y": 3
+  },
+  "RulesVersion": "coop-rules-v1",
+  "ContentVersion": "coop-c2-v1"
+}

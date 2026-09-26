@@ -58,12 +58,15 @@ function element(options = {}) {
 }
 
 function createHarness() {
-  const actionButtons = ["Up", "Down", "Left", "Right", "Undo", "Restart", "Next"].map((action) =>
+  const actionButtons = ["Up", "Down", "Left", "Right", "Undo", "Restart", "Restart", "Next"].map((action) =>
     element({ dataset: { gameAction: action }, tag: "button" }));
   const pieceButtons = [0, 1, 2].map((index) => element({ dataset: { pieceIndex: String(index) }, tag: "button" }));
   const elements = {
     "#unity-canvas": element(),
     "#menu-toggle": element({ tag: "button" }),
+    "#help-toggle": element({ tag: "button" }),
+    "#help-dialog": element({ tag: "dialog" }),
+    "#help-close": element({ tag: "button" }),
     "#menu-dialog": element({ tag: "dialog" }),
     "#menu-main": element(),
     "#menu-confirmation": element(),
@@ -80,7 +83,8 @@ function createHarness() {
     "#result-turn": element(),
     "#result-par": element(),
     "#result-actions": element(),
-    "#result-retry": actionButtons.find((button) => button.dataset.gameAction === "Restart"),
+    "#restart-top": actionButtons.find((button) => button.dataset.gameAction === "Restart"),
+    "#result-retry": actionButtons.filter((button) => button.dataset.gameAction === "Restart").at(-1),
     "#result-next": actionButtons.find((button) => button.dataset.gameAction === "Next"),
     "#result-share": element({ tag: "button" }),
     "#share-dialog": element({ tag: "dialog" }),
@@ -228,17 +232,29 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(board, /_selectionMarkers/);
   assert.doesNotMatch(board.match(/public void AdvanceTransition[\s\S]*?public void CompleteTransition/)[0], /new GameObject/);
   assert.doesNotMatch(board.match(/public void Render[\s\S]*?public bool BeginTransition/)[0], /ClearDynamicTiles/);
-  assert.match(template, /width: 228px; height: 228px/);
-  assert.match(template, /\.direction-button \{ width: 72px; height: 72px;/);
-  assert.match(template, /width: 64px; height: 64px/);
+  assert.match(template, /--paper:#eee7d8; --surface:#faf5e9; --ink:#293238/);
+  assert.match(template, /grid-template-rows:24px minmax\(0,1fr\) 220px/);
+  assert.match(template, /\.direction-console \{ grid-row:2; position:relative; width:180px; height:168px/);
+  assert.match(template, /\.direction-button,\.undo-button \{ position:absolute; width:56px; height:56px/);
+  assert.match(template, /\.piece-mark \{[^}]*border-radius:50%/);
+  assert.match(template, /data-piece-index="1"\] \.piece-mark \{[^}]*rotate\(45deg\)/);
+  assert.match(template, /data-piece-index="2"\] \.piece-mark \{[^}]*background:var\(--teal\)/);
+  assert.match(template, /class="goal-hint">파란 말을 목표 칸에 넣어요/);
+  assert.match(template, /현재 진행을 지우고 첫 번째 판부터 다시 시작해요/);
+  assert.match(template, /Math\.floor\(Math\.min\(bounds\.width, bounds\.height, 560\)\)/);
+  assert.match(template, /id="turn-runline" class="moves">0번 이동/);
+  assert.match(template, /id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
+  assert.match(template, /id="help-toggle"/);
+  assert.match(template, /id="help-dialog"/);
+  assert.match(template, /\.play-controls\[hidden\] \{ display:grid!important; visibility:hidden; pointer-events:none; \}/);
   assert.match(template, /data-game-action="Undo"/);
   assert.match(template, /data-piece-index="0"/);
   assert.match(template, /id="menu-save"[^>]*>저장하기/);
   assert.match(template, /id="menu-start-over"[^>]*>처음부터 하기/);
   assert.match(template, /id="result-menu"[^>]*>메뉴/);
   assert.match(template, /result-par/);
-  assert.doesNotMatch(template, /340px|96px/);
-  assert.match(template, /grid-template-rows: minmax\(0, 1fr\) 284px/);
+  assert.doesNotMatch(template, /width:340px|width:96px/);
+  assert.match(template, /<a href="\.\.\/index\.html">다른 모드<\/a>/);
   assert.match(template, /#result-dialog/);
   assert.doesNotMatch(template, /#share-entry/);
   assert.match(runtime, /typeof state\.transitioning !== "boolean"/);
@@ -247,7 +263,7 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(template, /reportReducedMotionPreference/);
   assert.doesNotMatch(template, /button:hover:enabled/);
   assert.match(template, /\.direction-button:enabled:hover::before/);
-  assert.match(template, /button:focus-visible, canvas:focus-visible, textarea:focus-visible/);
+  assert.match(template, /button:focus-visible,a:focus-visible,canvas:focus-visible,textarea:focus-visible/);
   assert.match(runtime, /event\.repeat/);
   assert.doesNotMatch(runtime, /focusCanvas/);
 
@@ -256,6 +272,16 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   const body = { closest() { return null; } };
   receive(state());
   assert.equal(h.pieceButtons[0].attributes["aria-pressed"], "true", "target piece starts selected at zero cost");
+  assert.equal(h.elements["#turn-runline"].textContent, "0번 이동");
+  h.elements["#help-toggle"].dispatch("click");
+  assert.equal(h.elements["#help-dialog"].open, true, "help is reachable without leaving the board");
+  const beforeHelpInput = h.sent.length;
+  h.actionButtons.find((button) => button.dataset.gameAction === "Up").dispatch("click");
+  h.pieceButtons[1].dispatch("click");
+  assert.equal(keyboard(h, "ArrowUp", "ArrowUp", { closest() { return null; } }), false);
+  assert.equal(h.sent.length, beforeHelpInput, "help blocks touch and keyboard game actions");
+  h.elements["#help-close"].dispatch("click");
+  assert.equal(h.elements["#help-dialog"].open, false);
 
   h.elements["#menu-toggle"].dispatch("click");
   assert.equal(h.elements["#menu-dialog"].open, true, "the persistent-menu action is available from regular play");
@@ -304,10 +330,12 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.elements["#menu-save-status"].textContent, "저장된 진행을 확인할 수 없습니다. 이 방을 다시 시작하거나 처음부터 할 수 있습니다.");
   const blockedMovementCount = h.sent.length;
   h.actionButtons.find((button) => button.dataset.gameAction === "Up").dispatch("click");
-  assert.equal(h.sent.length, blockedMovementCount, "blocked restore state cannot mutate and overwrite the rejected payload");
+  assert.equal(h.sent.length, blockedMovementCount, "open menu and blocked restore cannot mutate the rejected payload");
+  h.elements["#menu-continue"].dispatch("click");
   h.actionButtons.find((button) => button.dataset.gameAction === "Restart").dispatch("click");
   assert.equal(h.sent.at(-1).action, "Restart", "current-room retry is an explicit recovery path for blocked restore data");
   receive(state({ saveStatus: "failed", saveError: "webgl_persist_timeout", fingerprint: "save-timeout-retry" }));
+  h.elements["#menu-toggle"].dispatch("click");
   const beforeCancelledStartOver = h.sent.length;
   h.elements["#menu-start-over"].dispatch("click");
   assert.equal(h.elements["#menu-confirmation"].hidden, false, "start-over requires an in-game confirmation");
