@@ -289,7 +289,7 @@ function onlineObservation(overrides={}) {
 
 function uiHarness(hash="#record=fm1.shared") {
   const documentObject={activeElement:null,listeners:{},loader:null};
-  const ids=["unity-canvas","online-layout","lobby-intro","status-row","play-controls","online-controls","feedback","connection-label","room-form","room-start","join-entry","join-open","join-back","room-info","invite-input","invite-code","resume-invite-input","resume-button","copy-invite-button","invite-copy","invite-close","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","menu-dialog","menu-top","menu-close","menu-record","help-dialog","help-top","help-close","invite-dialog","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-record","clear-restart","clear-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
+  const ids=["unity-canvas","online-layout","lobby-intro","status-row","play-controls","online-controls","feedback","connection-label","room-form","room-start","join-entry","join-open","join-back","room-info","invite-input","invite-code","resume-invite-input","resume-button","copy-invite-button","invite-copy","invite-close","invite-link-fallback","room-status","turn-label","circle-goal","diamond-goal","leave-button","menu-dialog","menu-top","menu-close","menu-record","help-dialog","help-top","help-close","invite-dialog","expression-bubble","expression-sender","expression-icon","expression-name","definition-picker","definition-options","consent-dialog","consent-copy","consent-reject","consent-approve","clear-dialog","clear-copy","clear-turn","clear-record","clear-restart","clear-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare","create-button","join-button"];
   const elements=Object.fromEntries(ids.map(id=>[id,uiElement(documentObject,id)]));
   elements["join-entry"].hidden=true;elements["status-row"].hidden=true;elements["play-controls"].hidden=true;
   ["menu-dialog","help-dialog","invite-dialog","consent-dialog","clear-dialog","record-dialog"].forEach(id=>{elements[id].tagName="DIALOG";});
@@ -325,6 +325,33 @@ async function runUiFixtures() {
   inviteCopy.sandbox.location.search="";
   inviteCopy.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({inviteCode:"INV-NEW",message:"초대 코드에 연결할 저장된 좌석이 없습니다"})));
   assert.equal(inviteCopy.elements.feedback.textContent,"초대 코드에 연결할 저장된 좌석이 없습니다","without an invite link the original message is preserved");
+  // Healthy connection echoes are quiet once; waiting, reconnecting, errors, consent, notices and parse failures stay visible.
+  const calm=uiHarness("");
+  const healthy=overrides=>onlineObservation(Object.assign({joined:true,roomId:"calm-room",inviteCode:"INV-CALM",seatCode:0,availabilityCode:1,circleConnected:true,diamondConnected:true,inputEnabled:true,statusCode:"Playing",activeActorCode:"Circle",logicalActionCount:3,message:"연결됨"},overrides));
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({})));
+  assert.equal(calm.elements.feedback.textContent,"","ordinary healthy connection notice is not repeated in feedback");
+  assert.equal(calm.elements["connection-label"].textContent,"멀티","healthy header shows the mode name, not a second connection notice");
+  assert.equal(calm.elements["room-status"].textContent,"친구와 연결됐어요","room info keeps the single connection line");
+  assert.equal(calm.elements["room-info"].hidden,false,"invite access stays visible");
+  assert.equal(calm.elements["copy-invite-button"].disabled,false,"invite button stays usable");
+  assert.match(calm.elements["turn-label"].innerHTML,/3번 이동/,"current turn and move count stay visible");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({message:"온라인 행동을 적용했습니다",authorityRevision:1})));
+  assert.equal(calm.elements.feedback.textContent,"","ordinary accepted-move notice is quiet");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({message:"연결됨",error:"room_state_rejected",authorityRevision:2})));
+  assert.equal(calm.elements.feedback.textContent,"온라인 상태를 확인할 수 없습니다.","a stale healthy message never hides a nonempty error; the generic Korean notice replaces the internal code");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({message:"서버 방 자료가 현재 빌드와 다릅니다",authorityRevision:3})));
+  assert.equal(calm.elements.feedback.textContent,"서버 방 자료가 현재 빌드와 다릅니다","other notices stay visible while healthy");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({pendingConsent:{active:true,kind:"Restart",requesterCode:0,requestId:"calm-consent"},authorityRevision:4})));
+  assert.equal(calm.elements.feedback.textContent,"친구의 확인을 기다리고 있어요","pending consent stays visible");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({availabilityCode:0,diamondConnected:false,message:"상대 좌석의 입장을 기다리고 있습니다",authorityRevision:5})));
+  assert.equal(calm.elements.feedback.textContent,"상대 좌석의 입장을 기다리고 있습니다","waiting stays visible");
+  assert.equal(calm.elements["connection-label"].textContent,"친구 기다리는 중");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({transportLocked:true,message:"연결됨",authorityRevision:6})));
+  assert.equal(calm.elements.feedback.textContent,"연결됨","an allowlisted message is not blanked while reconnecting");
+  assert.equal(calm.elements["connection-label"].textContent,"다시 연결 중","reconnecting stays in the header");
+  calm.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(healthy({authorityRevision:7})));
+  calm.sandbox.window.__nectorialOnline.receiveState("{not json");
+  assert.equal(calm.elements.feedback.textContent,"온라인 상태를 확인할 수 없습니다.","a parse failure after a quiet healthy state is still shown");
   const boot=uiHarness("");
   boot.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(onlineObservation({transportLocked:true})));
   assert.equal(boot.boardStage.hidden,true,"unjoined lobby hides the empty board");
@@ -377,6 +404,8 @@ async function runUiFixtures() {
   h.sandbox.window.__nectorialOnline.receiveState(JSON.stringify(joined));
   assert.equal(h.elements["definition-picker"].hidden,true,"joined state locks the selector");
   assert.equal(h.elements["definition-options"].children.every(button=>button.disabled),true);
+  assert.equal(h.elements["clear-turn"].textContent,"14수","the result shows the move count large like solo and raid");
+  assert.doesNotMatch(h.elements["clear-copy"].textContent,/번 이동/,"the move count is not repeated inside the result sentence");
   h.elements["clear-record"].listeners.click();
   assert.equal(h.elements["record-dialog"].open,true);
   assert.equal(h.elements["clear-dialog"].open,false,"record is separate from the result dialog");

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" href="data:,">
-  <title>{{{ PRODUCT_NAME }}}</title>
+  <title>Few Moves · 솔로</title>
   <style>
     :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --focus:#5d8960; --blue:#4374b7; --amber:#d09743; --teal:#439491; --stage:#f0ece2; --pad:#293238; --pad-edge:#171e1f; }
     * { box-sizing:border-box; }
@@ -18,9 +18,9 @@
     main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
     .utility-bar { width:min(100%,560px); justify-self:center; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
     .top-actions { display:flex; align-items:center; flex:none; gap:6px; }
-    .moves { flex:none; padding-left:2px; color:var(--ink); font-size:20px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .quick-retry,.icon-button { min-height:48px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); }
-    .quick-retry:enabled:active,.icon-button:enabled:active { transform:translateY(1px); box-shadow:0 1px 0 var(--line); }
+    .moves { flex:none; min-height:36px; display:inline-flex; align-items:center; padding:0 11px; border:2px solid var(--ink); border-radius:9px; background:var(--pad); color:var(--paper); font-size:16px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .quick-retry,.icon-button { min-height:48px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); }
+    .quick-retry:enabled:active,.icon-button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     .quick-retry { flex:none; min-width:78px; padding:0 10px; font-size:15px; font-weight:800; }
     .icon-button { min-width:48px; display:grid; place-items:center; padding:0; font-size:21px; }
     .icon-button svg { width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; }
@@ -75,17 +75,18 @@
     .share-record { width:100%; min-height:58px; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#fffdf7; color:var(--ink); font:inherit; font-size:14px; line-height:1.4; resize:vertical; }
     .share-panel-feedback:empty { display:none; }
     .share-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
-    #result-dialog { width:min(296px,calc(100% - 24px)); }
+    #result-dialog { width:min(296px,calc(100% - 24px)); border:2px solid var(--ink); border-radius:14px; box-shadow:0 4px 0 var(--pad-edge); }
     .result-card { position:relative; display:grid; gap:10px; padding:13px; }
     .result-title { margin:0; font-size:21px; font-weight:850; text-align:center; }
-    .result-turn { margin:0; font-size:38px; font-weight:850; font-variant-numeric:tabular-nums; text-align:center; }
+    .result-turn { margin:0; font-size:44px; font-weight:850; line-height:1.1; font-variant-numeric:tabular-nums; text-align:center; }
     .result-par { margin:0; color:var(--muted); font-size:14px; text-align:center; }
-    .result-share,.result-menu { position:absolute; top:8px; min-width:48px; min-height:48px; display:grid; place-items:center; border-radius:9px; }
+    .result-share,.result-menu { position:absolute; top:8px; min-width:48px; min-height:48px; display:grid; place-items:center; border:2px solid var(--ink); border-radius:12px; background:var(--surface); }
     .result-share { right:8px; font-size:20px; } .result-menu { left:8px; font-size:14px; }
     .result-share svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
     .result-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
     .result-actions.is-single { grid-template-columns:1fr; }
-    .result-actions button { min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .result-actions button { min-height:48px; padding:0 9px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); font-size:14px; }
+    .result-actions button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     .result-actions .result-next { border-color:var(--ink); background:var(--ink); color:#fff; }
     @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:32px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; } }
     @media (max-height:520px) and (orientation:portrait) { html,body { overflow-y:auto; } main#app { min-height:520px; height:auto; } }
@@ -547,7 +548,8 @@
       var cleared = state.statusCode === "Cleared";
       resultTitle.textContent = "클리어";
       resultTurn.textContent = state.turn + "수";
-      resultPar.textContent = "최단 " + state.parMoves + "수";
+      // parMoves is the solver-proven optimum, so matching it is a true achievement, not a score.
+      resultPar.textContent = cleared && state.parMoves > 0 && state.turn === state.parMoves ? "최단 " + state.parMoves + "수 달성" : "최단 " + state.parMoves + "수";
       resultMenuButton.disabled = false;
       resultNextButton.hidden = !cleared || !state.nextEnabled;
       resultShareButton.hidden = !canShareState(state);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Few Moves · 뱀 레이드</title>
+  <title>Few Moves · 레이드</title>
   <style>
     :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --gold:#d5a043; --blue:#4374b7; --console:#d1c5af; --focus:#5d8960; --stage:#f0ece2; --pad:#293238; --pad-edge:#171e1f; }
     * { box-sizing:border-box; }
@@ -17,9 +17,9 @@
     main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
     .topbar { width:min(100%,560px); justify-self:center; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
     .top-actions { display:flex; align-items:center; flex:none; gap:6px; }
-    .moves { flex:none; padding-left:2px; color:var(--ink); font-size:20px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .icon-button { min-height:48px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); }
-    .icon-button:enabled:active { transform:translateY(1px); box-shadow:0 1px 0 var(--line); }
+    .moves { flex:none; min-height:36px; display:inline-flex; align-items:center; padding:0 11px; border:2px solid var(--ink); border-radius:9px; background:var(--pad); color:var(--paper); font-size:16px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .icon-button { min-height:48px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); }
+    .icon-button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     .icon-button { min-width:48px; display:grid; place-items:center; padding:0; font-size:21px; }
     .raid-layout { min-width:0; min-height:0; display:grid; grid-template-rows:50px minmax(0,1fr) 208px; gap:4px; }
     .goal-panel { grid-row:1; width:min(100%,560px); justify-self:center; min-width:0; height:50px; display:grid; grid-template-rows:minmax(0,1fr) auto; align-items:center; justify-items:center; }
@@ -55,7 +55,9 @@
     .dpad-up { left:62px; top:0; } .dpad-left { left:0; top:56px; } .dpad-right { left:124px; top:56px; } .dpad-down { left:62px; top:112px; }
     dialog { width:min(360px,calc(100% - 24px)); max-height:calc(100dvh - 24px); padding:0; border:1px solid var(--line); border-radius:13px; color:var(--ink); background:var(--surface); box-shadow:0 14px 44px color-mix(in srgb,var(--ink) 28%,transparent); overflow:auto; }
     dialog::backdrop { background:color-mix(in srgb,var(--ink) 26%,transparent); }
-    #result-dialog { width:min(296px,calc(100% - 24px)); margin:auto; }
+    #result-dialog { width:min(296px,calc(100% - 24px)); margin:auto; border:2px solid var(--ink); border-radius:14px; box-shadow:0 4px 0 var(--pad-edge); }
+    #result-dialog .dialog-actions button { border:2px solid var(--ink); border-radius:12px; box-shadow:0 3px 0 var(--pad-edge); }
+    #result-dialog .dialog-actions button:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     #result-dialog::backdrop { background:transparent; }
     .dialog-card { display:grid; gap:10px; padding:13px; }
     .dialog-title { margin:0; font-size:21px; font-weight:850; text-align:center; }
@@ -65,7 +67,7 @@
     .dialog-actions .primary { color:#fff; background:var(--ink); border-color:var(--ink); }
     .result-head { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; align-items:center; }
     .result-head .dialog-title { grid-column:2; }
-    .result-head button { grid-column:3; min-width:48px; min-height:48px; border-radius:8px; font-size:20px; }
+    .result-head button { grid-column:3; min-width:48px; min-height:48px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); font-size:20px; }
     .result-turn { margin:0; color:var(--ink); font-size:44px; font-weight:850; line-height:1.1; font-variant-numeric:tabular-nums; text-align:center; }
     .record-head { display:grid; grid-template-columns:48px 1fr 48px; align-items:center; }
     .record-head h2 { margin:0; font-size:18px; text-align:center; }

@@ -466,6 +466,10 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.elements["#result-title"].textContent, "클리어");
   assert.equal(h.elements["#result-turn"].textContent, "9수");
   assert.equal(h.elements["#result-par"].textContent, "최단 5수");
+  receive(clearedState({ turn: 5, fingerprint: "cleared-at-optimum" }));
+  assert.equal(h.elements["#result-par"].textContent, "최단 5수 달성", "matching the proven optimum is stated as a fact");
+  receive(clearedState());
+  assert.equal(h.elements["#result-par"].textContent, "최단 5수", "no achievement line above the optimum");
   assert.equal(h.elements["#result-share"].hidden, false, "share is reachable inside the cleared result dialog");
   assert.equal(h.elements["#result-next"].hidden, false, "next is visible only for a cleared state with a next room");
   const beforeResultInput = h.sent.length;
