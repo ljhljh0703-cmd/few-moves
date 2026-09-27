@@ -12,6 +12,9 @@ internal static class Program
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { IncludeFields = true };
     private const string LegacyV1Sha256 = "7119766996e1f1403573200e0aad43aa3532af15280432121bea654e240151fc";
     private const string LegacyV2Sha256 = "91c73e35a0dbea062e44b415b84a33398dd6e71d1e089252a1a64f3a4107fdaa";
+    private const string LegacyV3Sha256 = "59a0bc7c923218e454b0cabf7cac652ad8faca3b55ef8dd9b9cd5a62a1a8223c";
+    private const string LegacyV3Fingerprint = "d28fe769aec762eeea0db782f2d5e2d08b93325c7070fedffa3573d663ca4bd3";
+    private const string DefaultV4Fingerprint = "a0a60b8e1577ece9e270826d2d52eca68ccdf07349c6626ba7f789baf87b8988";
     private static RaidArenaDefinition Arena;
     private static RaidSolverResult WinningSolution;
     private static RaidSolverResult AllItemsSolution;
@@ -21,9 +24,11 @@ internal static class Program
     private static int Main()
     {
         Run("raid_arena_solver_trace_and_all_items", CheckWinningTrace);
-        Run("default_raid_v3_witnesses_and_content_identity", CheckDefaultV3Witnesses);
+        Run("default_raid_v4_slow_only_identity_and_witnesses", CheckDefaultV4Witnesses);
+        Run("item_kinds_optional_but_each_item_still_validated", CheckItemKindValidation);
+        Run("legacy_raid_v3_witnesses_and_content_identity", CheckLegacyV3Witnesses);
         Run("legacy_raid_v2_witnesses_and_content_identity", CheckLegacyV2Witnesses);
-        Run("legacy_raid_v1_v2_data_byte_identity", CheckLegacyDataByteIdentity);
+        Run("legacy_raid_v1_v2_v3_data_byte_identity", CheckLegacyDataByteIdentity);
         Run("microstep_vacated_tail_and_collision_before_pickup", CheckCollisionSemantics);
         Run("shield_recovery_keeps_snake_phase", CheckShieldRecovery);
         Run("slow_and_magnet_timing", CheckBuffTiming);
@@ -57,9 +62,11 @@ internal static class Program
         catch (Exception exception) { Records.Add(new CheckRecord { Name = name, Passed = false, Detail = exception.GetType().Name + ": " + exception.Message.Replace('\n', ' ') }); }
     }
 
+    // Mechanism checks (armed timing, replay, save, collisions, shield, magnet) keep their authored v3 witnesses
+    // on the explicit legacy v3 fixture; the current default (v4) is checked separately below.
     private static void CheckWinningTrace()
     {
-        Arena = LoadArena();
+        Arena = LoadArena("raid-01-v3.json");
         AssertEqual(0, RaidRules.ValidateArena(Arena).Length, "active raid arena must validate");
         WinningSolution = RaidSolver.FindSolution(Arena, 200000);
         AssertEqual(RaidSolverStatus.Solved, WinningSolution.Status, "initial arena must solve");
@@ -86,11 +93,74 @@ internal static class Program
         Assert(itemKinds.Contains("Shield") && itemKinds.Contains("Magnet") && itemKinds.Contains("Slow"), "all-item winning trace must collect each distinct item kind");
     }
 
-    private static void CheckDefaultV3Witnesses()
+    private static void CheckDefaultV4Witnesses()
     {
         RaidArenaDefinition arena = LoadArena();
-        AssertEqual(RaidContent.DefaultArenaId, arena.Id, "default Raid content ID is v3");
-        AssertEqual("d28fe769aec762eeea0db782f2d5e2d08b93325c7070fedffa3573d663ca4bd3", RaidRules.ArenaFingerprint(arena), "default Raid v3 fingerprint is exact");
+        AssertEqual("raid-01-v4", RaidContent.DefaultArenaId, "default Raid content ID is v4");
+        AssertEqual("raid-01-v4", arena.Id, "default arena file carries the v4 ID");
+        AssertEqual("raid-01-v4", arena.ContentVersion, "default arena content version is v4");
+        AssertEqual(0, RaidRules.ValidateArena(arena).Length, "Slow-only v4 arena validates");
+        AssertEqual(DefaultV4Fingerprint, RaidRules.ArenaFingerprint(arena), "default Raid v4 fingerprint is exact");
+        AssertEqual(1, arena.Items.Length, "v4 places exactly one item");
+        AssertEqual(RaidItemKind.Slow, arena.Items[0].Kind, "the only v4 item is Slow");
+        AssertEqual(0, arena.InitialShieldCharges, "v4 grants no initial shield");
+        RaidState initial = RaidRules.CreateInitialState(arena);
+        AssertEqual(0, initial.ShieldCharges, "v4 starts without shield charges");
+        AssertEqual(0, initial.MagnetStepsRemaining, "v4 starts without magnet steps");
+        // v4 is v3 minus the shield and magnet pickups and the initial shield: restoring exactly those fields gives v3 back.
+        RaidArenaDefinition restored = RaidRules.CloneArena(arena);
+        restored.Id = "raid-01-v3";
+        restored.ContentVersion = "raid-01-v3";
+        restored.InitialShieldCharges = 1;
+        restored.Items = LoadArena("raid-01-v3.json").Items;
+        AssertEqual(LegacyV3Fingerprint, RaidRules.ArenaFingerprint(restored), "v4 differs from v3 only by items, initial shield and identity");
+        RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
+        AssertEqual(RaidSolverStatus.Solved, shortest.Status, "v4 shortest solver status");
+        AssertEqual(12, shortest.OptimalActionCount, "v4 shortest cost");
+        AssertEqual("DURDULDRURLU", Directions(shortest.Moves), "v4 shortest trace");
+        RaidState clear = Replay(arena, "DURDULDRURLU");
+        AssertEqual(RaidRunStatus.Cleared, clear.Status, "v4 witness clears");
+        AssertEqual(0, clear.Hits, "v4 witness takes no hits");
+        AssertEqual(3, clear.CollectedTailIds.Length, "v4 witness collects three tails");
+        AssertEqual(1, clear.CollectedItemIds.Length, "v4 witness collects the Slow item");
+        AssertEqual("64261835492ef9f7c9ad0b6629e2c3f443dd4b5940660753ba06628ac8eea834", RaidRules.StateFingerprint(arena, clear), "v4 witness final state fingerprint");
+        AssertEqual(9, FindArmingIndex(arena, shortest.Moves), "v4 witness arms at the tenth action");
+        RaidState danger = Replay(arena, "RD");
+        AssertEqual(RaidRunStatus.Failed, danger.Status, "v4 danger trace fails from an actual collision");
+        AssertEqual(1, danger.Hits, "v4 danger trace records the hit");
+        RaidDispatchResult zero = RaidRules.Step(arena, initial, GameCommand.Up);
+        Assert(!zero.Accepted && zero.Reason == "blocked_zero", "v4 blocked input remains a no-effect action");
+        AssertEqual(RaidRules.StateFingerprint(arena, initial), RaidRules.StateFingerprint(arena, zero.State), "v4 blocked input keeps state unchanged");
+    }
+
+    // Item kinds are no longer all required, but every placed item is still validated.
+    private static void CheckItemKindValidation()
+    {
+        RaidArenaDefinition v4 = LoadArena();
+        RaidArenaDefinition none = RaidRules.CloneArena(v4);
+        none.Items = new RaidItemDefinition[0];
+        AssertEqual(0, RaidRules.ValidateArena(none).Length, "an arena without items validates");
+        AssertEqual(0, RaidRules.ValidateArena(LoadArena("raid-01-v3.json")).Length, "the three-item v3 arena still validates");
+        RaidArenaDefinition badKind = RaidRules.CloneArena(v4);
+        badKind.Items[0].Kind = (RaidItemKind)99;
+        Assert(Array.Exists(RaidRules.ValidateArena(badKind), error => error.StartsWith("item_kind_invalid:", StringComparison.Ordinal)), "an undefined item kind is rejected");
+        RaidArenaDefinition duplicate = RaidRules.CloneArena(v4);
+        duplicate.Items = new[] { duplicate.Items[0], new RaidItemDefinition { Id = "slow-2", Position = new GridPoint(2, 2), Kind = RaidItemKind.Slow } };
+        Assert(Array.Exists(RaidRules.ValidateArena(duplicate), error => error.StartsWith("item_kind_duplicate:", StringComparison.Ordinal)), "a duplicate item kind is rejected");
+        RaidArenaDefinition onWall = RaidRules.CloneArena(v4);
+        onWall.Items[0].Position = new GridPoint(0, 0);
+        Assert(Array.Exists(RaidRules.ValidateArena(onWall), error => error.StartsWith("item_position_invalid:", StringComparison.Ordinal)), "an item on a wall is rejected");
+        RaidArenaDefinition onTail = RaidRules.CloneArena(v4);
+        onTail.Items[0].Position = onTail.TailFragments[0].Position;
+        Assert(Array.Exists(RaidRules.ValidateArena(onTail), error => error.StartsWith("item_position_invalid:", StringComparison.Ordinal)), "an item on a tail fragment is rejected");
+        Assert(Array.IndexOf(RaidRules.ValidateArena(none), "required_item_kind_missing") < 0, "missing item kinds are no longer an arena error");
+    }
+
+    private static void CheckLegacyV3Witnesses()
+    {
+        RaidArenaDefinition arena = LoadArena("raid-01-v3.json");
+        AssertEqual("raid-01-v3", arena.Id, "legacy Raid content ID is v3");
+        AssertEqual(LegacyV3Fingerprint, RaidRules.ArenaFingerprint(arena), "legacy Raid v3 fingerprint is exact");
         RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
         AssertEqual(RaidSolverStatus.Solved, shortest.Status, "v3 shortest solver status");
         AssertEqual(11, shortest.OptimalActionCount, "v3 shortest cost");
@@ -133,6 +203,7 @@ internal static class Program
     {
         AssertEqual(LegacyV1Sha256, FileSha256("raid-01.json"), "legacy v1 data bytes changed");
         AssertEqual(LegacyV2Sha256, FileSha256("raid-01-v2.json"), "legacy v2 data bytes changed");
+        AssertEqual(LegacyV3Sha256, FileSha256("raid-01-v3.json"), "legacy v3 data bytes changed");
     }
 
     private static void CheckCollisionSemantics()

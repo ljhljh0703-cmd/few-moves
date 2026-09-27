@@ -59,7 +59,8 @@ const glyphPixelSize = Number(boardView.match(/GlyphPixelSize = ([0-9.]+)f/)[1])
 const maxHeadRadius = Math.max(...head.flatMap((row,y) => [...row].flatMap((pixel,x) => pixel === "." ? [] : [Math.hypot((Math.abs(x-4)+0.5)*glyphPixelSize,(Math.abs(y-4)+0.5)*glyphPixelSize)])));
 assert.ok(maxHeadRadius < 0.5, `the rotating head and eyes stay inside one cell: ${maxHeadRadius}`);
 assert.match(boardView, /state\.Status == RaidRunStatus\.Armed \|\| state\.Status == RaidRunStatus\.Cleared/, "gold player begins only after confirmed Armed");
-for (const name of ["PlayerGlyph","TailGlyph","SnakeHeadGlyph","SnakeBodyGlyph","ShieldGlyph","MagnetGlyph","SlowGlyph"]) {
+assert.doesNotMatch(template, /ShieldGlyph|MagnetGlyph|shield-effect|magnet-effect|shield-count|magnet-count|보호막|자석/, "current raid shows no shield or magnet: no help entry, chip or state readout");
+for (const name of ["PlayerGlyph","TailGlyph","SnakeHeadGlyph","SnakeBodyGlyph","SlowGlyph"]) {
   const pattern = boardGlyph(name).join("/");
   assert.ok(template.includes(`data-glyph="${name}" data-pattern="${pattern}"`), `${name} help picture matches the actual board glyph`);
 }
@@ -103,7 +104,7 @@ function observation(status = "Playing", overrides = {}) {
 
 function createHarness(hash = "#record=fm1.shared") {
   const documentObject = { activeElement: null, listeners: {}, loader: null };
-  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","shield-count","magnet-count","slow-count","effect-row","shield-effect","magnet-effect","slow-effect","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
+  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","slow-count","effect-row","slow-effect","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
   const elements = Object.fromEntries(ids.map(id => [id, makeElement(documentObject, id)]));
   for (const id of ["result-dialog","record-dialog","menu-dialog","help-dialog"]) elements[id].tagName = "DIALOG";
   const actions = [makeElement(documentObject,"up",{raidAction:"Slide",direction:"Up"}),makeElement(documentObject,"left",{raidAction:"Slide",direction:"Left"}),makeElement(documentObject,"right",{raidAction:"Slide",direction:"Right"}),makeElement(documentObject,"down",{raidAction:"Slide",direction:"Down"}),elements["save-button"],elements["result-restart"]];
@@ -144,10 +145,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), false, "collecting phase is not styled as armed");
   assert.equal(h.elements.feedback.classList.contains("is-alert"), false, "ordinary game feedback is not shown as a visible alert");
   assert.equal(h.elements["turn-label"].textContent, "2번 이동");
-  assert.equal(h.elements["shield-count"].textContent, "1회");
-  assert.equal(h.elements["shield-effect"].hidden, false, "shield capacity is visible when positive");
-  assert.equal(h.elements["effect-row"].hidden, false);
-  assert.equal(h.elements["magnet-effect"].hidden, true);
+  assert.equal(h.elements["effect-row"].hidden, true, "a legacy shieldCharges field shows nothing in the current raid");
   assert.equal(h.elements["slow-effect"].hidden, true);
   assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1 })));
@@ -204,11 +202,11 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements.feedback.textContent, "레이드 상태를 확인할 수 없습니다.");
   assert.equal(h.elements.feedback.classList.contains("is-alert"), true, "an unreadable state report stays visible");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
-  assert.equal(h.elements["shield-count"].textContent, "1회");
-  assert.equal(h.elements["magnet-count"].textContent, "2칸", "magnet shows its remaining cells of player movement");
   assert.equal(h.elements["slow-count"].textContent, "1칸", "hourglass shows its remaining cells of player movement");
-  assert.equal(h.elements["magnet-effect"].hidden, false);
   assert.equal(h.elements["slow-effect"].hidden, false);
+  assert.equal(h.elements["effect-row"].hidden, false, "an active hourglass shows the effect strip");
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:0 })));
+  assert.equal(h.elements["effect-row"].hidden, true, "legacy shield/magnet fields alone never show a chip");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { shieldCharges:0 })));
   assert.equal(h.elements["effect-row"].hidden, true, "inactive effect strip is hidden (its CSS slot stays reserved)");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
@@ -251,8 +249,10 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.elements["record-close"].listeners.click();
   assert.equal(h.elements["record-dialog"].open, false);
   assert.equal(h.sent.length, beforeClose, "closing the record dialog never restarts the game");
+  assert.equal(h.elements["result-dialog"].open, true, "closing the record returns a finished run to its result and 한 판 더");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(exact));
-  assert.equal(h.elements["result-dialog"].open, false, "closing record does not auto-reopen the same result");
+  assert.equal(h.elements["result-dialog"].open, true, "a repeated identical state keeps one result open");
+  h.elements["result-dialog"].close();
 
   h.elements["record-top"].listeners.click();
   h.elements["record-share"].listeners.click();
@@ -281,6 +281,34 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(exact)); h.elements["record-top"].listeners.click();
   h.elements["record-challenge"].listeners.click();
   assert.deepEqual(h.sent.slice(-2).map(item => item.payload.kind), ["Challenge","Restart"], "challenge requires the explicit challenge-and-restart button");
+  h.elements["record-dialog"].listeners.close();
+  assert.equal(h.elements["result-dialog"].open, false, "a late record close after Challenge never flashes the old result");
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(exact));
+  assert.equal(h.elements["result-dialog"].open, false, "the old result stays hidden until the restarted state arrives");
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing")));
+  assert.equal(h.elements["result-dialog"].open, false);
+
+  const flow = createHarness(""); flow.documentObject.loader.onload(); flow.unityReady.resolve(flow.instance); await settle();
+  flow.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { actions:12, hits:0, tailCount:3, stateFingerprint:"flow-clear" })));
+  assert.equal(flow.elements["result-dialog"].open, true, "a clear opens the result");
+  flow.elements["result-record"].listeners.click();
+  assert.equal(flow.elements["record-dialog"].open, true);
+  assert.equal(flow.elements["result-dialog"].open, false, "the record replaces the result while open");
+  flow.elements["record-close"].listeners.click();
+  assert.equal(flow.elements["result-dialog"].open, true, "clear → record → close returns to the result");
+  flow.elements["result-restart"].listeners.click();
+  assert.equal(flow.sent.at(-1).payload.kind, "Restart", "한 판 더 restarts after returning from the record");
+  flow.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Failed", { actions:2, hits:1, tailCount:0, stateFingerprint:"flow-fail" })));
+  assert.equal(flow.elements["result-dialog"].open, true, "a failure opens the result");
+  flow.elements["result-record"].listeners.click();
+  flow.elements["record-dialog"].close(); flow.elements["record-dialog"].listeners.close();
+  assert.equal(flow.elements["result-dialog"].open, true, "fail → record → Escape returns to the result");
+  flow.elements["result-restart"].listeners.click();
+  assert.equal(flow.sent.at(-1).payload.kind, "Restart");
+  flow.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { actions:0, stateFingerprint:"flow-play" })));
+  flow.elements["record-top"].listeners.click();
+  flow.elements["record-close"].listeners.click();
+  assert.equal(flow.elements["result-dialog"].open, false, "closing the record during play opens no result");
   const reverse = createHarness("#record=fm1.reverse"); reverse.documentObject.loader.onload(); reverse.unityReady.resolve(reverse.instance); await settle();
   assert.equal(reverse.sent.length, 0, "instance alone cannot import before an initialized observation");
   reverse.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation()));
