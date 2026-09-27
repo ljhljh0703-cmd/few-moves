@@ -15,52 +15,50 @@
     </header>
 
     <section class="home-content" aria-labelledby="mode-title">
-      <header class="home-intro">
-        <h1 id="mode-title">모드 선택</h1>
-      </header>
+      <h1 id="mode-title">모드 선택</h1>
 
-      <article class="featured-mode" aria-labelledby="solo-title">
-        <div class="featured-body">
-          <div class="mini-board solo-preview" role="img" aria-label="혼자 모드의 예시 보드입니다. 파란 원이 목표 점으로 가는 그림이며 실제 플레이 상태가 아닙니다.">
-            <span class="board-wall wall-one" aria-hidden="true"></span>
-            <span class="board-wall wall-two" aria-hidden="true"></span>
-            <span class="board-wall wall-three" aria-hidden="true"></span>
-            <span class="board-goal" aria-hidden="true"></span>
-            <span class="board-piece solo-piece" aria-hidden="true"></span>
-          </div>
-          <div class="featured-copy">
-            <h2 id="solo-title">혼자</h2>
-            <p>적게 움직여 목표에 도착</p>
-            <a class="play-button" href="solo/index.html">혼자 시작 <span aria-hidden="true">→</span></a>
-          </div>
-        </div>
-      </article>
-
-      <nav class="mode-list" aria-label="다른 놀이 고르기">
-        <a class="mode-row" href="coop/index.html">
-          <span class="mode-icon coop-icon" aria-hidden="true">
-            <span class="shape square"></span>
-            <span class="shape diamond"></span>
-            <span class="goal-dot circle-goal"></span>
-            <span class="goal-dot diamond-goal"></span>
+      <nav class="menu" aria-label="게임 모드">
+        <a class="menu-bar" href="solo/index.html">
+          <span class="menu-icon" aria-hidden="true">
+            <span class="solo-circle"></span>
           </span>
-          <span class="mode-copy">
-            <strong>친구와 <em>협력</em></strong>
-            <span>친구와 번갈아 둘 다 도착</span>
+          <span class="menu-copy">
+            <strong>솔로</strong>
+            <span>파란 말을 목표까지 보내세요.</span>
           </span>
-          <span class="mode-arrow" aria-hidden="true">→</span>
+          <span class="menu-arrow" aria-hidden="true">→</span>
         </a>
-        <a class="mode-row" href="raid/index.html">
-          <span class="mode-icon raid-icon" aria-hidden="true">
-            <span class="shape raid-player"></span>
-            <span class="shape gold-fragment"></span>
-            <span class="snake-line"><i></i><i></i><i></i></span>
+
+        <a class="menu-bar" href="coop/index.html">
+          <span class="menu-icon menu-icon-multi" aria-hidden="true">
+            <span class="multi-square"></span>
+            <span class="multi-diamond"></span>
           </span>
-          <span class="mode-copy">
-            <strong>뱀잡기 <em>레이드</em></strong>
-            <span>적은 수로 뱀잡기</span>
+          <span class="menu-copy">
+            <strong>멀티</strong>
+            <span>친구와 번갈아 움직여 각자의 목표에 도착하세요.</span>
           </span>
-          <span class="mode-arrow" aria-hidden="true">→</span>
+          <span class="menu-arrow" aria-hidden="true">→</span>
+        </a>
+
+        <a class="menu-bar" href="raid/index.html">
+          <span class="menu-icon" aria-hidden="true">
+            <svg class="snake-face" viewBox="0 0 48 48" focusable="false">
+              <path class="snake-tongue" d="M24 39v5m0 0-3.5 3m3.5-3 3.5 3"/>
+              <path class="snake-head" d="M24 5Q41 5 41 23Q41 40 24 40Q7 40 7 23Q7 5 24 5Z"/>
+              <circle class="snake-eye" cx="16.5" cy="20" r="5"/>
+              <circle class="snake-eye" cx="31.5" cy="20" r="5"/>
+              <ellipse class="snake-pupil" cx="16.5" cy="20" rx="1.6" ry="3.4"/>
+              <ellipse class="snake-pupil" cx="31.5" cy="20" rx="1.6" ry="3.4"/>
+              <circle class="snake-pupil" cx="21.5" cy="31" r="1.2"/>
+              <circle class="snake-pupil" cx="26.5" cy="31" r="1.2"/>
+            </svg>
+          </span>
+          <span class="menu-copy">
+            <strong>레이드</strong>
+            <span>뱀을 피해 조각을 모으고, 힘이 차면 돌진하세요.</span>
+          </span>
+          <span class="menu-arrow" aria-hidden="true">→</span>
         </a>
       </nav>
     </section>
