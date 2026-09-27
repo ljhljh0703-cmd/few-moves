@@ -38,12 +38,36 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private RecordSummaryObservation _shared;
         private string _mineCapsule = string.Empty;
         private string _recordCapsule = string.Empty;
+        // Presentation only: OS reduced motion makes slides instant and cell cues static; rules and order are unchanged.
+        private bool _reducedMotion;
+        // Brief hold after a caught/clear action so its cell mark is seen before the result is published.
+        private const float TerminalMarkHoldSeconds = 0.35f;
+        // Result comparison for a live clear against the best that existed before it; never set by a reload.
+        private string _clearComparison = string.Empty;
+        private int _clearComparisonDelta;
+        private string _clearComparisonFingerprint = string.Empty;
+        private RecordSummaryObservation _lastCapturedSummary;
+        // Set only when an accepted move commits a clear; the first of checkpoint save or presentation completion
+        // settles its record/best and comparison exactly once, so a checkpoint never pairs the clear with an older best.
+        private bool _clearSettlementPending;
         private string _sharedCapsule = string.Empty;
         private string _sharedRecordRequestId = string.Empty;
         private string _recordStatus = "idle";
         private string _recordError = string.Empty;
+        // Toss native storage (Toss builds only): one raid-scoped payload holds progress and the verified best.
+        // Ordinary web keeps PlayerPrefs; a Toss candidate never falls back to it.
+        private const float PlatformManualSaveUiTimeoutSeconds = 10f;
+        private TossPlatformAdapter _platform;
+        private TossNativeSaveCoordinator _platformWrites = new TossNativeSaveCoordinator();
+        private bool _platformStartupBlocked;
+        private int _nextSaveRequestId;
+        private bool _manualSaveAwaiting;
+        private int _manualSaveWatchRequestId;
+        private Coroutine _manualSaveWatchRoutine;
 #if UNITY_EDITOR
         private string _lastObservationJsonForCheck = string.Empty;
+        // Editor probe seam: when set, the bootstrap takes the Toss path and records writes instead of calling the SDK.
+        private System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<int, string>> _tossWritesForCheck;
 #endif
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -64,13 +88,29 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         private void Awake()
         {
+            _platform = GetComponent<TossPlatformAdapter>();
+            if (_platform == null) _platform = gameObject.AddComponent<TossPlatformAdapter>();
+            _platform.CheckpointRequested += RequestPlatformCheckpoint;
             ConfigureCamera();
             InitializeRaid();
+        }
+
+        public void SetReducedMotion(string value)
+        {
+            _reducedMotion = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+            if (_board != null) _board.SetReducedMotion(_reducedMotion);
+        }
+
+        private void LateUpdate()
+        {
+            if (_board != null) _board.TickEffects(Time.unscaledDeltaTime);
         }
 
         private void OnDestroy()
         {
             CancelActionPresentation();
+            StopManualSaveWatch();
+            if (_platform != null) _platform.CheckpointRequested -= RequestPlatformCheckpoint;
             if (_board != null) _board.Dispose();
         }
 
@@ -103,6 +143,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
             }
             if (string.Equals(input, "Save", StringComparison.Ordinal))
             {
+                if (UsesTossStorage())
+                {
+                    if (!_manualSaveAwaiting) QueuePlatformSave(true);
+                    PublishState();
+                    return;
+                }
                 SaveCurrent();
                 _message = _saveStatus == "saved" ? "저장했습니다" : "저장하지 못했습니다";
                 PublishState();
@@ -122,7 +168,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
 
         public void HandleCommand(string json)
         {
-            if (!_initialized || string.IsNullOrEmpty(json)) return;
+            if (string.IsNullOrEmpty(json) || (!_initialized && !_platformStartupBlocked)) return;
             RaidInput input;
             try { input = JsonUtility.FromJson<RaidInput>(json); }
             catch (Exception exception)
@@ -133,6 +179,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 return;
             }
             if (input == null || string.IsNullOrEmpty(input.kind)) return;
+            if (string.Equals(input.kind, "RetryStorage", StringComparison.Ordinal))
+            {
+                RetryPlatformStartup();
+                return;
+            }
+            if (!_initialized) return;
             if (string.Equals(input.kind, "Restart", StringComparison.Ordinal))
             {
                 HandleRaidInput("Restart");
@@ -184,6 +236,8 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 PublishState();
                 return false;
             }
+            ClearComparison();
+            _clearSettlementPending = result.State != null && result.State.Status == RaidRunStatus.Cleared;
             _pendingAction = result;
             _displayState = beforeAction;
             _transitioning = true;
@@ -200,11 +254,13 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 CompleteActionPresentation();
                 return;
             }
-            float duration = PresentationDuration(_pendingAction.Frames.Length);
-            _transitionRoutine = StartCoroutine(CompleteActionAfter(duration));
+            float duration = _reducedMotion ? 0f : PresentationDuration(_pendingAction.Frames.Length);
+            RaidRunStatus finalStatus = _pendingAction.State == null ? RaidRunStatus.Playing : _pendingAction.State.Status;
+            float hold = finalStatus == RaidRunStatus.Cleared || finalStatus == RaidRunStatus.Failed ? TerminalMarkHoldSeconds : 0f;
+            _transitionRoutine = StartCoroutine(CompleteActionAfter(duration, hold));
         }
 
-        private IEnumerator CompleteActionAfter(float duration)
+        private IEnumerator CompleteActionAfter(float duration, float hold)
         {
             float elapsed = 0f;
             while (elapsed < duration)
@@ -214,6 +270,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 yield return null;
             }
             if (_board != null) _board.AdvanceAction(1f);
+            float held = 0f;
+            while (held < hold)
+            {
+                held += Time.unscaledDeltaTime;
+                yield return null;
+            }
             _transitionRoutine = null;
             CompleteActionPresentation();
         }
@@ -227,8 +289,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _displayState = _session.State;
             if (_board != null) _board.CompleteAction(_arena, _session.State);
             _message = Describe(completed);
+            SettleClearIfPending();
+            // After the best is settled, so a Toss payload written here carries both the clear and the new best.
             SaveCurrent();
-            if (_session.State.Status == RaidRunStatus.Cleared) CaptureCurrentRecord(false);
             PublishState();
         }
 
@@ -258,9 +321,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _saveStatus = "idle";
             _saveError = string.Empty;
             _lastFrames = new RaidFrame[0];
+            _clearSettlementPending = false;
             RaidDispatchResult restarted = _session.Restart();
             _displayState = _session.State;
-            if (_board != null) _board.Render(_arena, _session.State);
+            if (_board != null) { _board.ClearEffects(); _board.Render(_arena, _session.State); }
+            ClearComparison();
             _message = Translate(restarted.Reason);
             SaveCurrent();
             PublishState();
@@ -287,6 +352,18 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _session = RaidSession.Create(_arena);
                 _displayState = _session.State;
                 _board = new RaidBoardView();
+                _board.SetReducedMotion(_reducedMotion);
+                if (UsesTossStorage())
+                {
+                    // Input stays off until the raid-scoped Toss payload is read and verified (or is absent).
+                    _message = "토스 저장소를 확인하고 있습니다";
+                    _saveStatus = "pending";
+                    _saveError = string.Empty;
+                    _board.Render(_arena, _session.State);
+                    _platform.BeginRaidStartup(_arena.Id, RaidRules.ArenaFingerprint(_arena), CompletePlatformStartup);
+                    PublishState();
+                    return;
+                }
                 _initialized = true;
                 RestoreIfPresent();
                 LoadBestRecord();
@@ -337,6 +414,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private void SaveCurrent()
         {
             if (!_initialized || _restoreBlocked || _session == null) return;
+            if (UsesTossStorage())
+            {
+                QueuePlatformSave(false);
+                return;
+            }
             try
             {
                 RaidSaveEnvelope envelope = RaidSaveCodec.Capture(_session);
@@ -350,6 +432,243 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _saveStatus = "failed";
                 _saveError = "raid_save_write:" + exception.GetType().Name;
             }
+        }
+
+        private bool UsesTossStorage()
+        {
+#if UNITY_EDITOR
+            if (_tossWritesForCheck != null) return true;
+#endif
+            return _platform != null && _platform.IsTossCandidate;
+        }
+
+        private void CompletePlatformStartup(TossStartupResult result)
+        {
+            ResetPlatformProgress();
+            if (result.Kind == TossStartupKind.Blocked || result.Kind == TossStartupKind.WebFallback)
+            {
+                // A Toss candidate never adopts PlayerPrefs, even if the adapter unexpectedly reports web.
+                BlockPlatformStartup(result.Kind == TossStartupKind.Blocked ? (result.Error ?? "startup_unavailable") : "startup_unexpected_web");
+                return;
+            }
+            if (result.Kind == TossStartupKind.ExistingPayload)
+            {
+                string error;
+                if (!TryRestorePlatformPayload(result.Payload, out error))
+                {
+                    ResetPlatformProgress();
+                    BlockPlatformStartup(error);
+                    return;
+                }
+                _message = "저장된 레이드를 불러왔습니다";
+                _saveStatus = "saved";
+            }
+            else
+            {
+                _message = "레이드를 시작하세요";
+                _saveStatus = "idle";
+            }
+            _platformStartupBlocked = false;
+            _initialized = true;
+            _saveError = string.Empty;
+            if (_board != null) _board.Render(_arena, _session.State);
+            PublishState();
+        }
+
+        private void ResetPlatformProgress()
+        {
+            CancelActionPresentation();
+            _session = RaidSession.Create(_arena);
+            _displayState = _session.State;
+            _lastFrames = new RaidFrame[0];
+            _restoreBlocked = false;
+            _hasMine = false;
+            _mine = null;
+            _mineCapsule = string.Empty;
+            _recordCapsule = string.Empty;
+            _recordStatus = "idle";
+            _recordError = string.Empty;
+            _clearSettlementPending = false;
+            ClearComparison();
+        }
+
+        private void BlockPlatformStartup(string error)
+        {
+            _initialized = false;
+            _platformStartupBlocked = true;
+            _message = "토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요";
+            _saveStatus = "failed";
+            _saveError = string.IsNullOrEmpty(error) ? "startup_unavailable" : error;
+            if (_board != null) _board.Render(_arena, _session.State);
+            PublishState();
+        }
+
+        public void RetryPlatformStartup()
+        {
+            if (!_platformStartupBlocked || !UsesTossStorage())
+            {
+                PublishState();
+                return;
+            }
+            _platformStartupBlocked = false;
+            _message = "토스 저장소를 다시 확인하고 있습니다";
+            _saveStatus = "pending";
+            _saveError = string.Empty;
+            PublishState();
+            if (_platform != null && _platform.IsTossCandidate) _platform.RetryStartup(CompletePlatformStartup);
+        }
+
+        // Both parts must verify against the live arena; either failing blocks startup rather than dropping data.
+        private bool TryRestorePlatformPayload(string payload, out string error)
+        {
+            string best;
+            string progress;
+            if (!TossPlatformPolicy.TryParseRaidPayload(payload, _arena.Id, RaidRules.ArenaFingerprint(_arena), out best, out progress, out error)) return false;
+            try
+            {
+                RaidSaveEnvelope envelope = JsonUtility.FromJson<RaidSaveEnvelope>(progress);
+                if (envelope == null) { error = "raid_toss_progress_missing"; return false; }
+                if (!RaidSaveSerializationAdapter.TryNormalize(envelope, out error)) return false;
+                RaidSession restored;
+                if (!RaidSaveCodec.TryRestore(_arena, envelope, out restored, out error)) return false;
+                RecordSummaryObservation bestSummary = null;
+                if (best.Length > 0 && !TryVerifyBestCapsule(best, out bestSummary))
+                {
+                    error = "raid_toss_best_invalid";
+                    return false;
+                }
+                _session = restored;
+                _displayState = _session.State;
+                if (bestSummary != null)
+                {
+                    _mine = bestSummary;
+                    _mineCapsule = best;
+                    _hasMine = true;
+                }
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = "raid_toss_progress_json:" + exception.GetType().Name;
+                return false;
+            }
+        }
+
+        private void QueuePlatformSave(bool manual)
+        {
+            if (!_initialized || _platformStartupBlocked || _session == null || _arena == null) return;
+            // A checkpoint can arrive while the clearing move is still animating; settle first so the payload carries
+            // the best derived from that committed clear.
+            SettleClearIfPending();
+            string payload;
+            try
+            {
+                string best = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mineCapsule : string.Empty;
+                payload = TossPlatformPolicy.FormatRaidPayload(_arena.Id, RaidRules.ArenaFingerprint(_arena), best, JsonUtility.ToJson(RaidSaveCodec.Capture(_session)));
+            }
+            catch (Exception exception)
+            {
+                _saveStatus = "failed";
+                _saveError = "raid_save_write:" + exception.GetType().Name;
+                if (manual) _message = "저장하지 못했습니다. 다시 저장할 수 있습니다";
+                return;
+            }
+            int requestId = ++_nextSaveRequestId;
+            TossWriteRequest requestToStart;
+            bool startNow = _platformWrites.Queue(new TossWriteRequest(requestId, payload, manual), out requestToStart);
+            if (manual)
+            {
+                _manualSaveAwaiting = true;
+                _message = "저장하고 있습니다";
+                StartManualSaveWatch(requestId);
+            }
+            SyncPlatformSaveUi();
+            // The coordinator never overlaps native writes: a newer payload waits behind the active one.
+            if (startNow) StorePlatform(requestToStart);
+        }
+
+        private void StorePlatform(TossWriteRequest request)
+        {
+#if UNITY_EDITOR
+            if (_tossWritesForCheck != null)
+            {
+                _tossWritesForCheck.Add(new System.Collections.Generic.KeyValuePair<int, string>(request.Id, request.Payload));
+                return;
+            }
+#endif
+            _platform.Store(request.Id, request.Payload, CompletePlatformSave);
+        }
+
+        private void CompletePlatformSave(int requestId, TossPlatformOperationResult result)
+        {
+            TossNativeSaveCompletion completion;
+            TossWriteRequest nextToStart;
+            if (!_platformWrites.Complete(requestId, result.Succeeded, result.Error, out completion, out nextToStart)) return;
+            // Only the newest payload's completion may change what the player sees; older ones are superseded.
+            if (completion.AffectsCurrentStatus)
+            {
+                SyncPlatformSaveUi();
+                if (_manualSaveAwaiting)
+                {
+                    _manualSaveAwaiting = false;
+                    StopManualSaveWatch();
+                    _message = result.Succeeded ? "저장했습니다" : "저장하지 못했습니다. 다시 저장할 수 있습니다";
+                }
+                else if (!result.Succeeded)
+                {
+                    _message = "저장하지 못했습니다. 진행은 계속할 수 있습니다";
+                }
+            }
+            if (nextToStart.Id != 0) StorePlatform(nextToStart);
+            PublishState();
+        }
+
+        private void RequestPlatformCheckpoint()
+        {
+            if (!_initialized || _platformStartupBlocked || _session == null) return;
+            QueuePlatformSave(false);
+            PublishState();
+        }
+
+        private void SyncPlatformSaveUi()
+        {
+            _saveStatus = _platformWrites.Status;
+            _saveError = _platformWrites.Error;
+        }
+
+        private void StartManualSaveWatch(int requestId)
+        {
+            StopManualSaveWatch();
+            _manualSaveWatchRequestId = requestId;
+            if (isActiveAndEnabled) _manualSaveWatchRoutine = StartCoroutine(WatchManualSave(requestId));
+        }
+
+        private void StopManualSaveWatch()
+        {
+            if (_manualSaveWatchRoutine != null) StopCoroutine(_manualSaveWatchRoutine);
+            _manualSaveWatchRoutine = null;
+            _manualSaveWatchRequestId = 0;
+        }
+
+        private IEnumerator WatchManualSave(int requestId)
+        {
+            yield return new WaitForSecondsRealtime(PlatformManualSaveUiTimeoutSeconds);
+            _manualSaveWatchRoutine = null;
+            TimeoutManualSave(requestId);
+        }
+
+        // The native write keeps running; only the waiting UI is released. A later completion of the newest
+        // payload still reports its real result.
+        private void TimeoutManualSave(int requestId)
+        {
+            if (!_manualSaveAwaiting || _manualSaveWatchRequestId != requestId) return;
+            _manualSaveAwaiting = false;
+            _manualSaveWatchRequestId = 0;
+            _platformWrites.TimeoutManual(requestId);
+            _saveStatus = "failed";
+            _saveError = "storage_ui_timeout";
+            _message = "저장이 아직 끝나지 않았습니다. 진행은 계속할 수 있습니다";
+            PublishState();
         }
 
         private void GetRecord()
@@ -390,6 +709,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 return false;
             }
             _recordCapsule = encoded;
+            _lastCapturedSummary = summary;
             ConsiderBest(capsule, encoded, summary);
             _recordStatus = "ready";
             if (string.IsNullOrEmpty(_recordError)) _recordError = string.Empty;
@@ -399,6 +719,35 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 PublishState();
             }
             return true;
+        }
+
+        // Runs at most once per committed clear. The comparison uses the best as it was before this clear.
+        private void SettleClearIfPending()
+        {
+            if (!_clearSettlementPending) return;
+            _clearSettlementPending = false;
+            if (_session == null || _session.State.Status != RaidRunStatus.Cleared) return;
+            bool hadBest = _hasMine && _mine != null;
+            int priorBest = hadBest ? _mine.effectiveActionCount : 0;
+            if (CaptureCurrentRecord(false) && _lastCapturedSummary != null)
+                SetClearComparison(hadBest, priorBest, _lastCapturedSummary.effectiveActionCount);
+        }
+
+        private void ClearComparison()
+        {
+            _clearComparison = string.Empty;
+            _clearComparisonDelta = 0;
+            _clearComparisonFingerprint = string.Empty;
+        }
+
+        // Moves only: "first" (no earlier best), "improved" by N, "tied", or "slower" by N than the earlier best.
+        private void SetClearComparison(bool hadBest, int priorBest, int current)
+        {
+            if (!hadBest) { _clearComparison = "first"; _clearComparisonDelta = 0; }
+            else if (current < priorBest) { _clearComparison = "improved"; _clearComparisonDelta = priorBest - current; }
+            else if (current == priorBest) { _clearComparison = "tied"; _clearComparisonDelta = 0; }
+            else { _clearComparison = "slower"; _clearComparisonDelta = current - priorBest; }
+            _clearComparisonFingerprint = RaidRules.StateFingerprint(_arena, _session.State);
         }
 
         private RecordCapsule CurrentRecordIdentity()
@@ -420,21 +769,31 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (_arena == null) return;
             string encoded;
             if (!LocalRecordBestStore.TryRead(CurrentRecordIdentity(), out encoded)) return;
-            RecordCapsule capsule;
-            string error;
-            RecordVerification verification;
-            if (!RecordCapsuleCodec.TryDecode(encoded, out capsule, out error) || !RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification)) return;
-            RecordSummaryObservation summary = RecordSummaryObservation.From(verification);
-            if (!RecordObservationGuard.IsUsable(true, summary)) return;
+            RecordSummaryObservation summary;
+            if (!TryVerifyBestCapsule(encoded, out summary)) return;
             _mine = summary;
             _mineCapsule = encoded;
             _hasMine = true;
         }
 
+        private bool TryVerifyBestCapsule(string encoded, out RecordSummaryObservation summary)
+        {
+            summary = null;
+            RecordCapsule capsule;
+            string error;
+            RecordVerification verification;
+            if (!RecordCapsuleCodec.TryDecode(encoded, out capsule, out error) || !RecordCapsuleVerifier.TryVerifyRaid(_arena, capsule, out verification)) return false;
+            RecordSummaryObservation candidate = RecordSummaryObservation.From(verification);
+            if (!RecordObservationGuard.IsUsable(true, candidate)) return false;
+            summary = candidate;
+            return true;
+        }
+
         private void ConsiderBest(RecordCapsule identity, string encoded, RecordSummaryObservation candidate)
         {
             if (_hasMine && !LocalRecordBestStore.IsBetter(candidate, _mine)) return;
-            if (!LocalRecordBestStore.TryWrite(identity, encoded))
+            // Toss persists the best inside the next raid payload (SaveCurrent after capture), not in PlayerPrefs.
+            if (!UsesTossStorage() && !LocalRecordBestStore.TryWrite(identity, encoded))
             {
                 _recordError = "record_best_write_failed";
                 return;
@@ -596,6 +955,8 @@ namespace Nectorial.SlideEscape.Unity.Raid
             var observation = new RaidObservation
             {
                 initialized = _initialized,
+                startupRetryEnabled = _platformStartupBlocked,
+                savePending = _manualSaveAwaiting,
                 inputEnabled = _initialized && !_restoreBlocked && !_transitioning && state != null && (state.Status == RaidRunStatus.Playing || state.Status == RaidRunStatus.Armed),
                 transitioning = _transitioning,
                 statusCode = state == null ? "Waiting" : state.Status.ToString(),
@@ -613,6 +974,10 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 selectedDefinitionId = _arena == null ? string.Empty : _arena.Id,
                 recordStatus = _recordStatus,
                 recordCapsule = _recordCapsule,
+                mineCapsule = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mineCapsule : string.Empty,
+                clearComparison = _clearComparison,
+                clearComparisonDelta = _clearComparisonDelta,
+                clearComparisonFingerprint = _clearComparisonFingerprint,
                 hasMine = _hasMine && RecordObservationGuard.IsUsable(true, _mine),
                 mine = _hasMine && RecordObservationGuard.IsUsable(true, _mine) ? _mine : null,
                 hasShared = _hasShared && RecordObservationGuard.IsUsable(true, _shared),
@@ -691,7 +1056,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
             if (result == null) return string.Empty;
             if (result.State != null && result.State.Status == RaidRunStatus.Cleared) return Translate("cleared");
             if (result.State != null && result.State.Status == RaidRunStatus.Failed) return Translate("failed");
-            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "꼬리 조각 3개 완성 · 이제 뱀 몸통에 돌진";
+            // Shown beside the "돌진!" quest line and the full charge pips, so it stays short enough to fit whole on a
+            // 360px phone. Any collision with the snake (head or body) clears an armed run.
+            if (result.State != null && result.State.Status == RaidRunStatus.Armed) return "머리든 몸통이든 부딪히면 잡아요";
             if (HasShieldedFrame(result)) return "보호막으로 충돌을 막았습니다";
 
             bool shield = false;
@@ -719,16 +1086,16 @@ namespace Nectorial.SlideEscape.Unity.Raid
             int tailCount = directTailCount + magnetTailCount;
             string itemName = ItemName(shield, magnet, slow);
             if (!string.IsNullOrEmpty(itemName) && tailCount > 0)
-                return itemName + " 획득 · 꼬리 조각 " + tailCount.ToString() + "개 수집";
+                return itemName + " 획득 · 금빛 조각 " + tailCount.ToString() + "개 수집";
             if (shield && !magnet && !slow && result.State != null) return "보호막 준비 · 충돌 " + result.State.ShieldCharges.ToString() + "회 방어";
-            if (magnet && !shield && !slow) return "자석 획득 · 주변 조각 수집";
-            if (slow && !shield && !magnet) return "감속 획득 · 뱀 이동 늦추기";
+            if (magnet && !shield && !slow) return "자석 획득 · 주변 금빛 조각 당기기";
+            if (slow && !shield && !magnet) return "모래시계 획득 · 뱀이 잠시 멈춰요";
             if (!string.IsNullOrEmpty(itemName)) return itemName + " 획득";
             if (tailCount > 0)
             {
-                if (magnetTailCount > 0 && directTailCount == 0 && tailCount == 1) return "자석으로 꼬리 조각을 모았습니다";
-                if (tailCount == 1) return "꼬리 조각을 모았습니다";
-                return "꼬리 조각 " + tailCount.ToString() + "개 수집";
+                if (magnetTailCount > 0 && directTailCount == 0 && tailCount == 1) return "자석으로 금빛 조각을 모았습니다";
+                if (tailCount == 1) return "금빛 조각을 모았습니다";
+                return "금빛 조각 " + tailCount.ToString() + "개 수집";
             }
             return Translate(result.Reason);
         }
@@ -745,11 +1112,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
         {
             if (shield && !magnet && !slow) return "보호막";
             if (magnet && !shield && !slow) return "자석";
-            if (slow && !shield && !magnet) return "감속";
-            if (shield && magnet && slow) return "보호막·자석·감속";
+            if (slow && !shield && !magnet) return "모래시계";
+            if (shield && magnet && slow) return "보호막·자석·모래시계";
             if (shield && magnet) return "보호막·자석";
-            if (shield && slow) return "보호막·감속";
-            if (magnet && slow) return "자석·감속";
+            if (shield && slow) return "보호막·모래시계";
+            if (magnet && slow) return "자석·모래시계";
             return string.Empty;
         }
 
@@ -781,10 +1148,11 @@ namespace Nectorial.SlideEscape.Unity.Raid
         [Serializable]
         private sealed class RaidObservation
         {
-            public bool initialized; public bool inputEnabled; public bool transitioning; public string statusCode;
+            public bool initialized; public bool startupRetryEnabled; public bool savePending; public bool inputEnabled; public bool transitioning; public string statusCode;
             public int actions; public int hits; public int shieldCharges; public int magnetStepsRemaining; public int slowStepsRemaining;
             public int tailCount; public int tailTarget; public int playerX; public int playerY; public int snakeHeadIndex;
             public string activeDefinitionId; public string selectedDefinitionId; public string recordStatus; public string recordCapsule;
+            public string mineCapsule; public string clearComparison; public int clearComparisonDelta; public string clearComparisonFingerprint;
             public bool hasMine; public RecordSummaryObservation mine; public bool hasShared; public RecordSummaryObservation shared; public string sharedRecordRequestId; public string recordError;
             public string message; public string saveStatus; public string saveError; public string stateFingerprint;
         }

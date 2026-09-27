@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -22,6 +25,9 @@ namespace FewMoves.Coop.Server
         private static readonly string[] JoinFields = { "inviteCode", "joinRequestId" };
         private static readonly string[] HeartbeatFields = new string[0];
         private static readonly string[] CommandFields = { "commandId", "expectedRevision", "kind", "direction", "requestId", "approve", "expression" };
+        private static readonly Regex HashedBuildPath = new Regex(
+            @"^/(?:solo|coop|raid|shared)/Build/[0-9a-fA-F]{32}\.(?:data|wasm|framework\.js|loader\.js|symbols\.json)$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public static WebApplication Create(ServerOptions options)
         {
@@ -31,6 +37,16 @@ namespace FewMoves.Coop.Server
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = Array.Empty<string>() });
             builder.WebHost.UseUrls(options.ListenUrl);
             builder.Logging.ClearProviders();
+            builder.Services.AddResponseCompression(compression =>
+            {
+                // The middleware is reached only by public, uncompressed Unity build files.
+                compression.EnableForHttps = true;
+                compression.Providers.Add<BrotliCompressionProvider>();
+                compression.Providers.Add<GzipCompressionProvider>();
+                compression.MimeTypes = new[] { "application/wasm", "application/octet-stream", "application/javascript", "text/javascript" };
+            });
+            builder.Services.Configure<BrotliCompressionProviderOptions>(compression => compression.Level = CompressionLevel.Optimal);
+            builder.Services.Configure<GzipCompressionProviderOptions>(compression => compression.Level = CompressionLevel.Optimal);
             builder.Services.AddSingleton(options);
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton(new ApiRequestLimiter(options.MaxRequestBuckets, options.MaxRequestsPerWindow, options.RequestWindow));
@@ -51,6 +67,7 @@ namespace FewMoves.Coop.Server
                 await next(context);
             });
 
+            app.UseWhen(context => IsCompressibleBuildAsset(context.Request.Path), branch => branch.UseResponseCompression());
             ConfigureStaticFiles(app, options);
             app.MapGet("/healthz", async context =>
             {
@@ -189,9 +206,28 @@ namespace FewMoves.Coop.Server
                 OnPrepareResponse = delegate (StaticFileResponseContext context)
                 {
                     context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-                    context.Context.Response.Headers["Cache-Control"] = "no-store";
+                    PathString path = context.Context.Request.Path;
+                    context.Context.Response.Headers["Cache-Control"] = IsHashedBuildAsset(path)
+                        ? "public,max-age=31536000,immutable"
+                        : "no-store";
+                    if (IsCompressibleBuildAsset(path))
+                        context.Context.Response.Headers["Vary"] = "Accept-Encoding";
                 }
             });
+        }
+
+        private static bool IsHashedBuildAsset(PathString path)
+        {
+            return path.HasValue && HashedBuildPath.IsMatch(path.Value);
+        }
+
+        private static bool IsCompressibleBuildAsset(PathString path)
+        {
+            if (!IsHashedBuildAsset(path)) return false;
+            string value = path.Value;
+            return value.EndsWith(".wasm", StringComparison.Ordinal)
+                || value.EndsWith(".data", StringComparison.Ordinal)
+                || value.EndsWith(".js", StringComparison.Ordinal);
         }
 
         private static IResult ToStateOrError(StoreResult result)

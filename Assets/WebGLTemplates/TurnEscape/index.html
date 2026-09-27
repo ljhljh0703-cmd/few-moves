@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" href="data:,">
-  <title>{{{ PRODUCT_NAME }}}</title>
+  <title>Few Moves · 솔로</title>
   <style>
-    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --focus:#5d8960; --blue:#4374b7; --amber:#d09743; --teal:#439491; }
+    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --focus:#5d8960; --blue:#4374b7; --amber:#d09743; --teal:#439491; --stage:#f0ece2; --pad:#293238; --pad-edge:#171e1f; }
     * { box-sizing:border-box; }
-    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--paper); }
+    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--stage); }
     body { color:var(--ink); }
     button,a { min-width:48px; min-height:48px; border:0; color:inherit; background:transparent; font:inherit; font-weight:750; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
     a { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
@@ -16,22 +16,27 @@
     button:disabled { opacity:.36; cursor:default; }
     [hidden] { display:none!important; }
     main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
-    .utility-bar { min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; border-bottom:1px solid var(--line); }
-    .top-actions { display:flex; align-items:center; flex:none; }
-    .moves { flex:none; font-size:14px; font-weight:750; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .quick-retry { flex:none; min-width:78px; min-height:48px; padding:0 7px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
-    .icon-button { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border-radius:10px; font-size:23px; }
+    .utility-bar { width:min(100%,560px); justify-self:center; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
+    .top-actions { display:flex; align-items:center; flex:none; gap:6px; }
+    .moves { flex:none; min-height:36px; display:inline-flex; align-items:center; padding:0 11px; border:2px solid var(--ink); border-radius:9px; background:var(--pad); color:var(--paper); font-size:16px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .quick-retry,.icon-button { min-height:48px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); }
+    .quick-retry:enabled:active,.icon-button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
+    .quick-retry { flex:none; min-width:78px; padding:0 10px; font-size:15px; font-weight:800; }
+    .icon-button { min-width:48px; display:grid; place-items:center; padding:0; font-size:21px; }
     .icon-button svg { width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; }
-    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:24px minmax(0,1fr) 220px; gap:4px; }
-    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; min-width:0; margin:0; color:var(--muted); font-size:14px; line-height:20px; font-weight:650; text-align:center; }
+    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:32px minmax(0,1fr) 234px; gap:4px; }
+    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; gap:9px; min-width:0; margin:0; color:var(--ink); font-size:clamp(18px,5.4vw,21px); line-height:1.25; font-weight:800; text-align:center; white-space:nowrap; }
+    .goal-mark { width:14px; height:14px; flex:none; border-radius:50%; background:#669bd3; box-shadow:0 0 0 3px color-mix(in srgb,#669bd3 28%,transparent); }
+    .goal-piece { color:var(--blue); font-weight:850; }
     .board-stage { grid-row:2; position:relative; min-width:0; min-height:0; width:100%; overflow:hidden; display:grid; place-items:center; }
     .game { min-width:0; min-height:0; width:100%; height:100%; display:grid; place-items:center; }
-    canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:1px solid var(--line); border-radius:9px; background:var(--floor); image-rendering:pixelated; }
+    canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:0; border-radius:0; background:var(--stage); image-rendering:pixelated; }
     .feedback { position:absolute; z-index:2; left:50%; bottom:4px; width:min(calc(100% - 20px),360px); margin:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font-size:14px; line-height:1.3; text-align:center; transform:translateX(-50%); }
-    .control-slot { grid-row:3; min-height:0; display:grid; place-items:center; border-top:1px solid var(--line); }
-    .play-controls { width:100%; height:220px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:4px; }
+    .control-slot { grid-row:3; min-height:0; display:grid; place-items:center; }
+    .play-controls { width:100%; height:234px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:18px; }
     .play-controls[hidden] { display:grid!important; visibility:hidden; pointer-events:none; }
     .piece-row { grid-row:1; width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; }
+    .piece-row[hidden] { display:flex!important; visibility:hidden; pointer-events:none; }
     .piece-chips { display:flex; align-items:center; justify-content:center; gap:6px; }
     .piece-chip { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
     .piece-chip[aria-pressed="true"] { border-color:var(--focus); box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--focus) 38%,transparent); }
@@ -39,13 +44,16 @@
     .piece-chip[data-piece-index="1"] .piece-mark { border-color:color-mix(in srgb,var(--amber) 65%,var(--ink)); border-radius:2px; background:var(--amber); transform:rotate(45deg); }
     .piece-chip[data-piece-index="2"] .piece-mark { border-color:color-mix(in srgb,var(--teal) 65%,var(--ink)); border-radius:2px; background:var(--teal); }
     .direction-console { grid-row:2; position:relative; width:180px; height:168px; margin:0 auto; }
-    .direction-button,.undo-button { position:absolute; width:56px; height:56px; display:grid; place-items:center; padding:0; border-radius:12px; }
-    .direction-button::after,.undo-button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--line); }
-    .direction-button::before,.undo-button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:var(--surface); }
-    .direction-button:enabled:hover::before,.undo-button:enabled:hover::before { background:var(--floor); }
-    .direction-button:enabled:active::before,.undo-button:enabled:active::before { background:#d1c5af; }
-    .direction-button span,.undo-button span { position:relative; z-index:2; color:var(--ink); font-size:24px; line-height:1; }
-    .direction-up { left:62px; top:0; } .direction-left { left:0; top:56px; } .direction-right { left:124px; top:56px; } .direction-down { left:62px; top:112px; } .undo-button { left:62px; top:56px; }
+    .dpad-base { position:absolute; inset:0; z-index:0; pointer-events:none; filter:drop-shadow(0 4px 0 var(--pad-edge)); }
+    .dpad-base::before,.dpad-base::after { position:absolute; content:""; border-radius:14px; background:var(--pad); }
+    .dpad-base::before { left:62px; top:0; width:56px; height:164px; } .dpad-base::after { left:0; top:56px; width:180px; height:52px; }
+    .dpad-center { position:absolute; left:78px; top:70px; z-index:1; width:24px; height:24px; border-radius:50%; background:var(--pad-edge); pointer-events:none; }
+    .direction-button { position:absolute; z-index:2; width:56px; height:56px; display:grid; place-items:center; padding:0; border-radius:12px; background:transparent; }
+    .direction-button:enabled:hover { background:color-mix(in srgb,#fff 9%,transparent); }
+    .direction-button:enabled:active { background:color-mix(in srgb,#000 24%,transparent); }
+    .direction-button span { color:var(--paper); font-size:22px; line-height:1; transition:transform 60ms ease-out; }
+    .direction-button:enabled:active span { transform:translateY(2px); }
+    .direction-up { left:62px; top:0; } .direction-left { left:0; top:56px; } .direction-right { left:124px; top:56px; } .direction-down { left:62px; top:112px; }
     dialog { width:min(360px,calc(100% - 24px)); max-height:calc(100dvh - 24px); margin:auto; padding:0; overflow:auto; border:1px solid var(--line); border-radius:13px; background:var(--surface); color:var(--ink); box-shadow:0 14px 44px color-mix(in srgb,var(--ink) 28%,transparent); }
     dialog::backdrop { background:color-mix(in srgb,var(--ink) 30%,transparent); }
     .dialog-body { display:grid; gap:10px; padding:14px; }
@@ -67,19 +75,20 @@
     .share-record { width:100%; min-height:58px; padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#fffdf7; color:var(--ink); font:inherit; font-size:14px; line-height:1.4; resize:vertical; }
     .share-panel-feedback:empty { display:none; }
     .share-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
-    #result-dialog { width:min(296px,calc(100% - 24px)); }
+    #result-dialog { width:min(296px,calc(100% - 24px)); border:2px solid var(--ink); border-radius:14px; box-shadow:0 4px 0 var(--pad-edge); }
     .result-card { position:relative; display:grid; gap:10px; padding:13px; }
     .result-title { margin:0; font-size:21px; font-weight:850; text-align:center; }
-    .result-turn { margin:0; font-size:38px; font-weight:850; font-variant-numeric:tabular-nums; text-align:center; }
+    .result-turn { margin:0; font-size:44px; font-weight:850; line-height:1.1; font-variant-numeric:tabular-nums; text-align:center; }
     .result-par { margin:0; color:var(--muted); font-size:14px; text-align:center; }
-    .result-share,.result-menu { position:absolute; top:8px; min-width:48px; min-height:48px; display:grid; place-items:center; border-radius:9px; }
+    .result-share,.result-menu { position:absolute; top:8px; min-width:48px; min-height:48px; display:grid; place-items:center; border:2px solid var(--ink); border-radius:12px; background:var(--surface); }
     .result-share { right:8px; font-size:20px; } .result-menu { left:8px; font-size:14px; }
     .result-share svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; }
     .result-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
     .result-actions.is-single { grid-template-columns:1fr; }
-    .result-actions button { min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; }
+    .result-actions button { min-height:48px; padding:0 9px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); font-size:14px; }
+    .result-actions button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     .result-actions .result-next { border-color:var(--ink); background:var(--ink); color:#fff; }
-    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:24px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; border-top:0; border-left:1px solid var(--line); } }
+    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:32px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; } }
     @media (max-height:520px) and (orientation:portrait) { html,body { overflow-y:auto; } main#app { min-height:520px; height:auto; } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
   </style>
@@ -88,11 +97,10 @@
   <main id="app">
     <header class="utility-bar">
       <span id="turn-runline" class="moves">0번 이동</span>
-      <button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button>
-      <div class="top-actions"><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
+      <div class="top-actions"><button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
     </header>
     <section class="play-layout" aria-label="Few Moves">
-      <p class="goal-hint">파란 말을 목표 칸에 넣어요</p>
+      <p class="goal-hint"><span class="goal-mark" aria-hidden="true"></span><span><strong class="goal-piece">파란 말</strong>을 목표 칸에 넣어요</span></p>
       <section class="board-stage" aria-label="게임 보드">
         <section class="game">
           <canvas id="unity-canvas" tabindex="0" aria-label="Few Moves 보드"></canvas>
@@ -101,7 +109,7 @@
       </section>
       <section class="control-slot">
         <section id="play-controls" class="play-controls" aria-label="조작">
-          <div class="piece-row">
+          <div id="piece-row" class="piece-row" hidden>
             <div class="piece-chips" role="group" aria-label="말 선택">
               <button class="piece-chip" type="button" data-piece-index="0" aria-pressed="true" aria-label="파란 원 말 선택"><span class="piece-mark" aria-hidden="true"></span></button>
               <button class="piece-chip" type="button" data-piece-index="1" aria-pressed="false" aria-label="호박색 마름모 말 선택" hidden><span class="piece-mark" aria-hidden="true"></span></button>
@@ -109,9 +117,9 @@
             </div>
           </div>
           <div class="direction-console" aria-label="방향 조작">
+            <span class="dpad-base" aria-hidden="true"></span><span class="dpad-center" aria-hidden="true"></span>
             <button class="direction-button direction-up" type="button" data-game-action="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button>
             <button class="direction-button direction-left" type="button" data-game-action="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button>
-            <button class="undo-button" type="button" data-game-action="Undo" disabled aria-label="한 수 되돌리기"><span aria-hidden="true">↶</span></button>
             <button class="direction-button direction-right" type="button" data-game-action="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button>
             <button class="direction-button direction-down" type="button" data-game-action="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button>
           </div>
@@ -163,7 +171,7 @@
       <ul class="help-list">
         <li><span class="help-mark" aria-hidden="true">▲</span><span>방향을 누르면 선택한 말이 벽이나 다른 말 앞까지 미끄러져요.</span></li>
         <li><span class="help-mark" aria-hidden="true">●</span><span>파란 말을 목표 칸에 넣으면 성공해요.</span></li>
-        <li><span class="help-mark" aria-hidden="true">↶</span><span>위의 말 버튼으로 움직일 말을 바꾸고, 가운데 버튼으로 한 번 되돌려요.</span></li>
+        <li><span class="help-mark" aria-hidden="true">◆</span><span>말이 여러 개인 방에서는 위의 말 버튼으로 움직일 말을 바꿔요.</span></li>
       </ul>
     </div>
   </dialog>
@@ -185,6 +193,7 @@
     var unityInstance = null;
     var gameActionButtons = Array.from(document.querySelectorAll("button[data-game-action]"));
     var pieceButtons = Array.from(document.querySelectorAll("button[data-piece-index]"));
+    var pieceRow = document.querySelector("#piece-row");
     var menuButton = document.querySelector("#menu-toggle");
     var helpButton = document.querySelector("#help-toggle");
     var helpDialog = document.querySelector("#help-dialog");
@@ -296,7 +305,6 @@
       if (action === "StartOver") return state.startOverEnabled === true;
       if (action === "Restart") return state.restartEnabled === true && !state.savePending;
       if (state.error) return false;
-      if (action === "Undo") return !state.savePending && state.statusCode === "Playing" && (state.transitioning || state.turn > 0);
       if (state.transitioning) return false;
       if (action === "Next") return state.statusCode === "Cleared" && state.nextEnabled === true;
       return state.statusCode === "Playing" && state.inputEnabled === true &&
@@ -315,7 +323,7 @@
     function isSelectionAllowed(pieceIndex) {
       var state = currentState;
       return !!unityInstance && isInitializedState(state) && !state.savePending && state.inputEnabled === true && !state.transitioning &&
-        state.statusCode === "Playing" && Number.isInteger(pieceIndex) &&
+        state.statusCode === "Playing" && state.pieceCount > 1 && Number.isInteger(pieceIndex) &&
         pieceIndex >= 0 && pieceIndex < state.pieceCount;
     }
     function selectPiece(pieceIndex) {
@@ -516,6 +524,8 @@
       });
     }
     function renderPieceButtons(state) {
+      // A selector with a single piece has nothing to choose; its slot stays reserved so the pad does not move.
+      pieceRow.hidden = !(!!state && state.initialized === true && state.pieceCount > 1);
       pieceButtons.forEach(function (button) {
         var index = Number(button.dataset.pieceIndex);
         var visible = !!state && state.initialized && index >= 0 && index < state.pieceCount;
@@ -538,7 +548,8 @@
       var cleared = state.statusCode === "Cleared";
       resultTitle.textContent = "클리어";
       resultTurn.textContent = state.turn + "수";
-      resultPar.textContent = "최단 " + state.parMoves + "수";
+      // parMoves is the solver-proven optimum, so matching it is a true achievement, not a score.
+      resultPar.textContent = cleared && state.parMoves > 0 && state.turn === state.parMoves ? "최단 " + state.parMoves + "수 달성" : "최단 " + state.parMoves + "수";
       resultMenuButton.disabled = false;
       resultNextButton.hidden = !cleared || !state.nextEnabled;
       resultShareButton.hidden = !canShareState(state);
@@ -603,7 +614,6 @@
       if (event.code === "ArrowDown") return "Down";
       if (event.code === "ArrowLeft") return "Left";
       if (event.code === "ArrowRight") return "Right";
-      if (event.code === "Space" || event.key === " " || event.key === "Spacebar") return "Undo";
       if (event.code === "KeyR" || String(event.key || "").toLowerCase() === "r") return "Restart";
       return null;
     }

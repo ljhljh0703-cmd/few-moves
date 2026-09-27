@@ -6,7 +6,7 @@ using Object = UnityEngine.Object;
 
 namespace Nectorial.SlideEscape.Unity
 {
-    internal sealed class GameBoardView : IDisposable
+    internal sealed class GameBoardView : IBoardView
     {
         private const int TilePixels = 16;
         private static readonly Color Floor = new Color32(229, 224, 211, 255);
