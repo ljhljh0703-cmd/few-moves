@@ -19,7 +19,8 @@ internal static class Program
         Run("capsule_codec_bounds_and_canonical_round_trip", CheckCodec);
         Run("raid_capsule_replays_actual_clear_only", CheckRaidCapsule);
         Run("default_raid_v2_capsule_replays_no_hit_clear", CheckDefaultRaidV2Capsule);
-        Run("default_raid_v4_capsule_identity_separate_from_v3", CheckDefaultRaidV4Capsule);
+        Run("default_raid_v5_capsule_identity_separate_from_v4", CheckDefaultRaidV5Capsule);
+        Run("legacy_raid_v4_capsule_identity_separate_from_v3", CheckLegacyRaidV4Capsule);
         Run("coop_capsule_replays_no_pass_clear_only", CheckCoopCapsule);
         Run("coop_effective_stack_undo_restart_and_erased_pass", CheckEffectiveStack);
 
@@ -96,12 +97,25 @@ internal static class Program
         Assert(verification.Hits == 0 && verification.EffectiveActionCount == 7 && verification.StatusCode == RaidRunStatus.Cleared.ToString(), "v2 record derives no-hit clear outcome");
     }
 
-    // v4 (Slow only) records verify on their own identity; v3 and v4 records are not interchangeable.
-    private static void CheckDefaultRaidV4Capsule()
+    // v5 (no helper items) is the default; its records verify on their own identity and never cross with v4.
+    private static void CheckDefaultRaidV5Capsule()
+    {
+        RaidArenaDefinition v5 = Load<RaidArenaDefinition>("RaidArenas", "raid-01-v5.json");
+        RaidArenaDefinition v4 = Load<RaidArenaDefinition>("RaidArenas", "raid-01-v4.json");
+        Assert(RaidContent.DefaultArenaId == v5.Id, "v5 is the default raid arena");
+        RecordCapsule capsule = RaidCapsule(v5, "DURDULDRURLU");
+        RecordVerification verification;
+        Assert(RecordCapsuleVerifier.TryVerifyRaid(v5, capsule, out verification), "v5 record capsule validates: " + verification.ErrorCode);
+        Assert(verification.Hits == 0 && verification.EffectiveActionCount == 12 && verification.StatusCode == RaidRunStatus.Cleared.ToString(), "v5 record derives the witness clear");
+        Assert(!RecordCapsuleVerifier.TryVerifyRaid(v5, RaidCapsule(v4, "DURDULDRURLU"), out verification) && verification.ErrorCode == "definition_identity_mismatch", "a v4 record cannot verify against v5");
+        Assert(!RecordCapsuleVerifier.TryVerifyRaid(v4, capsule, out verification) && verification.ErrorCode == "definition_identity_mismatch", "a v5 record cannot verify against v4");
+    }
+
+    // v4 (Slow only) records keep verifying on their own identity; v3 and v4 records are not interchangeable.
+    private static void CheckLegacyRaidV4Capsule()
     {
         RaidArenaDefinition v4 = Load<RaidArenaDefinition>("RaidArenas", "raid-01-v4.json");
         RaidArenaDefinition v3 = Load<RaidArenaDefinition>("RaidArenas", "raid-01-v3.json");
-        Assert(RaidContent.DefaultArenaId == v4.Id, "v4 is the default raid arena");
         RecordCapsule capsule = RaidCapsule(v4, "DURDULDRURLU");
         RecordVerification verification;
         Assert(RecordCapsuleVerifier.TryVerifyRaid(v4, capsule, out verification), "v4 record capsule validates: " + verification.ErrorCode);

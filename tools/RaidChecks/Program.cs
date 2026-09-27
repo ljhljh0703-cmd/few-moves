@@ -14,7 +14,15 @@ internal static class Program
     private const string LegacyV2Sha256 = "91c73e35a0dbea062e44b415b84a33398dd6e71d1e089252a1a64f3a4107fdaa";
     private const string LegacyV3Sha256 = "59a0bc7c923218e454b0cabf7cac652ad8faca3b55ef8dd9b9cd5a62a1a8223c";
     private const string LegacyV3Fingerprint = "d28fe769aec762eeea0db782f2d5e2d08b93325c7070fedffa3573d663ca4bd3";
-    private const string DefaultV4Fingerprint = "a0a60b8e1577ece9e270826d2d52eca68ccdf07349c6626ba7f789baf87b8988";
+    private const string LegacyV4Sha256 = "e73b5a87b7c36255aaee133be1ce478c2505ca40d9646170cacee75e65c7629c";
+    private const string LegacyV4Fingerprint = "a0a60b8e1577ece9e270826d2d52eca68ccdf07349c6626ba7f789baf87b8988";
+    private const string DefaultV5Fingerprint = "3215b96aed7249f73ecc11b7e4f8b9f34df6e404dd7a1c4c43e12ddf2cddfe80";
+    // v5 witness from Sol's solver analysis (task feasibility/production-core-run.json), re-confirmed below on the production Core.
+    private const string V5WitnessTrace = "DURDULDRURLU";
+    private const int V5WitnessCost = 12;
+    private const int V5WitnessHits = 0;
+    private const string V5WitnessFinalState = "b574d509923eb2c3e7192cdb4e48380ef53a13fda384fe6b238e09ce80576370";
+    private const string V5DangerTrace = "RD";
     private static RaidArenaDefinition Arena;
     private static RaidSolverResult WinningSolution;
     private static RaidSolverResult AllItemsSolution;
@@ -24,11 +32,12 @@ internal static class Program
     private static int Main()
     {
         Run("raid_arena_solver_trace_and_all_items", CheckWinningTrace);
-        Run("default_raid_v4_slow_only_identity_and_witnesses", CheckDefaultV4Witnesses);
+        Run("default_raid_v5_no_items_identity_and_witnesses", CheckDefaultV5Witnesses);
+        Run("legacy_raid_v4_slow_only_identity_and_witnesses", CheckLegacyV4Witnesses);
         Run("item_kinds_optional_but_each_item_still_validated", CheckItemKindValidation);
         Run("legacy_raid_v3_witnesses_and_content_identity", CheckLegacyV3Witnesses);
         Run("legacy_raid_v2_witnesses_and_content_identity", CheckLegacyV2Witnesses);
-        Run("legacy_raid_v1_v2_v3_data_byte_identity", CheckLegacyDataByteIdentity);
+        Run("legacy_raid_v1_to_v4_data_byte_identity", CheckLegacyDataByteIdentity);
         Run("microstep_vacated_tail_and_collision_before_pickup", CheckCollisionSemantics);
         Run("shield_recovery_keeps_snake_phase", CheckShieldRecovery);
         Run("slow_and_magnet_timing", CheckBuffTiming);
@@ -93,14 +102,52 @@ internal static class Program
         Assert(itemKinds.Contains("Shield") && itemKinds.Contains("Magnet") && itemKinds.Contains("Slow"), "all-item winning trace must collect each distinct item kind");
     }
 
-    private static void CheckDefaultV4Witnesses()
+    // The current default: every helper item removed. Witness values come from Sol's analysis, confirmed here on the production Core.
+    private static void CheckDefaultV5Witnesses()
     {
         RaidArenaDefinition arena = LoadArena();
-        AssertEqual("raid-01-v4", RaidContent.DefaultArenaId, "default Raid content ID is v4");
-        AssertEqual("raid-01-v4", arena.Id, "default arena file carries the v4 ID");
-        AssertEqual("raid-01-v4", arena.ContentVersion, "default arena content version is v4");
+        AssertEqual("raid-01-v5", RaidContent.DefaultArenaId, "default Raid content ID is v5");
+        AssertEqual("raid-01-v5", arena.Id, "default arena file carries the v5 ID");
+        AssertEqual("raid-01-v5", arena.ContentVersion, "default arena content version is v5");
+        AssertEqual(0, RaidRules.ValidateArena(arena).Length, "item-free v5 arena validates");
+        AssertEqual(DefaultV5Fingerprint, RaidRules.ArenaFingerprint(arena), "default Raid v5 fingerprint is exact");
+        AssertEqual(0, arena.Items.Length, "v5 places no helper items");
+        AssertEqual(0, arena.InitialShieldCharges, "v5 grants no initial shield");
+        AssertEqual(3, arena.TailFragments.Length, "v5 keeps the three collectibles as the goal");
+        RaidState initial = RaidRules.CreateInitialState(arena);
+        Assert(initial.ShieldCharges == 0 && initial.MagnetStepsRemaining == 0 && initial.SlowStepsRemaining == 0, "v5 starts without any helper effect");
+        // v5 is v4 minus the Slow pickup: restoring exactly that and the identity gives v4 back.
+        RaidArenaDefinition restored = RaidRules.CloneArena(arena);
+        restored.Id = "raid-01-v4";
+        restored.ContentVersion = "raid-01-v4";
+        restored.Items = LoadArena("raid-01-v4.json").Items;
+        AssertEqual(LegacyV4Fingerprint, RaidRules.ArenaFingerprint(restored), "v5 differs from v4 only by the Slow item and identity");
+        RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
+        AssertEqual(RaidSolverStatus.Solved, shortest.Status, "v5 shortest solver status");
+        AssertEqual(V5WitnessCost, shortest.OptimalActionCount, "v5 shortest cost");
+        AssertEqual(V5WitnessTrace, Directions(shortest.Moves), "v5 shortest trace");
+        RaidState clear = Replay(arena, V5WitnessTrace);
+        AssertEqual(RaidRunStatus.Cleared, clear.Status, "v5 witness clears");
+        AssertEqual(V5WitnessHits, clear.Hits, "v5 witness hit count");
+        AssertEqual(3, clear.CollectedTailIds.Length, "v5 witness collects three collectibles");
+        AssertEqual(0, clear.CollectedItemIds.Length, "v5 witness collects no helper items");
+        AssertEqual(V5WitnessFinalState, RaidRules.StateFingerprint(arena, clear), "v5 witness final state fingerprint");
+        AssertEqual(9, FindArmingIndex(arena, shortest.Moves), "v5 witness arms at the tenth action");
+        RaidState danger = Replay(arena, V5DangerTrace);
+        AssertEqual(RaidRunStatus.Failed, danger.Status, "v5 danger trace fails from an actual collision");
+        AssertEqual(1, danger.Hits, "v5 danger trace records the hit");
+        RaidDispatchResult zero = RaidRules.Step(arena, initial, GameCommand.Up);
+        Assert(!zero.Accepted && zero.Reason == "blocked_zero", "v5 blocked input remains a no-effect action");
+        AssertEqual(RaidRules.StateFingerprint(arena, initial), RaidRules.StateFingerprint(arena, zero.State), "v5 blocked input keeps state unchanged");
+    }
+
+    private static void CheckLegacyV4Witnesses()
+    {
+        RaidArenaDefinition arena = LoadArena("raid-01-v4.json");
+        AssertEqual("raid-01-v4", arena.Id, "legacy v4 fixture carries the v4 ID");
+        AssertEqual("raid-01-v4", arena.ContentVersion, "legacy v4 content version");
         AssertEqual(0, RaidRules.ValidateArena(arena).Length, "Slow-only v4 arena validates");
-        AssertEqual(DefaultV4Fingerprint, RaidRules.ArenaFingerprint(arena), "default Raid v4 fingerprint is exact");
+        AssertEqual(LegacyV4Fingerprint, RaidRules.ArenaFingerprint(arena), "legacy Raid v4 fingerprint is exact");
         AssertEqual(1, arena.Items.Length, "v4 places exactly one item");
         AssertEqual(RaidItemKind.Slow, arena.Items[0].Kind, "the only v4 item is Slow");
         AssertEqual(0, arena.InitialShieldCharges, "v4 grants no initial shield");
@@ -136,7 +183,7 @@ internal static class Program
     // Item kinds are no longer all required, but every placed item is still validated.
     private static void CheckItemKindValidation()
     {
-        RaidArenaDefinition v4 = LoadArena();
+        RaidArenaDefinition v4 = LoadArena("raid-01-v4.json");
         RaidArenaDefinition none = RaidRules.CloneArena(v4);
         none.Items = new RaidItemDefinition[0];
         AssertEqual(0, RaidRules.ValidateArena(none).Length, "an arena without items validates");
@@ -204,6 +251,7 @@ internal static class Program
         AssertEqual(LegacyV1Sha256, FileSha256("raid-01.json"), "legacy v1 data bytes changed");
         AssertEqual(LegacyV2Sha256, FileSha256("raid-01-v2.json"), "legacy v2 data bytes changed");
         AssertEqual(LegacyV3Sha256, FileSha256("raid-01-v3.json"), "legacy v3 data bytes changed");
+        AssertEqual(LegacyV4Sha256, FileSha256("raid-01-v4.json"), "legacy v4 data bytes changed");
     }
 
     private static void CheckCollisionSemantics()

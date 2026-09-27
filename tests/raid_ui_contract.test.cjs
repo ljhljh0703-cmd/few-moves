@@ -16,7 +16,8 @@ assert.match(template, /id="menu-dialog"/);
 assert.match(template, /id="help-dialog"/);
 assert.match(template, /목표: 조각 3개를 모아 뱀에게 돌진/, "the goal stays readable to screen readers");
 assert.doesNotMatch(template, /금빛 조각|다시 도전해|↻/, "no quest sentence names, retry prompt or in-play retry glyph");
-assert.match(template, /모래시계: 표시된 칸만큼 내가 움직이는 동안 뱀이 멈춰요/, "hourglass is described as a stop measured in cells you slide");
+assert.doesNotMatch(template, /SlowGlyph|slow-effect|slow-count|모래시계|effect-chip/, "the active raid shows no helper items at all: no hourglass help, chip or readout");
+assert.match(template, /<div id="effect-row" class="effect-row" hidden aria-hidden="true"><\/div>/, "an empty, hidden spacer keeps the fixed effect row");
 assert.match(template, /<header class="topbar">\s*<span id="turn-label" class="moves">0번 이동<\/span>\s*<div class="top-actions"><button id="help-top"/, "one HUD row: moves left, help/menu right");
 assert.doesNotMatch(template, /restart-top|quick-retry/, "no in-play retry button, style or listener");
 assert.doesNotMatch(template, /quickbar|small-screen-actions|turn-label-small|restart-small|goal-help|<h1>/, "no duplicate title or second move/retry row");
@@ -60,7 +61,7 @@ const maxHeadRadius = Math.max(...head.flatMap((row,y) => [...row].flatMap((pixe
 assert.ok(maxHeadRadius < 0.5, `the rotating head and eyes stay inside one cell: ${maxHeadRadius}`);
 assert.match(boardView, /state\.Status == RaidRunStatus\.Armed \|\| state\.Status == RaidRunStatus\.Cleared/, "gold player begins only after confirmed Armed");
 assert.doesNotMatch(template, /ShieldGlyph|MagnetGlyph|shield-effect|magnet-effect|shield-count|magnet-count|보호막|자석/, "current raid shows no shield or magnet: no help entry, chip or state readout");
-for (const name of ["PlayerGlyph","TailGlyph","SnakeHeadGlyph","SnakeBodyGlyph","SlowGlyph"]) {
+for (const name of ["PlayerGlyph","TailGlyph","SnakeHeadGlyph","SnakeBodyGlyph"]) {
   const pattern = boardGlyph(name).join("/");
   assert.ok(template.includes(`data-glyph="${name}" data-pattern="${pattern}"`), `${name} help picture matches the actual board glyph`);
 }
@@ -104,9 +105,10 @@ function observation(status = "Playing", overrides = {}) {
 
 function createHarness(hash = "#record=fm1.shared") {
   const documentObject = { activeElement: null, listeners: {}, loader: null };
-  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","slow-count","effect-row","slow-effect","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
+  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","effect-row","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
   const elements = Object.fromEntries(ids.map(id => [id, makeElement(documentObject, id)]));
   for (const id of ["result-dialog","record-dialog","menu-dialog","help-dialog"]) elements[id].tagName = "DIALOG";
+  elements["effect-row"].hidden = true; // mirrors the markup's hidden attribute on the empty spacer
   const actions = [makeElement(documentObject,"up",{raidAction:"Slide",direction:"Up"}),makeElement(documentObject,"left",{raidAction:"Slide",direction:"Left"}),makeElement(documentObject,"right",{raidAction:"Slide",direction:"Right"}),makeElement(documentObject,"down",{raidAction:"Slide",direction:"Down"}),elements["save-button"],elements["result-restart"]];
   elements["save-button"].dataset = { raidAction:"Save" }; elements["result-restart"].dataset = { raidAction:"Restart" };
   const boardStage = makeElement(documentObject, "board-stage"); boardStage.tagName = "SECTION";
@@ -146,7 +148,6 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements.feedback.classList.contains("is-alert"), false, "ordinary game feedback is not shown as a visible alert");
   assert.equal(h.elements["turn-label"].textContent, "2번 이동");
   assert.equal(h.elements["effect-row"].hidden, true, "a legacy shieldCharges field shows nothing in the current raid");
-  assert.equal(h.elements["slow-effect"].hidden, true);
   assert.equal(h.elements["charge-0"].classList.contains("filled"), false);
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1 })));
   assert.equal(h.elements["tail-count"].textContent, "조각 1/3 모음, 다 모으면 뱀에게 돌진");
@@ -202,11 +203,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements.feedback.textContent, "레이드 상태를 확인할 수 없습니다.");
   assert.equal(h.elements.feedback.classList.contains("is-alert"), true, "an unreadable state report stays visible");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));
-  assert.equal(h.elements["slow-count"].textContent, "1칸", "hourglass shows its remaining cells of player movement");
-  assert.equal(h.elements["slow-effect"].hidden, false);
-  assert.equal(h.elements["effect-row"].hidden, false, "an active hourglass shows the effect strip");
-  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:0 })));
-  assert.equal(h.elements["effect-row"].hidden, true, "legacy shield/magnet fields alone never show a chip");
+  assert.equal(h.elements["effect-row"].hidden, true, "legacy shield/magnet/slow fields never show anything in the item-free raid");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { shieldCharges:0 })));
   assert.equal(h.elements["effect-row"].hidden, true, "inactive effect strip is hidden (its CSS slot stays reserved)");
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { tailCount:1, shieldCharges:1, magnetStepsRemaining:2, slowStepsRemaining:1 })));

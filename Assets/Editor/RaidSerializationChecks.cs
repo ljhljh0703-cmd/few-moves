@@ -14,7 +14,10 @@ namespace Nectorial.Editor
         private const string SaveKey = "nectorial-raid.save.v1.raid-v1." + RaidContent.DefaultArenaId;
         private const string FailedSaveKey = SaveKey + ".restore-failed";
         private const string LegacyV2SaveKey = "nectorial-raid.save.v1";
-        private const string DefaultArenaFingerprint = "a0a60b8e1577ece9e270826d2d52eca68ccdf07349c6626ba7f789baf87b8988";
+        private const string DefaultArenaFingerprint = "3215b96aed7249f73ecc11b7e4f8b9f34df6e404dd7a1c4c43e12ddf2cddfe80";
+        private const string LegacyV4ArenaResource = "RaidArenas/raid-01-v4";
+        private const string LegacyV4ArenaFingerprint = "a0a60b8e1577ece9e270826d2d52eca68ccdf07349c6626ba7f789baf87b8988";
+        private const string LegacyV4SaveKey = "nectorial-raid.save.v1.raid-v1.raid-01-v4";
         private const string LegacyV3ArenaResource = "RaidArenas/raid-01-v3";
         private const string LegacyV3ArenaFingerprint = "d28fe769aec762eeea0db782f2d5e2d08b93325c7070fedffa3573d663ca4bd3";
         private const string LegacyV3SaveKey = "nectorial-raid.save.v1.raid-v1.raid-01-v3";
@@ -28,7 +31,8 @@ namespace Nectorial.Editor
             RaidArenaDefinition arena = JsonUtility.FromJson<RaidArenaDefinition>(asset.text);
             string[] errors = RaidRules.ValidateArena(arena);
             if (errors.Length > 0) throw new InvalidOperationException("Raid arena invalid: " + errors[0]);
-            CheckDefaultV4Witnesses(arena);
+            CheckDefaultV5Witnesses(arena);
+            CheckLegacyV4Witnesses();
             RaidArenaDefinition legacyV3 = CheckLegacyV3Witnesses();
             CheckLegacyV2Witnesses();
 
@@ -84,30 +88,61 @@ namespace Nectorial.Editor
             Debug.Log("RAID_JSON_PROBE_RESULT pass=true");
         }
 
-        private static void CheckDefaultV4Witnesses(RaidArenaDefinition arena)
+        private static void CheckDefaultV5Witnesses(RaidArenaDefinition arena)
         {
-            if (arena.Id != RaidContent.DefaultArenaId || arena.Id != "raid-01-v4" || arena.ContentVersion != "raid-01-v4" || RaidRules.ArenaFingerprint(arena) != DefaultArenaFingerprint)
-                throw new InvalidOperationException("Default Raid arena identity is not v4.");
+            if (arena.Id != RaidContent.DefaultArenaId || arena.Id != "raid-01-v5" || arena.ContentVersion != "raid-01-v5" || RaidRules.ArenaFingerprint(arena) != DefaultArenaFingerprint)
+                throw new InvalidOperationException("Default Raid arena identity is not v5.");
             if (arena.Width != 16 || arena.Height != 16 || arena.SnakeRing == null || arena.SnakeRing.Length != 28 || arena.SnakeBodyLength != 12 || arena.TailFragments == null || arena.TailFragments.Length != 3)
-                throw new InvalidOperationException("Default Raid v4 scale contract did not match.");
-            if (arena.Items == null || arena.Items.Length != 1 || arena.Items[0].Kind != RaidItemKind.Slow || arena.InitialShieldCharges != 0)
-                throw new InvalidOperationException("Default Raid v4 must place only Slow and grant no initial shield.");
+                throw new InvalidOperationException("Default Raid v5 scale contract did not match.");
+            if (arena.Items == null || arena.Items.Length != 0 || arena.InitialShieldCharges != 0)
+                throw new InvalidOperationException("Default Raid v5 must place no helper items and grant no initial shield.");
             RaidState initial = RaidRules.CreateInitialState(arena);
-            if (initial.ShieldCharges != 0 || initial.MagnetStepsRemaining != 0) throw new InvalidOperationException("Default Raid v4 starts with a shield or magnet effect.");
+            if (initial.ShieldCharges != 0 || initial.MagnetStepsRemaining != 0 || initial.SlowStepsRemaining != 0) throw new InvalidOperationException("Default Raid v5 starts with a helper effect.");
             RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
             if (shortest.Status != RaidSolverStatus.Solved || shortest.OptimalActionCount != 12 || Directions(shortest.Moves) != "DURDULDRURLU")
-                throw new InvalidOperationException("Default Raid v4 shortest witness did not match.");
+                throw new InvalidOperationException("Default Raid v5 shortest witness did not match.");
             RaidState clearState = Replay(arena, "DURDULDRURLU");
-            if (clearState.Status != RaidRunStatus.Cleared || clearState.Actions != 12 || clearState.Hits != 0 || clearState.CollectedTailIds == null || clearState.CollectedTailIds.Length != 3 || clearState.CollectedItemIds == null || clearState.CollectedItemIds.Length != 1)
-                throw new InvalidOperationException("Default Raid v4 witness did not clear with three tails and the Slow item.");
-            if (RaidRules.StateFingerprint(arena, clearState) != "64261835492ef9f7c9ad0b6629e2c3f443dd4b5940660753ba06628ac8eea834")
-                throw new InvalidOperationException("Default Raid v4 witness final state changed.");
+            if (clearState.Status != RaidRunStatus.Cleared || clearState.Actions != 12 || clearState.Hits != 0 || clearState.CollectedTailIds == null || clearState.CollectedTailIds.Length != 3 || clearState.CollectedItemIds == null || clearState.CollectedItemIds.Length != 0)
+                throw new InvalidOperationException("Default Raid v5 witness did not clear with three collectibles and no items.");
+            if (RaidRules.StateFingerprint(arena, clearState) != "b574d509923eb2c3e7192cdb4e48380ef53a13fda384fe6b238e09ce80576370")
+                throw new InvalidOperationException("Default Raid v5 witness final state changed.");
             RaidState failureState = Replay(arena, "RD");
-            if (failureState.Status != RaidRunStatus.Failed || failureState.Hits != 1) throw new InvalidOperationException("Default Raid v4 danger witness did not fail.");
+            if (failureState.Status != RaidRunStatus.Failed) throw new InvalidOperationException("Default Raid v5 danger witness did not fail.");
             RaidDispatchResult zero = RaidRules.Step(arena, initial, GameCommand.Up);
             if (zero.Accepted || zero.Reason != "blocked_zero" || RaidRules.StateFingerprint(arena, initial) != RaidRules.StateFingerprint(arena, zero.State))
-                throw new InvalidOperationException("Default Raid v4 blocked input changed state.");
-            Debug.Log("RAID_JSON_PROBE case=default-v4-witnesses state=pass fingerprint=" + DefaultArenaFingerprint);
+                throw new InvalidOperationException("Default Raid v5 blocked input changed state.");
+            Debug.Log("RAID_JSON_PROBE case=default-v5-witnesses state=pass fingerprint=" + DefaultArenaFingerprint);
+        }
+
+        private static void CheckLegacyV4Witnesses()
+        {
+            TextAsset asset = Resources.Load<TextAsset>(LegacyV4ArenaResource);
+            if (asset == null) throw new InvalidOperationException("Missing legacy Raid v4 arena.");
+            RaidArenaDefinition arena = JsonUtility.FromJson<RaidArenaDefinition>(asset.text);
+            string[] errors = RaidRules.ValidateArena(arena);
+            if (errors.Length > 0) throw new InvalidOperationException("Legacy Raid v4 arena invalid: " + errors[0]);
+            if (arena.Id != "raid-01-v4" || arena.ContentVersion != "raid-01-v4" || RaidRules.ArenaFingerprint(arena) != LegacyV4ArenaFingerprint)
+                throw new InvalidOperationException("Legacy Raid v4 identity changed.");
+            if (arena.Width != 16 || arena.Height != 16 || arena.SnakeRing == null || arena.SnakeRing.Length != 28 || arena.SnakeBodyLength != 12 || arena.TailFragments == null || arena.TailFragments.Length != 3)
+                throw new InvalidOperationException("Legacy Raid v4 scale contract did not match.");
+            if (arena.Items == null || arena.Items.Length != 1 || arena.Items[0].Kind != RaidItemKind.Slow || arena.InitialShieldCharges != 0)
+                throw new InvalidOperationException("Legacy Raid v4 must place only Slow and grant no initial shield.");
+            RaidState initial = RaidRules.CreateInitialState(arena);
+            if (initial.ShieldCharges != 0 || initial.MagnetStepsRemaining != 0) throw new InvalidOperationException("Legacy Raid v4 starts with a shield or magnet effect.");
+            RaidSolverResult shortest = RaidSolver.FindSolution(arena, 200000);
+            if (shortest.Status != RaidSolverStatus.Solved || shortest.OptimalActionCount != 12 || Directions(shortest.Moves) != "DURDULDRURLU")
+                throw new InvalidOperationException("Legacy Raid v4 shortest witness did not match.");
+            RaidState clearState = Replay(arena, "DURDULDRURLU");
+            if (clearState.Status != RaidRunStatus.Cleared || clearState.Actions != 12 || clearState.Hits != 0 || clearState.CollectedTailIds == null || clearState.CollectedTailIds.Length != 3 || clearState.CollectedItemIds == null || clearState.CollectedItemIds.Length != 1)
+                throw new InvalidOperationException("Legacy Raid v4 witness did not clear with three tails and the Slow item.");
+            if (RaidRules.StateFingerprint(arena, clearState) != "64261835492ef9f7c9ad0b6629e2c3f443dd4b5940660753ba06628ac8eea834")
+                throw new InvalidOperationException("Legacy Raid v4 witness final state changed.");
+            RaidState failureState = Replay(arena, "RD");
+            if (failureState.Status != RaidRunStatus.Failed || failureState.Hits != 1) throw new InvalidOperationException("Legacy Raid v4 danger witness did not fail.");
+            RaidDispatchResult zero = RaidRules.Step(arena, initial, GameCommand.Up);
+            if (zero.Accepted || zero.Reason != "blocked_zero" || RaidRules.StateFingerprint(arena, initial) != RaidRules.StateFingerprint(arena, zero.State))
+                throw new InvalidOperationException("Legacy Raid v4 blocked input changed state.");
+            Debug.Log("RAID_JSON_PROBE case=legacy-v4-witnesses state=pass fingerprint=" + LegacyV4ArenaFingerprint);
         }
 
         private static RaidArenaDefinition CheckLegacyV3Witnesses()
@@ -307,6 +342,7 @@ namespace Nectorial.Editor
             PreferenceSnapshot priorFailedSave = CapturePreference(FailedSaveKey);
             PreferenceSnapshot priorLegacyV2Save = CapturePreference(LegacyV2SaveKey);
             PreferenceSnapshot priorLegacyV3Save = CapturePreference(LegacyV3SaveKey);
+            PreferenceSnapshot priorLegacyV4Save = CapturePreference(LegacyV4SaveKey);
             GameObject sourceObject = null;
             GameObject restoredObject = null;
             GameObject blockedObject = null;
@@ -317,6 +353,7 @@ namespace Nectorial.Editor
                 PlayerPrefs.DeleteKey(FailedSaveKey);
                 PlayerPrefs.SetString(LegacyV2SaveKey, "legacy-v2-save-sentinel");
                 PlayerPrefs.SetString(LegacyV3SaveKey, "legacy-v3-save-sentinel");
+                PlayerPrefs.SetString(LegacyV4SaveKey, "legacy-v4-save-sentinel");
                 PlayerPrefs.Save();
                 RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
                 if (solution.Status != RaidSolverStatus.Solved || solution.Moves == null || solution.Moves.Length < 2 || solution.Moves[0].Direction == solution.Moves[1].Direction)
@@ -333,7 +370,9 @@ namespace Nectorial.Editor
                 if (!PlayerPrefs.HasKey(LegacyV2SaveKey) || PlayerPrefs.GetString(LegacyV2SaveKey) != "legacy-v2-save-sentinel")
                     throw new InvalidOperationException("Raid bootstrap overwrote a legacy v2 save.");
                 if (SaveKey == LegacyV3SaveKey || !PlayerPrefs.HasKey(LegacyV3SaveKey) || PlayerPrefs.GetString(LegacyV3SaveKey) != "legacy-v3-save-sentinel")
-                    throw new InvalidOperationException("Raid v4 bootstrap touched the legacy v3 save.");
+                    throw new InvalidOperationException("Raid default bootstrap touched the legacy v3 save.");
+                if (SaveKey == LegacyV4SaveKey || !PlayerPrefs.HasKey(LegacyV4SaveKey) || PlayerPrefs.GetString(LegacyV4SaveKey) != "legacy-v4-save-sentinel")
+                    throw new InvalidOperationException("Raid default bootstrap touched the legacy v4 save.");
                 if (ReadPrivateString(source, "_message") != "저장했습니다") throw new InvalidOperationException("Raid bootstrap did not report an explicit save success.");
                 RaidDispatchResult first;
                 if (!source.TryStartMove(solution.Moves[0].Direction, out first) || !first.Accepted || first.Idempotent)
@@ -407,7 +446,7 @@ namespace Nectorial.Editor
                 Debug.Log("RAID_JSON_PROBE case=bootstrap-pre-action-display-state state=pass");
                 Debug.Log("RAID_JSON_PROBE case=bootstrap-command-save-and-transition-lock state=pass");
                 Debug.Log("RAID_JSON_PROBE case=failed-restore-preserved-before-restart state=pass");
-                Debug.Log("RAID_JSON_PROBE case=v4-save-key-isolated-from-v3-v2 state=pass");
+                Debug.Log("RAID_JSON_PROBE case=v5-save-key-isolated-from-v4-v3-v2 state=pass");
                 Debug.Log("RAID_JSON_PROBE case=v3-camera-fit state=pass size=" + expectedCameraSize.ToString());
             }
             finally
@@ -419,6 +458,7 @@ namespace Nectorial.Editor
                 RestorePreference(FailedSaveKey, priorFailedSave);
                 RestorePreference(LegacyV2SaveKey, priorLegacyV2Save);
                 RestorePreference(LegacyV3SaveKey, priorLegacyV3Save);
+                RestorePreference(LegacyV4SaveKey, priorLegacyV4Save);
                 if (priorCamera == null)
                 {
                     Camera generatedCamera = Camera.main;
@@ -463,6 +503,8 @@ namespace Nectorial.Editor
             PreferenceSnapshot priorLegacyV2Best = CapturePreference(legacyV2BestKey);
             string legacyV3BestKey = "nectorial.record.best.v1.raid-v1.raid-01-v3." + LegacyV3ArenaFingerprint;
             PreferenceSnapshot priorLegacyV3Best = CapturePreference(legacyV3BestKey);
+            string legacyV4BestKey = "nectorial.record.best.v1.raid-v1.raid-01-v4." + LegacyV4ArenaFingerprint;
+            PreferenceSnapshot priorLegacyV4Best = CapturePreference(legacyV4BestKey);
             GameObject host = null;
             GameObject reloadedHost = null;
             try
@@ -471,12 +513,15 @@ namespace Nectorial.Editor
                 PlayerPrefs.DeleteKey(FailedSaveKey);
                 PlayerPrefs.SetString(legacyV2BestKey, "legacy-v2-best-sentinel");
                 PlayerPrefs.SetString(legacyV3BestKey, "legacy-v3-best-sentinel");
+                PlayerPrefs.SetString(legacyV4BestKey, "legacy-v4-best-sentinel");
                 PlayerPrefs.Save();
                 RaidBootstrap bootstrap = CreateBootstrap("Raid record probe", out host);
                 if (!PlayerPrefs.HasKey(legacyV2BestKey) || PlayerPrefs.GetString(legacyV2BestKey) != "legacy-v2-best-sentinel")
                     throw new InvalidOperationException("Raid default record load overwrote a legacy v2 best.");
                 if (bestKey == legacyV3BestKey || !PlayerPrefs.HasKey(legacyV3BestKey) || PlayerPrefs.GetString(legacyV3BestKey) != "legacy-v3-best-sentinel")
-                    throw new InvalidOperationException("Raid v4 record load touched the legacy v3 best.");
+                    throw new InvalidOperationException("Raid default record load touched the legacy v3 best.");
+                if (bestKey == legacyV4BestKey || !PlayerPrefs.HasKey(legacyV4BestKey) || PlayerPrefs.GetString(legacyV4BestKey) != "legacy-v4-best-sentinel")
+                    throw new InvalidOperationException("Raid default record load touched the legacy v4 best.");
                 RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
                 if (solution.Status != RaidSolverStatus.Solved) throw new InvalidOperationException("Raid record probe solver did not solve.");
                 for (int index = 0; index < solution.Moves.Length; index++)
@@ -517,7 +562,7 @@ namespace Nectorial.Editor
                 if (!ReadPrivate<bool>(reloaded, "_hasMine") || ReadPrivateString(reloaded, "_mineCapsule") != bestBeforeShared)
                     throw new InvalidOperationException("Raid runtime did not revalidate the local best record after reload.");
                 Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge-and-request-correlation state=pass");
-                Debug.Log("RAID_JSON_PROBE case=v4-best-key-isolated-from-v3-v2 state=pass");
+                Debug.Log("RAID_JSON_PROBE case=v5-best-key-isolated-from-v4-v3-v2 state=pass");
             }
             finally
             {
@@ -528,6 +573,7 @@ namespace Nectorial.Editor
                 RestorePreference(bestKey, priorBest);
                 RestorePreference(legacyV2BestKey, priorLegacyV2Best);
                 RestorePreference(legacyV3BestKey, priorLegacyV3Best);
+                RestorePreference(legacyV4BestKey, priorLegacyV4Best);
             }
         }
 
