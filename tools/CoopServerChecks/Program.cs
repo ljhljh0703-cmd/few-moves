@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -23,6 +24,7 @@ internal static class Program
     private static async Task<int> Main()
     {
         await Run("http_lifecycle_auth_static_and_secret_boundary", CheckLifecycleAuthStaticAndSecretBoundary);
+        await Run("http_hashed_build_transport_compression_and_cache_boundary", CheckHashedBuildTransport);
         await Run("http_catalog_allowlist_and_create_definition_binding", CheckCatalogDefinitionBinding);
         await Run("http_completed_record_capsule_uses_effective_action_stack", CheckCompletedRecordCapsule);
         await Run("http_command_race_idempotency_stale_and_public_pass", CheckCommands);
@@ -98,6 +100,86 @@ internal static class Program
             Assert(!privateState.Contains(session.InviteCode, StringComparison.Ordinal), "private state must not retain invite raw value");
             HttpResponse privatePath = await harness.SendAsync(HttpMethod.Get, "/rooms.v1.json", null, null);
             Assert(privatePath.StatusCode == 404, "private state cannot be reached through static root");
+        }
+    }
+
+    private static async Task CheckHashedBuildTransport()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            const string hash = "0123456789abcdef0123456789abcdef";
+            string buildDir = Path.Combine(harness.Options.PublicRoot, "raid", "Build");
+            Directory.CreateDirectory(buildDir);
+            File.WriteAllText(Path.Combine(harness.Options.PublicRoot, "raid", "index.html"), "<title>raid</title>");
+            byte[] wasm = new byte[65536];
+            byte[] data = new byte[32768];
+            for (int index = 0; index < wasm.Length; index++) wasm[index] = (byte)(index % 13);
+            for (int index = 0; index < data.Length; index++) data[index] = (byte)(index % 17);
+            wasm[0] = 0; wasm[1] = 97; wasm[2] = 115; wasm[3] = 109;
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm"), wasm);
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".data"), data);
+            File.WriteAllBytes(Path.Combine(buildDir, "unhashed.wasm"), wasm);
+            File.WriteAllText(Path.Combine(buildDir, hash + ".symbols.json"), "{}");
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm.br"), new byte[] { 1, 2, 3 });
+
+            string wasmPath = "/raid/Build/" + hash + ".wasm";
+            RawHttpResponse br = await harness.SendRawAsync(wasmPath, "br");
+            AssertEqual(200, br.StatusCode, "brotli wasm status");
+            AssertEqual("br", br.ContentEncoding, "brotli wasm encoding");
+            AssertEqual("application/wasm", br.ContentType, "brotli wasm MIME");
+            Assert(br.CacheControl != null && br.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && br.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed wasm cache: " + br.CacheControl);
+            Assert(br.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "compressed response varies by encoding");
+            Assert(br.Bytes.Length < wasm.Length, "brotli must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(br.Bytes, true))), "brotli decoded wasm hash");
+
+            RawHttpResponse gzip = await harness.SendRawAsync(wasmPath, "gzip");
+            AssertEqual("gzip", gzip.ContentEncoding, "gzip wasm encoding");
+            Assert(gzip.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "gzip response varies by encoding");
+            Assert(gzip.Bytes.Length < wasm.Length, "gzip must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(gzip.Bytes, false))), "gzip decoded wasm hash");
+
+            RawHttpResponse identity = await harness.SendRawAsync(wasmPath, "identity");
+            AssertEqual(200, identity.StatusCode, "identity wasm status");
+            Assert(string.IsNullOrEmpty(identity.ContentEncoding), "identity must not be encoded");
+            Assert(identity.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "identity response varies by encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(identity.Bytes)), "identity wasm hash");
+
+            RawHttpResponse brData = await harness.SendRawAsync("/raid/Build/" + hash + ".data", "br");
+            AssertEqual("br", brData.ContentEncoding, "brotli data encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(data), SHA256.HashData(Decompress(brData.Bytes, true))), "brotli decoded data hash");
+            RawHttpResponse symbols = await harness.SendRawAsync("/raid/Build/" + hash + ".symbols.json", "br");
+            Assert(symbols.CacheControl != null && symbols.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && symbols.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed symbols cache: " + symbols.CacheControl);
+            Assert(string.IsNullOrEmpty(symbols.ContentEncoding), "symbols remain uncompressed by scoped middleware");
+
+            RawHttpResponse html = await harness.SendRawAsync("/raid/index.html", "br");
+            AssertEqual("no-store", html.CacheControl, "mode HTML cache");
+            Assert(string.IsNullOrEmpty(html.ContentEncoding), "mode HTML is outside compression scope");
+            RawHttpResponse unhashed = await harness.SendRawAsync("/raid/Build/unhashed.wasm", "br");
+            AssertEqual("no-store", unhashed.CacheControl, "unhashed build cache");
+            Assert(string.IsNullOrEmpty(unhashed.ContentEncoding), "unhashed build is outside compression scope");
+            RawHttpResponse api = await harness.SendRawAsync("/api/coop/v1/definitions", "br");
+            AssertEqual("no-store", api.CacheControl, "API cache");
+            Assert(string.IsNullOrEmpty(api.ContentEncoding), "API is outside compression scope");
+            RawHttpResponse health = await harness.SendRawAsync("/healthz", "br");
+            AssertEqual("no-store", health.CacheControl, "health cache");
+            Assert(string.IsNullOrEmpty(health.ContentEncoding), "health is outside compression scope");
+
+            RawHttpResponse precompressed = await harness.SendRawAsync("/raid/Build/" + hash + ".wasm.br", "br");
+            Assert(precompressed.StatusCode == 404 || (string.IsNullOrEmpty(precompressed.ContentEncoding) && precompressed.CacheControl == "no-store"),
+                "precompressed artifacts cannot be double-encoded or treated as immutable build files");
+        }
+    }
+
+    private static byte[] Decompress(byte[] bytes, bool brotli)
+    {
+        using (var input = new MemoryStream(bytes))
+        using (Stream decoder = brotli ? (Stream)new BrotliStream(input, CompressionMode.Decompress) : new GZipStream(input, CompressionMode.Decompress))
+        using (var output = new MemoryStream())
+        {
+            decoder.CopyTo(output);
+            return output.ToArray();
         }
     }
 
@@ -626,6 +708,16 @@ internal static class Program
         }
     }
 
+    private sealed class RawHttpResponse
+    {
+        public int StatusCode;
+        public byte[] Bytes;
+        public string ContentType;
+        public string ContentEncoding;
+        public string CacheControl;
+        public string Vary;
+    }
+
     private sealed class ServerHarness : IAsyncDisposable
     {
         private WebApplication _app;
@@ -685,6 +777,27 @@ internal static class Program
                         ContentType = contentType,
                         CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
                         Document = contentType != null && contentType.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0 ? JsonDocument.Parse(responseBody) : null
+                    };
+                }
+            }
+        }
+
+        public async Task<RawHttpResponse> SendRawAsync(string path, string acceptEncoding)
+        {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+            {
+                if (!string.IsNullOrEmpty(acceptEncoding)) request.Headers.TryAddWithoutValidation("Accept-Encoding", acceptEncoding);
+                using (HttpResponseMessage response = await _client.SendAsync(request))
+                {
+                    byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+                    return new RawHttpResponse
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Bytes = bytes,
+                        ContentType = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.MediaType,
+                        ContentEncoding = string.Join(",", response.Content.Headers.ContentEncoding),
+                        CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
+                        Vary = string.Join(",", response.Headers.Vary)
                     };
                 }
             }

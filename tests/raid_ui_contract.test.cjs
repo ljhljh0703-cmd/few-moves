@@ -8,10 +8,12 @@ const template = readFileSync(path.join(root, "Assets/WebGLTemplates/Raid/index.
 const boardView = readFileSync(path.join(root, "Assets/Nectorial/Runtime/Raid/RaidBoardView.cs"), "utf8");
 const bridge = readFileSync(path.join(root, "Assets/Plugins/WebGL/RaidState.jslib"), "utf8");
 const build = readFileSync(path.join(root, "Assets/Editor/RaidBuild.cs"), "utf8");
+const raidBootstrap = readFileSync(path.join(root, "Assets/Nectorial/Runtime/Raid/RaidBootstrap.cs"), "utf8");
 
 assert.match(template, /data-raid-action="Slide" data-direction="Up"/);
 assert.match(template, /id="record-dialog"/);
 assert.match(template, /id="record-close"/);
+assert.doesNotMatch(template, /id="record-get"|GetRecord|현재 기록 확인/, "no manual current-record step: the verified best is shared directly");
 assert.match(template, /id="menu-dialog"/);
 assert.match(template, /id="help-dialog"/);
 assert.match(template, /목표: 조각 3개를 모아 뱀에게 돌진/, "the goal stays readable to screen readers");
@@ -70,6 +72,19 @@ assert.doesNotMatch(template, /snake\.advance|enemy\.move|Math\.random|leaderboa
 assert.match(bridge, /NectorialRaidReportState/);
 assert.doesNotMatch(bridge, /RaidRules|RaidSession|RaidSolver/);
 assert.match(build, /RaidSerializationChecks\.Run\(\);/);
+// Cell cues: pooled, inside one cell, emitted only while an action plays (never by Render or restore), cleared on cancel.
+assert.match(boardView, /private const int CuePoolSize = 6;/);
+const renderBody = boardView.slice(boardView.indexOf("public void Render(RaidArenaDefinition arena, RaidState state)"), boardView.indexOf("public bool BeginAction("));
+assert.doesNotMatch(renderBody, /EmitCuesThrough|PlayCue/, "Render and restore never emit cues");
+assert.match(boardView, /public void AdvanceAction[\s\S]*?EmitCuesThrough\(frameProgress >= 0\.999f \? frameIndex : frameIndex - 1\);/, "cues fire once a frame completes");
+assert.match(boardView, /public void CompleteAction[\s\S]*?EmitCuesThrough\(_activeFrames\.Length - 1\);/, "skipped frames still cue once at completion");
+assert.match(boardView, /for \(; _nextCueFrame <= lastFrame && _nextCueFrame < _activeFrames\.Length; _nextCueFrame\+\+\)/, "each frame cues at most once per action");
+assert.match(boardView, /public void CancelAction\(\)[\s\S]*?ClearEffects\(\);/, "cancel clears cues");
+assert.match(boardView, /float half = 0\.45f \* scale;/, "cue ring stays inside its cell");
+assert.doesNotMatch(boardView.slice(boardView.indexOf("private void PlayCue")), /Camera|orthographicSize/, "cues never move or zoom the camera");
+assert.match(raidBootstrap, /float duration = _reducedMotion \? 0f : PresentationDuration\(/, "reduced motion makes slides instant (presentation only)");
+assert.match(raidBootstrap, /public void SetReducedMotion\(string value\)/);
+assert.match(raidBootstrap, /_board\.ClearEffects\(\); _board\.Render\(_arena, _session\.State\);/, "restart clears cues");
 
 function deferred() {
   let resolve;
@@ -103,9 +118,9 @@ function observation(status = "Playing", overrides = {}) {
   }, overrides);
 }
 
-function createHarness(hash = "#record=fm1.shared") {
+function createHarness(hash = "#record=fm1.shared", options = {}) {
   const documentObject = { activeElement: null, listeners: {}, loader: null };
-  const ids = ["unity-canvas","feedback","turn-label","tail-count","goal-panel","effect-row","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
+  const ids = ["unity-canvas","storage-retry","feedback","turn-label","tail-count","goal-panel","effect-row","charge-0","charge-1","charge-2","charge-meter","result-dialog","result-title","result-turn","result-copy","result-record","result-restart","save-button","menu-top","menu-dialog","menu-close","help-top","help-dialog","help-close","record-dialog","record-top","record-note","record-get","record-share","record-challenge","record-fallback","record-close","mine-value","mine-meta","shared-value","shared-meta","record-compare"];
   const elements = Object.fromEntries(ids.map(id => [id, makeElement(documentObject, id)]));
   for (const id of ["result-dialog","record-dialog","menu-dialog","help-dialog"]) elements[id].tagName = "DIALOG";
   elements["effect-row"].hidden = true; // mirrors the markup's hidden attribute on the empty spacer
@@ -119,6 +134,7 @@ function createHarness(hash = "#record=fm1.shared") {
   documentObject.addEventListener = (name, handler) => { documentObject.listeners[name] = handler; };
   const sent = [], unityReady = deferred(), clipboardCalls = [];
   const windowObject = { listeners:{}, addEventListener(name,handler){ this.listeners[name]=handler; } };
+  if (options.matchMedia) windowObject.matchMedia = options.matchMedia;
   const sandbox = { window:windowObject, document:documentObject, ResizeObserver:undefined, location:{ origin:"https://game.test", pathname:"/content/raid/index.html", search:"?invite=DROP", hash }, navigator:{ clipboard:{ writeText(value){ const item=deferred(); clipboardCalls.push({value,item}); return item.promise; } } }, setTimeout(){return 1;}, clearTimeout(){}, console, JSON, Math, Number, String,
     createUnityInstance(_canvas,_config,onProgress){ sandbox.progress=onProgress; return unityReady.promise; }
   };
@@ -171,7 +187,8 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(h.elements["tail-count"].textContent, "뱀에게 잡혔어요");
   assert.equal(h.elements["result-title"].textContent, "뱀에게 잡혔어요");
   assert.equal(h.elements["goal-panel"].classList.contains("is-armed"), false, "a failed run drops the armed marker");
-  assert.equal(h.elements["result-copy"].textContent, "2번 이동 · 피격 0번", "a failed result shows the record, not a retry prompt");
+  assert.equal(h.elements["result-turn"].textContent, "2수", "a failed result shows the move count large");
+  assert.equal(h.elements["result-copy"].textContent, "", "a failed result has no retry prompt and no zero-hit noise");
   assert.equal(h.elements["result-dialog"].open, true);
   assert.equal(h.elements["result-record"].disabled, false);
   h.elements["result-restart"].listeners.click();
@@ -233,7 +250,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.elements["record-top"].listeners.click();
   assert.equal(h.elements["record-dialog"].open, true, "record opens in its own dialog");
   assert.equal(h.elements["mine-value"].textContent, "기록 없음", "default objects are not shown as zero records");
-  const exact = observation("Cleared", { actions:14, hits:3, recordStatus:"ready", recordCapsule:"fm1.mine", hasMine:true, mine:summary(11,2), hasShared:true, shared:summary(13,4), sharedRecordRequestId:firstRequestId, stateFingerprint:"clear-1" });
+  const exact = observation("Cleared", { actions:14, hits:3, recordStatus:"ready", recordCapsule:"fm1.mine", mineCapsule:"fm1.mine", hasMine:true, mine:summary(11,2), hasShared:true, shared:summary(13,4), sharedRecordRequestId:firstRequestId, stateFingerprint:"clear-1" });
   h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(exact));
   assert.equal(h.elements["mine-value"].textContent, "11수");
   assert.equal(h.elements["shared-value"].textContent, "13수");
@@ -254,7 +271,7 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   h.elements["record-top"].listeners.click();
   h.elements["record-share"].listeners.click();
   assert.equal(h.clipboardCalls[0].value, "https://game.test/content/raid/index.html#record=fm1.mine", "record URL drops invitation/query data");
-  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(Object.assign({}, exact, { recordCapsule:"fm1.new" })));
+  h.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(Object.assign({}, exact, { recordCapsule:"fm1.new", mineCapsule:"fm1.new" })));
   h.clipboardCalls[0].item.resolve(); await settle();
   assert.notEqual(h.elements["record-note"].textContent, "기록 링크를 복사했습니다.", "stale clipboard completion is ignored");
   h.elements["record-share"].listeners.click(); h.clipboardCalls[1].item.reject(new Error("denied")); await settle();
@@ -306,6 +323,75 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   flow.elements["record-top"].listeners.click();
   flow.elements["record-close"].listeners.click();
   assert.equal(flow.elements["result-dialog"].open, false, "closing the record during play opens no result");
+
+  // OS reduced motion reaches the raid presentation once, and again only when it changes.
+  const motionQuery = { matches:true, listeners:{}, addEventListener(name, handler){ this.listeners[name] = handler; } };
+  const calm = createHarness("", { matchMedia: () => motionQuery }); calm.documentObject.loader.onload(); calm.unityReady.resolve(calm.instance); await settle();
+  const motionMessages = () => calm.sent.filter(item => item.method === "SetReducedMotion");
+  assert.deepEqual(motionMessages().map(item => item.payload), [true], "reduce-motion preference is sent when the instance is ready");
+  motionQuery.listeners.change();
+  assert.equal(motionMessages().length, 1, "an unchanged preference is not resent");
+  motionQuery.matches = false; motionQuery.listeners.change();
+  assert.deepEqual(motionMessages().map(item => item.payload), [true, false], "turning reduce-motion off is forwarded");
+
+  // Best-record sharing after a reload: a verified best exists, but there is no current-run capsule.
+  const best = createHarness(""); best.documentObject.loader.onload(); best.unityReady.resolve(best.instance); await settle();
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { actions:0, hasMine:true, mine:summary(12,0), mineCapsule:"fm1.best", recordStatus:"idle", recordCapsule:"", stateFingerprint:"reloaded" })));
+  best.elements["record-top"].listeners.click();
+  assert.equal(best.elements["record-share"].disabled, false, "the verified best is shareable right after a reload and during a new run");
+  assert.equal(best.elements["mine-meta"].textContent, "", "a zero-hit best shows no hit count");
+  best.elements["record-share"].listeners.click();
+  assert.equal(best.clipboardCalls.at(-1).value, "https://game.test/content/raid/index.html#record=fm1.best", "without native share the best link is copied");
+  best.clipboardCalls.at(-1).item.resolve(); await settle();
+  const shareCalls = [];
+  best.sandbox.navigator.share = payload => { const item = deferred(); shareCalls.push({ payload, item }); return item.promise; };
+  best.elements["record-fallback"].hidden = true;
+  const copiesBeforeNative = best.clipboardCalls.length, noteBeforeCancel = best.elements["record-note"].textContent;
+  best.elements["record-share"].listeners.click();
+  assert.equal(shareCalls.length, 1, "native share is tried first when available");
+  assert.equal(shareCalls[0].payload.url, "https://game.test/content/raid/index.html#record=fm1.best");
+  const cancel = new Error("cancel"); cancel.name = "AbortError"; shareCalls[0].item.reject(cancel); await settle();
+  assert.equal(best.clipboardCalls.length, copiesBeforeNative, "a cancelled share does not copy");
+  assert.equal(best.elements["record-fallback"].hidden, true, "a cancelled share stays silent");
+  assert.equal(best.elements["record-note"].textContent, noteBeforeCancel, "a cancelled share changes no message");
+  best.elements["record-share"].listeners.click(); shareCalls[1].item.reject(new Error("blocked")); await settle();
+  assert.equal(best.clipboardCalls.length, copiesBeforeNative + 1, "a failed native share falls back to copying the link");
+  best.clipboardCalls.at(-1).item.reject(new Error("denied")); await settle();
+  assert.equal(best.elements["record-fallback"].hidden, false, "and still leaves a selectable link");
+  best.elements["record-share"].listeners.click(); shareCalls[2].item.resolve(); await settle();
+  assert.equal(best.elements["record-note"].textContent, "기록을 공유했습니다.");
+  best.elements["record-share"].listeners.click();
+  best.elements["record-share"].listeners.click();
+  assert.equal(shareCalls.length, 4, "a second tap while a share is pending does not start another share");
+  const copiesBeforeStaleClose = best.clipboardCalls.length;
+  best.elements["record-close"].listeners.click();
+  shareCalls[3].item.reject(new Error("late failure")); await settle();
+  assert.equal(best.clipboardCalls.length, copiesBeforeStaleClose, "a failure arriving after the dialog closed never copies");
+  best.elements["record-top"].listeners.click();
+  best.elements["record-share"].listeners.click();
+  assert.equal(shareCalls.length, 5, "closing the dialog releases the pending share");
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { actions:0, hasMine:true, mine:summary(11,0), mineCapsule:"fm1.newer", recordStatus:"idle", recordCapsule:"", stateFingerprint:"reloaded-2" })));
+  shareCalls[4].item.reject(new Error("late failure")); await settle();
+  assert.equal(best.clipboardCalls.length, copiesBeforeStaleClose, "a failure for a replaced best record never copies");
+  best.sandbox.navigator.share = () => { const error = new Error("cancel"); error.name = "AbortError"; throw error; };
+  best.elements["record-fallback"].hidden = true;
+  const noteBeforeSyncCancel = best.elements["record-note"].textContent;
+  best.elements["record-share"].listeners.click(); await settle();
+  assert.equal(best.clipboardCalls.length, copiesBeforeStaleClose, "a synchronous cancel never copies");
+  assert.equal(best.elements["record-fallback"].hidden, true, "a synchronous cancel stays silent");
+  assert.equal(best.elements["record-note"].textContent, noteBeforeSyncCancel, "a synchronous cancel changes no message");
+  best.elements["record-close"].listeners.click();
+
+  // Result comparison is shown only for the live clear it was computed for.
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { actions:10, hits:0, tailCount:3, hasMine:true, mine:summary(10,0), mineCapsule:"fm1.best2", clearComparison:"improved", clearComparisonDelta:2, clearComparisonFingerprint:"clear-improved", stateFingerprint:"clear-improved" })));
+  assert.equal(best.elements["result-turn"].textContent, "10수", "the result shows the move count large");
+  assert.equal(best.elements["result-copy"].textContent, "신기록 · 2수 단축", "an improved clear reports the real improvement");
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { actions:10, hits:0, tailCount:3, hasMine:true, mine:summary(10,0), mineCapsule:"fm1.best2", clearComparison:"", clearComparisonDelta:0, clearComparisonFingerprint:"", stateFingerprint:"restored-clear" })));
+  assert.equal(best.elements["result-copy"].textContent, "", "a restored clear makes no new-best claim");
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { actions:12, hits:0, tailCount:3, hasMine:true, mine:summary(10,0), mineCapsule:"fm1.best2", clearComparison:"improved", clearComparisonDelta:2, clearComparisonFingerprint:"clear-improved", stateFingerprint:"a-different-clear" })));
+  assert.equal(best.elements["result-copy"].textContent, "", "a comparison for another state is never shown");
+  best.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Cleared", { actions:12, hits:0, tailCount:3, hasMine:true, mine:summary(10,0), mineCapsule:"fm1.best2", clearComparison:"slower", clearComparisonDelta:2, clearComparisonFingerprint:"slow-clear", stateFingerprint:"slow-clear" })));
+  assert.equal(best.elements["result-copy"].textContent, "최고보다 2수 많아요", "a slower clear is reported truthfully, not as a new best");
   const reverse = createHarness("#record=fm1.reverse"); reverse.documentObject.loader.onload(); reverse.unityReady.resolve(reverse.instance); await settle();
   assert.equal(reverse.sent.length, 0, "instance alone cannot import before an initialized observation");
   reverse.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation()));
@@ -340,5 +426,52 @@ async function settle() { await Promise.resolve(); await Promise.resolve(); awai
   assert.equal(route.elements["shared-value"].textContent,"기록 없음");
   route.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing",{recordStatus:"ready",hasShared:true,shared:summary(9,1),sharedRecordRequestId:requestB})));assert.equal(route.elements["shared-value"].textContent,"기록 없음","stale success cannot replace the accepted latest failure");
   assert.equal(route.sent.every(item=>item.payload.kind==="LoadSharedRecord"),true,"record navigation never sends save or restart commands");
+  // Phase 3 storage: retry appears only on an actual Toss startup failure, is one-shot, and manual save is
+  // never shown as saved while a native write is still pending; a UI timeout shows its own message.
+  assert.match(template, /<button id="storage-retry" class="storage-retry" type="button" hidden>저장소 다시 확인<\/button>/);
+  // Failed-startup observation can arrive before createUnityInstance resolves; a tap then cannot dispatch and
+  // must leave retry available, and the first tap after the instance is ready sends exactly one retry.
+  const early = createHarness(""); early.documentObject.loader.onload();
+  early.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, startupRetryEnabled:true, saveStatus:"failed", saveError:"startup_timeout", message:"토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요" })));
+  assert.equal(early.elements["storage-retry"].hidden, false, "pre-ready startup failure shows retry");
+  early.elements["storage-retry"].listeners.click();
+  assert.equal(early.elements["storage-retry"].hidden, false, "undispatched retry stays available");
+  early.unityReady.resolve(early.instance); await settle();
+  early.elements["storage-retry"].listeners.click();
+  assert.equal(early.sent.filter(item => item.payload.kind === "RetryStorage").length, 1, "retry dispatches once the instance is ready");
+  assert.equal(early.elements["storage-retry"].hidden, true);
+  const store = createHarness(""); store.documentObject.loader.onload(); store.unityReady.resolve(store.instance); await settle();
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, saveStatus:"pending", message:"토스 저장소를 확인하고 있습니다" })));
+  assert.equal(store.elements["storage-retry"].hidden, true, "retry stays hidden while startup is still pending");
+  store.elements["storage-retry"].listeners.click();
+  assert.equal(store.sent.some(item => item.payload.kind === "RetryStorage"), false, "hidden retry sends nothing");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, startupRetryEnabled:true, saveStatus:"failed", saveError:"startup_timeout", message:"토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요" })));
+  assert.equal(store.elements["storage-retry"].hidden, false, "startup failure exposes retry");
+  assert.equal(store.elements.feedback.textContent, "토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요", "startup failure is not reported as a save failure");
+  assert.equal(store.actions.every(button => button.disabled), true, "no move, save or restart while storage startup failed");
+  store.elements["storage-retry"].listeners.click();
+  assert.deepEqual(store.sent.filter(item => item.payload.kind === "RetryStorage").map(item => item.payload), [{ kind:"RetryStorage" }]);
+  assert.equal(store.elements["storage-retry"].hidden, true, "retry hides immediately after one tap");
+  store.elements["storage-retry"].listeners.click();
+  assert.equal(store.sent.filter(item => item.payload.kind === "RetryStorage").length, 1, "double tap sends one retry");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, startupRetryEnabled:true, saveStatus:"failed", saveError:"startup_timeout", message:"토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요" })));
+  assert.equal(store.elements["storage-retry"].hidden, true, "a repeated failure state before Unity reports the retry keeps it one-shot");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, saveStatus:"pending", message:"토스 저장소를 다시 확인하고 있습니다" })));
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { initialized:false, inputEnabled:false, startupRetryEnabled:true, saveStatus:"failed", saveError:"raid_toss_payload_version", message:"토스 저장소를 확인하지 못했습니다. 다시 확인해 주세요" })));
+  assert.equal(store.elements["storage-retry"].hidden, false, "a new failure after the retry started offers retry again");
+  store.elements["storage-retry"].listeners.click();
+  assert.equal(store.sent.filter(item => item.payload.kind === "RetryStorage").length, 2);
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { saveStatus:"pending", savePending:true, message:"저장하고 있습니다" })));
+  assert.equal(store.elements["storage-retry"].hidden, true, "retry is not a permanent control once storage is ready");
+  assert.equal(store.elements["save-button"].disabled, true, "save cannot overlap a pending manual write");
+  assert.equal(store.elements.feedback.textContent, "저장하고 있습니다", "pending manual save is not shown as saved");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { saveStatus:"failed", saveError:"storage_ui_timeout", message:"저장이 아직 끝나지 않았습니다. 진행은 계속할 수 있습니다" })));
+  assert.equal(store.elements.feedback.textContent, "저장이 아직 끝나지 않았습니다. 진행은 계속할 수 있습니다", "UI timeout is visible as not finished");
+  assert.equal(store.elements["save-button"].disabled, false, "timeout releases the save button");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { saveStatus:"failed", saveError:"storage_api_error", message:"저장하지 못했습니다. 다시 저장할 수 있습니다" })));
+  assert.equal(store.elements.feedback.textContent, "저장하지 못했습니다", "real write failure keeps the existing failure text");
+  store.sandbox.window.__nectorialRaid.receiveState(JSON.stringify(observation("Playing", { saveStatus:"saved", message:"저장했습니다" })));
+  assert.equal(store.elements.feedback.textContent, "저장했습니다");
+  assert.equal(store.sent.some(item => item.payload.kind === "Save"), false, "state updates never send save commands");
   console.log("Raid UI contract checks passed");
 })().catch(error => { console.error(error); process.exitCode=1; });

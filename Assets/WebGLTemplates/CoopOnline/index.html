@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Few Moves 온라인</title>
   <style>
-    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --console:#d1c5af; --focus:#5d8960; --circle:#4374b7; --diamond:#d18a37; }
+    :root { color-scheme:light; font-family:"Avenir Next","Pretendard",ui-sans-serif,system-ui,sans-serif; --paper:#eee7d8; --surface:#faf5e9; --ink:#293238; --muted:#626963; --line:#c9c0b0; --floor:#e5e0d3; --console:#d1c5af; --focus:#5d8960; --circle:#4374b7; --diamond:#d18a37; --stage:#f0ece2; --pad:#293238; --pad-edge:#171e1f; }
     * { box-sizing:border-box; }
-    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--paper); }
+    html,body { width:100%; min-height:100%; margin:0; overflow:hidden; background:var(--stage); }
     body { color:var(--ink); }
     button,a,select,input { min-height:48px; color:inherit; font:inherit; }
     button,a { min-width:48px; border:0; background:transparent; font-weight:750; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
@@ -16,34 +16,36 @@
     button:disabled,select:disabled { opacity:.36; cursor:default; }
     [hidden] { display:none!important; }
     main#app { width:min(100%,920px); height:100dvh; min-height:0; margin:0 auto; padding:max(3px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(3px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); display:grid; grid-template-rows:48px minmax(0,1fr); gap:3px; }
-    .topbar { position:relative; min-height:48px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; border-bottom:1px solid var(--line); }
-    .topbar h1 { margin:0; font-size:14px; font-weight:650; white-space:nowrap; }
-    .topbar small { display:inline; margin-left:6px; color:var(--muted); font-size:12px; font-weight:650; }
-    .top-actions { display:flex; align-items:center; }
-    .icon-button,.top-action { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0 7px; border-radius:10px; }
-    .icon-button { font-size:22px; } .top-action { font-size:13px; }
+    .topbar { position:relative; width:min(100%,560px); justify-self:center; min-height:48px; display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:6px; }
+    .topbar h1 { min-width:0; max-height:48px; margin:0; padding-left:2px; display:grid; align-content:center; overflow:hidden; font-size:16px; font-weight:850; line-height:19px; letter-spacing:-.03em; white-space:nowrap; }
+    .topbar small { display:block; min-width:0; margin-left:0; overflow:hidden; text-overflow:ellipsis; color:var(--muted); font-size:12px; font-weight:650; line-height:15px; letter-spacing:0; }
+    .top-actions { display:flex; align-items:center; gap:6px; }
+    .icon-button,.top-action { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0 7px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); }
+    .icon-button { font-size:21px; } .top-action { font-size:13px; }
+    .icon-button:enabled:active,.top-action:enabled:active { transform:translateY(1px); box-shadow:0 1px 0 var(--line); }
     .online-layout { min-height:0; display:grid; grid-template-rows:minmax(0,1fr) auto; gap:4px; }
     .online-layout.lobby { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:14px 0; }
     .lobby-intro { width:min(100%,360px); display:grid; justify-items:center; gap:8px; text-align:center; }
-    .lobby-intro h2 { margin:0; font-size:23px; line-height:1.2; }
+    .lobby-intro h2 { margin:0; font-size:23px; line-height:1.2; letter-spacing:-.04em; }
     .lobby-intro p { max-width:26ch; margin:0; color:var(--muted); font-size:14px; line-height:1.45; }
-    .lobby-pair { display:flex; align-items:center; justify-content:center; gap:15px; height:44px; }
+    .lobby-pair { display:flex; align-items:center; justify-content:center; gap:15px; width:80px; height:44px; border:1px solid var(--line); border-radius:12px; background:var(--floor); box-shadow:0 3px 0 var(--line); }
     .lobby-pair .seat-dot { width:22px; height:22px; }
     .online-controls.lobby { width:min(100%,360px); grid-template-rows:48px 48px minmax(22px,auto); align-content:center; border:0; padding:0; overflow:visible; }
     .online-controls.lobby .feedback { grid-row:3; white-space:normal; line-height:1.35; }
     .board-stage { position:relative; width:100%; min-height:0; overflow:hidden; display:grid; place-items:center; }
-    #unity-canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:1px solid var(--line); border-radius:9px; background:var(--floor); image-rendering:pixelated; }
+    #unity-canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:0; border-radius:0; background:var(--stage); image-rendering:pixelated; }
     .expression-bubble { position:absolute; top:6px; left:50%; z-index:3; display:flex; align-items:center; justify-content:center; gap:7px; min-width:102px; height:40px; padding:5px 12px; transform:translateX(-50%); border:1px solid var(--line); border-radius:999px; background:var(--surface); box-shadow:0 4px 12px color-mix(in srgb,var(--ink) 14%,transparent); font-size:20px; pointer-events:none; white-space:nowrap; }
     .expression-sender { width:12px; height:12px; border-radius:2px; background:var(--circle); } .expression-sender.diamond { background:var(--diamond); transform:rotate(45deg); }
     .expression-name { color:var(--muted); font-size:12px; font-weight:800; }
-    .online-controls { min-height:0; width:min(100%,360px); margin:0 auto; display:grid; grid-template-rows:48px 48px 56px 168px 18px; gap:3px; align-content:end; border-top:1px solid var(--line); padding-top:3px; }
+    .online-controls { min-height:0; width:min(100%,360px); margin:0 auto; display:grid; grid-template-rows:48px 48px 56px 168px 18px; gap:3px; align-content:end; padding-top:3px; }
     .online-controls.joined { grid-template-rows:48px 0 56px 168px 18px; }
     .room-panel { grid-row:1; min-height:0; }
     .room-form,.room-start,.join-entry,.room-info { width:100%; height:48px; display:grid; align-items:center; gap:5px; }
     .room-start { grid-template-columns:1fr 1fr; } .join-entry { grid-template-columns:48px minmax(0,1fr) 66px; }
-    .room-start button,.join-entry button,.room-action { min-height:48px; padding:0 8px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:14px; white-space:nowrap; }
-    .room-start .primary,.join-entry .primary { color:#fff; background:var(--ink); border-color:var(--ink); }
-    .join-entry input,.menu-input,.invite-link-fallback,.record-fallback { width:100%; min-width:0; min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; }
+    .room-start button,.join-entry button,.room-action { min-height:48px; padding:0 8px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); font-size:14px; white-space:nowrap; }
+    .room-start button:enabled:active,.join-entry button:enabled:active,.room-action:enabled:active,.definition-options button:enabled:active,.emoji-button:enabled:active,.rail-button:enabled:active { transform:translateY(1px); box-shadow:0 1px 0 var(--line); }
+    .room-start .primary,.join-entry .primary { color:#fff; background:var(--pad); border-color:var(--pad); box-shadow:0 2px 0 var(--pad-edge); }
+    .join-entry input,.menu-input,.invite-link-fallback,.record-fallback { width:100%; min-width:0; min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:12px; background:var(--surface); font-size:13px; }
     .room-info { grid-template-columns:minmax(0,1fr) auto; color:var(--muted); font-size:13px; }
     .room-info>span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .room-info strong { color:var(--ink); font-size:14px; }
@@ -51,25 +53,29 @@
     .definition-picker { grid-row:2; min-height:48px; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:6px; }
     .definition-picker>span { color:var(--muted); font-size:12px; font-weight:750; }
     .definition-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
-    .definition-options button { min-height:48px; padding:0 5px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; }
-    .definition-options button[aria-pressed="true"] { color:#fff; background:var(--ink); border-color:var(--ink); }
+    .definition-options button { min-height:48px; padding:0 5px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); font-size:13px; }
+    .definition-options button[aria-pressed="true"] { color:#fff; background:var(--pad); border-color:var(--pad); box-shadow:0 2px 0 var(--pad-edge); }
     .status-row { grid-row:3; min-height:56px; display:grid; grid-template-columns:minmax(0,1fr) minmax(118px,1.2fr) minmax(0,1fr); align-items:center; gap:3px; }
     .goal-chip { min-width:0; display:grid; justify-items:center; align-content:center; gap:1px; color:var(--muted); font-size:11px; text-align:center; white-space:nowrap; }
     .goal-chip strong { color:var(--ink); font-size:12px; }
     .goal-chip .mark-name { display:flex; align-items:center; gap:5px; }
-    .turn-label { min-width:0; min-height:54px; display:grid; place-items:center; align-content:center; padding:3px 4px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:16px; font-weight:850; line-height:1.15; text-align:center; }
+    .turn-label { min-width:0; min-height:54px; display:grid; place-items:center; align-content:center; padding:3px 4px; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); font-size:16px; font-weight:850; line-height:1.15; text-align:center; }
     .turn-label small { margin-top:2px; color:var(--muted); font-size:12px; font-weight:650; }
     .seat-dot { width:11px; height:11px; border-radius:2px; background:var(--circle); } .seat-dot.diamond { background:var(--diamond); transform:rotate(45deg); }
     .play-controls { grid-row:4; position:relative; width:100%; height:168px; }
     .dpad { position:absolute; left:50%; top:0; width:180px; height:168px; transform:translateX(-50%); }
-    .dpad button { position:absolute; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; }
-    .dpad button::after { position:absolute; inset:0; z-index:0; content:""; border-radius:12px; background:var(--line); }
-    .dpad button::before { position:absolute; inset:3px; z-index:1; content:""; border-radius:10px; background:var(--surface); }
-    .dpad button:enabled:active::before { background:var(--console); } .dpad button span { position:relative; z-index:2; color:var(--ink); font-size:24px; }
+    .dpad-base { position:absolute; inset:0; z-index:0; pointer-events:none; filter:drop-shadow(0 4px 0 var(--pad-edge)); }
+    .dpad-base::before,.dpad-base::after { position:absolute; content:""; border-radius:14px; background:var(--pad); }
+    .dpad-base::before { left:62px; top:0; width:56px; height:164px; } .dpad-base::after { left:0; top:56px; width:180px; height:52px; }
+    .dpad-center { position:absolute; left:78px; top:70px; z-index:1; width:24px; height:24px; border-radius:50%; background:var(--pad-edge); pointer-events:none; }
+    .dpad button { position:absolute; z-index:2; display:grid; place-items:center; width:56px; height:56px; padding:0; border-radius:12px; }
+    .dpad button:enabled:hover { background:color-mix(in srgb,#fff 9%,transparent); }
+    .dpad button:enabled:active { background:color-mix(in srgb,#000 24%,transparent); }
+    .dpad button span { color:var(--paper); font-size:22px; line-height:1; } .dpad button:enabled:active span { transform:translateY(2px); }
     .dpad-up { left:62px; top:0; } .dpad-left { left:0; top:56px; } .dpad-right { left:124px; top:56px; } .dpad-down { left:62px; top:112px; }
     .emoji-rail { position:absolute; left:0; top:0; width:100px; height:168px; display:grid; grid-template-columns:48px 48px; grid-template-rows:48px 48px; align-content:space-between; gap:4px; }
     .action-rail { position:absolute; right:0; top:0; display:flex; flex-direction:column; gap:8px; }
-    .emoji-button,.rail-button { width:48px; height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+    .emoji-button,.rail-button { width:48px; height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 0 var(--line); }
     .emoji-button { font-size:20px; } .rail-button { font-size:11px; line-height:1.1; text-align:center; }
     .feedback { grid-row:5; min-height:18px; margin:0; color:var(--muted); font-size:12px; line-height:18px; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     dialog { width:min(360px,calc(100% - 24px)); max-height:calc(100dvh - 24px); padding:0; border:1px solid var(--line); border-radius:13px; color:var(--ink); background:var(--surface); box-shadow:0 14px 44px color-mix(in srgb,var(--ink) 28%,transparent); overflow:auto; }
@@ -85,7 +91,7 @@
     .dialog-copy,.record-note { margin:0; color:var(--muted); font-size:13px; line-height:1.45; text-align:center; }
     .dialog-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; }
     .dialog-actions button,.dialog-actions a { flex:1 1 82px; min-height:48px; padding:0 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; text-align:center; }
-    .dialog-actions .primary { color:#fff; background:var(--ink); border-color:var(--ink); }
+    .dialog-actions .primary { color:#fff; background:var(--pad); border-color:var(--pad); }
     .dialog-note { margin:0; color:var(--muted); font-size:12px; line-height:1.4; text-align:center; }
     .menu-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .menu-actions button,.menu-actions a { min-height:48px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; background:var(--surface); font-size:13px; text-align:center; }
@@ -98,7 +104,7 @@
     .record-card { min-height:86px; padding:10px; border:1px solid var(--line); border-radius:11px; background:var(--surface); }
     .record-card h3 { margin:0 0 6px; font-size:13px; } .record-value { margin:0; color:var(--ink); font-size:18px; font-weight:850; } .record-meta { min-height:16px; margin:3px 0 0; color:var(--muted); font-size:11px; }
     .record-compare { min-height:32px; display:grid; place-items:center; margin:0; padding:6px 8px; border-radius:9px; background:var(--floor); font-size:12px; font-weight:750; text-align:center; }
-    @media (orientation:landscape) and (max-height:520px) { main#app { width:100%; } .online-layout { grid-template-columns:minmax(0,1fr) minmax(320px,360px); grid-template-rows:minmax(0,1fr); gap:6px; } .online-controls { width:100%; align-content:start; overflow-y:auto; padding:0 2px 4px 6px; border-top:0; border-left:1px solid var(--line); } }
+    @media (orientation:landscape) and (max-height:520px) { main#app { width:100%; } .online-layout { grid-template-columns:minmax(0,1fr) minmax(320px,360px); grid-template-rows:minmax(0,1fr); gap:6px; } .online-controls { width:100%; align-content:start; overflow-y:auto; padding:0 2px 4px 6px; border-top:0; } }
     @media (prefers-reduced-motion:reduce) { * { animation:none!important; transition:none!important; } }
   </style>
 </head>
@@ -112,7 +118,7 @@
         <section class="room-panel" aria-label="방 연결"><div id="room-form" class="room-form"><div id="room-start" class="room-start"><button id="create-button" class="primary" type="button" disabled>방 만들기</button><button id="join-open" type="button" disabled>초대받고 참여</button></div><div id="join-entry" class="join-entry" hidden><button id="join-back" type="button" disabled aria-label="방 선택으로 돌아가기">←</button><input id="invite-input" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="초대 코드" aria-label="초대 코드"><button id="join-button" class="primary" type="button" disabled>참여</button></div></div><div id="room-info" class="room-info" hidden><span id="room-status">친구 기다리는 중</span><button id="copy-invite-button" class="room-action" type="button">친구 초대</button></div></section>
         <section id="definition-picker" class="definition-picker" aria-label="협력 판 선택"><span>함께 할 판</span><div id="definition-options" class="definition-options"></div></section>
         <div class="status-row" aria-live="polite" hidden><span class="goal-chip"><span class="mark-name"><span class="seat-dot" aria-hidden="true"></span><strong>사각형</strong></span><span id="circle-goal">진행 중</span></span><span id="turn-label" class="turn-label">친구와 연결<small>0번 이동</small></span><span class="goal-chip"><span class="mark-name"><span class="seat-dot diamond" aria-hidden="true"></span><strong>마름모</strong></span><span id="diamond-goal">진행 중</span></span></div>
-        <div class="play-controls" hidden><div class="emoji-rail" role="group" aria-label="친구에게 표현하기"><button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요">👍</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Handshake" disabled aria-label="협력">🤝</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Waiting" disabled aria-label="기다리기">⏳</button></div><div class="dpad" aria-label="방향 조작"><button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button><button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button><button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button><button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button></div><div class="action-rail"><button class="rail-button" type="button" data-online-action="RequestUndo" disabled>되돌리기<br>요청</button><button class="rail-button" type="button" data-online-action="RequestRestart" disabled>다시하기<br>요청</button></div></div>
+        <div class="play-controls" hidden><div class="emoji-rail" role="group" aria-label="친구에게 표현하기"><button class="emoji-button" type="button" data-online-action="Express" data-expression="Look" disabled aria-label="살펴보기">👀</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="ThumbsUp" disabled aria-label="좋아요">👍</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Handshake" disabled aria-label="협력">🤝</button><button class="emoji-button" type="button" data-online-action="Express" data-expression="Waiting" disabled aria-label="기다리기">⏳</button></div><div class="dpad" aria-label="방향 조작"><span class="dpad-base" aria-hidden="true"></span><span class="dpad-center" aria-hidden="true"></span><button class="dpad-up" type="button" data-online-action="Slide" data-direction="Up" disabled aria-label="위로 이동"><span aria-hidden="true">▲</span></button><button class="dpad-left" type="button" data-online-action="Slide" data-direction="Left" disabled aria-label="왼쪽으로 이동"><span aria-hidden="true">◀</span></button><button class="dpad-right" type="button" data-online-action="Slide" data-direction="Right" disabled aria-label="오른쪽으로 이동"><span aria-hidden="true">▶</span></button><button class="dpad-down" type="button" data-online-action="Slide" data-direction="Down" disabled aria-label="아래로 이동"><span aria-hidden="true">▼</span></button></div><div class="action-rail"><button class="rail-button" type="button" data-online-action="RequestUndo" disabled>되돌리기<br>요청</button><button class="rail-button" type="button" data-online-action="RequestRestart" disabled>다시하기<br>요청</button></div></div>
         <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
       </section>
     </section>

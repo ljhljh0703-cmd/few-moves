@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Raid;
+using Nectorial.SlideEscape.Record;
 using Nectorial.SlideEscape.Unity.Raid;
 using UnityEditor;
 using UnityEngine;
@@ -85,6 +87,9 @@ namespace Nectorial.Editor
             CheckActionFeedback(legacyV3);
             CheckBootstrapRestoreAndRecovery(arena);
             CheckRaidRecordRuntime(arena);
+            CheckTossBootstrapIntegration(arena);
+            CheckTossBootstrapRegressionEdges(arena);
+            CheckBoardCellCues(arena);
             Debug.Log("RAID_JSON_PROBE_RESULT pass=true");
         }
 
@@ -467,6 +472,72 @@ namespace Nectorial.Editor
             }
         }
 
+        // Cell cues fire once per collected cell and once for a caught/clear cell; Render (restore) adds none; cancel/clear removes them.
+        private static void CheckBoardCellCues(RaidArenaDefinition arena)
+        {
+            PreferenceSnapshot priorSave = CapturePreference(SaveKey);
+            PreferenceSnapshot priorFailedSave = CapturePreference(FailedSaveKey);
+            GameObject host = null;
+            try
+            {
+                PlayerPrefs.DeleteKey(SaveKey);
+                PlayerPrefs.DeleteKey(FailedSaveKey);
+                PlayerPrefs.Save();
+                RaidBootstrap bootstrap = CreateBootstrap("Raid cue probe", out host);
+                object board = typeof(RaidBootstrap).GetField("_board", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(bootstrap);
+                if (board == null) throw new InvalidOperationException("Raid cue probe has no board.");
+                Type boardType = board.GetType();
+                Func<string, MethodInfo> method = name => boardType.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                Func<int> active = () => (int)boardType.GetProperty("ActiveEffectCount", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(board);
+
+                RaidSession session = RaidSession.Create(arena);
+                RaidDispatchResult pickup = null;
+                foreach (char step in "DURDULDRURLU")
+                {
+                    RaidDispatchResult result = session.Dispatch(new RaidMove { CommandId = "cue-" + session.State.Actions.ToString(), Direction = DirectionFromTrace(step) });
+                    if (!result.Accepted) throw new InvalidOperationException("Raid cue probe move rejected.");
+                    if (HasEvent(result, "tail_collected", null)) { pickup = result; break; }
+                }
+                if (pickup == null) throw new InvalidOperationException("Raid cue probe found no pickup action.");
+                int expected = 0;
+                foreach (RaidFrame frame in pickup.Frames) expected += frame.CollectedTailIds == null ? 0 : frame.CollectedTailIds.Length;
+
+                method("ClearEffects").Invoke(board, null);
+                method("BeginAction").Invoke(board, new object[] { arena, pickup.Frames });
+                method("AdvanceAction").Invoke(board, new object[] { 0.5f });
+                method("AdvanceAction").Invoke(board, new object[] { 0.5f });
+                method("AdvanceAction").Invoke(board, new object[] { 1f });
+                method("AdvanceAction").Invoke(board, new object[] { 1f });
+                method("CompleteAction").Invoke(board, new object[] { arena, pickup.State });
+                if (active() != expected) throw new InvalidOperationException("Raid pickup cues were not emitted exactly once per collected cell: " + active().ToString() + "/" + expected.ToString());
+                method("Render").Invoke(board, new object[] { arena, pickup.State });
+                if (active() != expected) throw new InvalidOperationException("Raid render (restore) emitted extra cues.");
+                method("ClearEffects").Invoke(board, null);
+                if (active() != 0) throw new InvalidOperationException("Raid cues were not cleared.");
+
+                RaidSession danger = RaidSession.Create(arena);
+                danger.Dispatch(new RaidMove { CommandId = "cue-danger-0", Direction = DirectionFromTrace('R') });
+                RaidDispatchResult caught = danger.Dispatch(new RaidMove { CommandId = "cue-danger-1", Direction = DirectionFromTrace('D') });
+                if (caught.State.Status != RaidRunStatus.Failed) throw new InvalidOperationException("Raid cue probe failure trace did not fail.");
+                method("BeginAction").Invoke(board, new object[] { arena, caught.Frames });
+                method("CompleteAction").Invoke(board, new object[] { arena, caught.State });
+                if (active() != 1) throw new InvalidOperationException("Raid caught cell mark was not emitted exactly once.");
+                method("CancelAction").Invoke(board, null);
+                if (active() != 0) throw new InvalidOperationException("Raid cancel did not clear cues.");
+
+                bootstrap.SetReducedMotion("true");
+                if (!(bool)boardType.GetField("_reducedMotion", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(board))
+                    throw new InvalidOperationException("Raid reduced motion did not reach the board.");
+                Debug.Log("RAID_JSON_PROBE case=board-cell-cues-once-and-cleared state=pass pickups=" + expected.ToString());
+            }
+            finally
+            {
+                if (host != null) UnityEngine.Object.DestroyImmediate(host);
+                RestorePreference(SaveKey, priorSave);
+                RestorePreference(FailedSaveKey, priorFailedSave);
+            }
+        }
+
         private static RaidBootstrap CreateBootstrap(string name, out GameObject host)
         {
             host = new GameObject(name);
@@ -514,6 +585,7 @@ namespace Nectorial.Editor
                 PlayerPrefs.SetString(legacyV2BestKey, "legacy-v2-best-sentinel");
                 PlayerPrefs.SetString(legacyV3BestKey, "legacy-v3-best-sentinel");
                 PlayerPrefs.SetString(legacyV4BestKey, "legacy-v4-best-sentinel");
+                PlayerPrefs.DeleteKey(bestKey);
                 PlayerPrefs.Save();
                 RaidBootstrap bootstrap = CreateBootstrap("Raid record probe", out host);
                 if (!PlayerPrefs.HasKey(legacyV2BestKey) || PlayerPrefs.GetString(legacyV2BestKey) != "legacy-v2-best-sentinel")
@@ -532,6 +604,13 @@ namespace Nectorial.Editor
                 }
                 if (bootstrap.State.Status != RaidRunStatus.Cleared) throw new InvalidOperationException("Raid record probe did not clear.");
                 string beforeChallenge = RaidRules.StateFingerprint(arena, bootstrap.State);
+                // A live first clear publishes the verified best capsule and a "first" comparison bound to this cleared state.
+                string clearObservation = ReadPrivateString(bootstrap, "_lastObservationJsonForCheck");
+                string liveBest = ReadPrivateString(bootstrap, "_mineCapsule");
+                if (string.IsNullOrEmpty(liveBest) || !clearObservation.Contains("\"mineCapsule\":\"" + liveBest + "\""))
+                    throw new InvalidOperationException("Raid clear did not publish the best record for sharing.");
+                if (!clearObservation.Contains("\"clearComparison\":\"first\"") || !clearObservation.Contains("\"clearComparisonFingerprint\":\"" + beforeChallenge + "\""))
+                    throw new InvalidOperationException("Raid first clear did not publish a first-record comparison for this state.");
                 bootstrap.HandleCommand("{\"kind\":\"GetRecord\"}");
                 if (!ReadPrivate<bool>(bootstrap, "_hasMine")) throw new InvalidOperationException("Raid runtime did not create mine record.");
                 string capsule = ReadPrivateString(bootstrap, "_recordCapsule");
@@ -561,6 +640,13 @@ namespace Nectorial.Editor
                 RaidBootstrap reloaded = CreateBootstrap("Raid record reload probe", out reloadedHost);
                 if (!ReadPrivate<bool>(reloaded, "_hasMine") || ReadPrivateString(reloaded, "_mineCapsule") != bestBeforeShared)
                     throw new InvalidOperationException("Raid runtime did not revalidate the local best record after reload.");
+                // After a reload the best stays shareable, and no new-best claim is made for a restored state.
+                string reloadObservation = ReadPrivateString(reloaded, "_lastObservationJsonForCheck");
+                if (!reloadObservation.Contains("\"mineCapsule\":\"" + bestBeforeShared + "\""))
+                    throw new InvalidOperationException("Raid reload did not publish the best record for sharing.");
+                if (!reloadObservation.Contains("\"clearComparison\":\"\"") || !reloadObservation.Contains("\"clearComparisonFingerprint\":\"\""))
+                    throw new InvalidOperationException("Raid reload fabricated a result comparison.");
+                Debug.Log("RAID_JSON_PROBE case=best-record-shareable-live-and-after-reload state=pass");
                 Debug.Log("RAID_JSON_PROBE case=record-mine-shared-challenge-and-request-correlation state=pass");
                 Debug.Log("RAID_JSON_PROBE case=v5-best-key-isolated-from-v4-v3-v2 state=pass");
             }
@@ -575,6 +661,398 @@ namespace Nectorial.Editor
                 RestorePreference(legacyV3BestKey, priorLegacyV3Best);
                 RestorePreference(legacyV4BestKey, priorLegacyV4Best);
             }
+        }
+
+        private static void CheckTossBootstrapIntegration(RaidArenaDefinition arena)
+        {
+            string bestKey = "nectorial.record.best.v1.raid-v1." + arena.Id + "." + RaidRules.ArenaFingerprint(arena);
+            string legacyBestKey = "nectorial.record.best.v1.raid-v1.raid-01-v4." + LegacyV4ArenaFingerprint;
+            PreferenceSnapshot priorSave = CapturePreference(SaveKey);
+            PreferenceSnapshot priorFailed = CapturePreference(FailedSaveKey);
+            PreferenceSnapshot priorBest = CapturePreference(bestKey);
+            PreferenceSnapshot priorLegacySave = CapturePreference(LegacyV4SaveKey);
+            PreferenceSnapshot priorLegacyBest = CapturePreference(legacyBestKey);
+            GameObject blockedHost = null;
+            GameObject clearHost = null;
+            GameObject restoredHost = null;
+            GameObject manualHost = null;
+            try
+            {
+                PlayerPrefs.SetString(SaveKey, "toss-probe-local-save-sentinel");
+                PlayerPrefs.SetString(FailedSaveKey, "toss-probe-failed-save-sentinel");
+                PlayerPrefs.SetString(bestKey, "toss-probe-local-best-sentinel");
+                PlayerPrefs.SetString(LegacyV4SaveKey, "toss-probe-v4-save-sentinel");
+                PlayerPrefs.SetString(legacyBestKey, "toss-probe-v4-best-sentinel");
+                PlayerPrefs.Save();
+
+                List<KeyValuePair<int, string>> blockedWrites;
+                RaidBootstrap blocked = CreateTossBootstrap("Raid Toss blocked probe", out blockedHost, out blockedWrites);
+                AssertTossBlocked(blocked, "startup_unexpected_web");
+                InvokePrivate(blocked, "CompletePlatformStartup", TossFactory("TossStartupResult", "Blocked", "startup_api_error"));
+                AssertTossBlocked(blocked, "startup_api_error");
+                blocked.HandleCommand("{\"kind\":\"Save\"}");
+                blocked.HandleCommand("{\"kind\":\"Restart\"}");
+                if (blockedWrites.Count != 0 || blocked.State.Actions != 0) throw new InvalidOperationException("Raid blocked Toss startup accepted input or queued a write.");
+                AssertTossPlayerPrefsUntouched(SaveKey, FailedSaveKey, bestKey, legacyBestKey);
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-startup-fail-closed-no-web-fallback state=pass");
+
+                RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
+                if (solution.Status != RaidSolverStatus.Solved || Directions(solution.Moves) != "DURDULDRURLU")
+                    throw new InvalidOperationException("Raid Toss probe could not find the fixed v5 clear witness.");
+                List<KeyValuePair<int, string>> clearWrites;
+                RaidBootstrap clear = CreateTossBootstrap("Raid Toss clear probe", out clearHost, out clearWrites);
+                InvokePrivate(clear, "CompletePlatformStartup", TossFactory("TossStartupResult", "NewUser"));
+                if (!ReadPrivate<bool>(clear, "_initialized") || clear.State.Actions != 0) throw new InvalidOperationException("Raid Toss new-user startup did not initialize fresh progress.");
+                clearHost.SetActive(false); // Keep manual watchdog coroutines out of this synchronous Editor probe.
+                for (int index = 0; index < solution.Moves.Length; index++)
+                {
+                    RaidDispatchResult result;
+                    if (!clear.TryStartMove(solution.Moves[index].Direction, out result) || !result.Accepted)
+                        throw new InvalidOperationException("Raid Toss clear move was rejected: " + index);
+                    clear.CompleteActionPresentation();
+                    if (clearWrites.Count != index + 1) throw new InvalidOperationException("Raid Toss clear did not start exactly one checkpoint per action: " + index);
+                    InvokePrivate(clear, "CompletePlatformSave", clearWrites[index].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                }
+                if (clear.State.Status != RaidRunStatus.Cleared || clear.State.Hits != 0 || !ReadPrivate<bool>(clear, "_hasMine"))
+                    throw new InvalidOperationException("Raid Toss live witness did not clear and verify its best record.");
+                string clearBest;
+                string clearProgress;
+                ParseTossPayload(clearWrites[clearWrites.Count - 1].Value, arena, out clearBest, out clearProgress);
+                if (string.IsNullOrEmpty(clearBest) || clearBest != ReadPrivateString(clear, "_mineCapsule"))
+                    throw new InvalidOperationException("Raid Toss final write omitted the new verified best.");
+                RaidSaveEnvelope clearEnvelope = JsonUtility.FromJson<RaidSaveEnvelope>(clearProgress);
+                RaidSession clearRestored;
+                string clearError = null;
+                if (clearEnvelope == null || !RaidSaveSerializationAdapter.TryNormalize(clearEnvelope, out clearError)
+                    || !RaidSaveCodec.TryRestore(arena, clearEnvelope, out clearRestored, out clearError)
+                    || clearRestored.State.Status != RaidRunStatus.Cleared)
+                    throw new InvalidOperationException("Raid Toss final write omitted valid cleared progress: " + clearError);
+                RecordCapsule decodedBest;
+                RecordVerification bestVerification;
+                if (!RecordCapsuleCodec.TryDecode(clearBest, out decodedBest, out clearError)
+                    || !RecordCapsuleVerifier.TryVerifyRaid(arena, decodedBest, out bestVerification))
+                    throw new InvalidOperationException("Raid Toss final write did not contain a verifiable best capsule: " + clearError);
+                AssertTossPlayerPrefsUntouched(SaveKey, FailedSaveKey, bestKey, legacyBestKey);
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-clear-payload-progress-and-best state=pass");
+
+                RaidSession partial = RaidSession.Create(arena);
+                for (int index = 0; index < 2; index++)
+                    if (!partial.Dispatch(solution.Moves[index]).Accepted) throw new InvalidOperationException("Raid Toss partial witness was rejected.");
+                string partialJson = JsonUtility.ToJson(RaidSaveCodec.Capture(partial));
+                string fingerprint = RaidRules.ArenaFingerprint(arena);
+                string validPayload = (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", arena.Id, fingerprint, clearBest, partialJson);
+                List<KeyValuePair<int, string>> restoredWrites;
+                RaidBootstrap restored = CreateTossBootstrap("Raid Toss restore probe", out restoredHost, out restoredWrites);
+                InvokePrivate(restored, "CompletePlatformStartup", TossFactory("TossStartupResult", "ExistingPayload", validPayload));
+                if (!ReadPrivate<bool>(restored, "_initialized") || restored.State.Actions != 2
+                    || RaidRules.StateFingerprint(arena, restored.State) != RaidRules.StateFingerprint(arena, partial.State)
+                    || !ReadPrivate<bool>(restored, "_hasMine") || ReadPrivateString(restored, "_mineCapsule") != clearBest)
+                    throw new InvalidOperationException("Raid Toss bootstrap did not adopt valid progress and best together.");
+                if (restoredWrites.Count != 0) throw new InvalidOperationException("Raid Toss restore wrote back during startup.");
+                AssertTossPlayerPrefsUntouched(SaveKey, FailedSaveKey, bestKey, legacyBestKey);
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-valid-progress-best-restore state=pass");
+
+                AssertTossPayloadRejected(restored, "", "raid_toss_payload_empty");
+                AssertTossPayloadRejected(restored, (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", arena.Id, fingerprint, "fm1.invalid", partialJson), "raid_toss_best_invalid");
+                AssertTossPayloadRejected(restored, (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", arena.Id, fingerprint, clearBest, "{}"), null);
+                string mismatchedJson = partialJson.Replace("\"ContentVersion\":\"raid-01-v5\"", "\"ContentVersion\":\"raid-01-v4\"");
+                if (mismatchedJson == partialJson) throw new InvalidOperationException("Raid Toss progress mismatch fixture did not change content identity.");
+                AssertTossPayloadRejected(restored, (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", arena.Id, fingerprint, clearBest, mismatchedJson), "content_version_mismatch");
+                AssertTossPayloadRejected(restored, (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", "raid-01-v4", fingerprint, clearBest, partialJson), "raid_toss_payload_arena");
+                AssertTossPayloadRejected(restored, (string)TossFactory("TossPlatformPolicy", "FormatRaidPayload", arena.Id, new string('a', 64), clearBest, partialJson), "raid_toss_payload_fingerprint");
+                if (restoredWrites.Count != 0) throw new InvalidOperationException("Raid Toss rejected payload queued a write.");
+                AssertTossPlayerPrefsUntouched(SaveKey, FailedSaveKey, bestKey, legacyBestKey);
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-corrupt-mismatched-progress-best-rejected state=pass");
+
+                List<KeyValuePair<int, string>> manualWrites;
+                RaidBootstrap manual = CreateTossBootstrap("Raid Toss manual probe", out manualHost, out manualWrites);
+                InvokePrivate(manual, "CompletePlatformStartup", TossFactory("TossStartupResult", "NewUser"));
+                manualHost.SetActive(false);
+                manual.HandleCommand("{\"kind\":\"Save\"}");
+                AssertTossSaveState(manual, "pending", true);
+                if (manualWrites.Count != 1) throw new InvalidOperationException("Raid Toss manual save did not start its native write.");
+                InvokePrivate(manual, "CompletePlatformSave", manualWrites[0].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                AssertTossSaveState(manual, "saved", false);
+                manual.HandleCommand("{\"kind\":\"Save\"}");
+                if (manualWrites.Count != 2) throw new InvalidOperationException("Raid Toss second manual save did not start.");
+                InvokePrivate(manual, "CompletePlatformSave", manualWrites[1].Key, TossFactory("TossPlatformOperationResult", "Failure", "storage_api_error"));
+                AssertTossSaveState(manual, "failed", false);
+                if (ReadPrivateString(manual, "_saveError") != "storage_api_error") throw new InvalidOperationException("Raid Toss native failure was hidden.");
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-manual-save-pending-success-failure state=pass");
+
+                manual.HandleCommand("{\"kind\":\"Save\"}");
+                if (manualWrites.Count != 3) throw new InvalidOperationException("Raid Toss timeout write did not start.");
+                int timedOutId = manualWrites[2].Key;
+                InvokePrivate(manual, "TimeoutManualSave", timedOutId);
+                AssertTossSaveState(manual, "failed", false);
+                if (ReadPrivateString(manual, "_saveError") != "storage_ui_timeout") throw new InvalidOperationException("Raid Toss timeout was not visible.");
+                RaidDispatchResult moved;
+                if (!manual.TryStartMove(solution.Moves[0].Direction, out moved) || !moved.Accepted)
+                    throw new InvalidOperationException("Raid Toss could not advance after UI timeout.");
+                manual.CompleteActionPresentation(); // Newer automatic checkpoint waits behind the timed-out native write.
+                manual.HandleCommand("{\"kind\":\"Save\"}"); // Newest manual payload replaces that queued checkpoint.
+                AssertTossSaveState(manual, "pending", true);
+                if (manualWrites.Count != 3) throw new InvalidOperationException("Raid Toss overlapped a timed-out native write.");
+                InvokePrivate(manual, "CompletePlatformSave", timedOutId, TossFactory("TossPlatformOperationResult", "Failure", "late_failure"));
+                AssertTossSaveState(manual, "pending", true);
+                if (manualWrites.Count != 4) throw new InvalidOperationException("Raid Toss did not start the newest queued snapshot after completion.");
+                string newestBest;
+                string newestProgress;
+                ParseTossPayload(manualWrites[3].Value, arena, out newestBest, out newestProgress);
+                RaidSaveEnvelope newestEnvelope = JsonUtility.FromJson<RaidSaveEnvelope>(newestProgress);
+                if (newestEnvelope == null || newestEnvelope.State == null || newestEnvelope.State.Actions != 1)
+                    throw new InvalidOperationException("Raid Toss newest queued write lost the post-timeout move.");
+                InvokePrivate(manual, "CompletePlatformSave", manualWrites[3].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                AssertTossSaveState(manual, "saved", false);
+                InvokePrivate(manual, "CompletePlatformSave", timedOutId, TossFactory("TossPlatformOperationResult", "Failure", "stale_failure"));
+                AssertTossSaveState(manual, "saved", false);
+                AssertTossPlayerPrefsUntouched(SaveKey, FailedSaveKey, bestKey, legacyBestKey);
+                Debug.Log("RAID_JSON_PROBE case=toss-bootstrap-timeout-inflight-latest-snapshot-stale-completion state=pass");
+            }
+            finally
+            {
+                if (blockedHost != null) UnityEngine.Object.DestroyImmediate(blockedHost);
+                if (clearHost != null) UnityEngine.Object.DestroyImmediate(clearHost);
+                if (restoredHost != null) UnityEngine.Object.DestroyImmediate(restoredHost);
+                if (manualHost != null) UnityEngine.Object.DestroyImmediate(manualHost);
+                RestorePreference(SaveKey, priorSave);
+                RestorePreference(FailedSaveKey, priorFailed);
+                RestorePreference(bestKey, priorBest);
+                RestorePreference(LegacyV4SaveKey, priorLegacySave);
+                RestorePreference(legacyBestKey, priorLegacyBest);
+            }
+        }
+
+        // Both known edge paths run before reporting failure, so one red assertion cannot hide the other.
+        private static void CheckTossBootstrapRegressionEdges(RaidArenaDefinition arena)
+        {
+            string failures = string.Empty;
+            try { CheckTossTerminalCheckpoint(arena); }
+            catch (Exception exception)
+            {
+                failures += " terminal-checkpoint=" + exception.GetBaseException().Message;
+                Debug.LogError("RAID_JSON_PROBE case=toss-terminal-checkpoint-before-presentation state=fail detail=" + exception.GetBaseException().Message);
+            }
+            try { CheckTossSupersededManual(arena); }
+            catch (Exception exception)
+            {
+                failures += " superseded-manual=" + exception.GetBaseException().Message;
+                Debug.LogError("RAID_JSON_PROBE case=toss-superseded-manual-auto-status state=fail detail=" + exception.GetBaseException().Message);
+            }
+            if (failures.Length > 0) throw new InvalidOperationException("Raid Toss bootstrap regression probes failed:" + failures);
+        }
+
+        private static void CheckTossTerminalCheckpoint(RaidArenaDefinition arena)
+        {
+            string bestKey = "nectorial.record.best.v1.raid-v1." + arena.Id + "." + RaidRules.ArenaFingerprint(arena);
+            PreferenceSnapshot priorSave = CapturePreference(SaveKey);
+            PreferenceSnapshot priorBest = CapturePreference(bestKey);
+            GameObject host = null;
+            GameObject restoredHost = null;
+            try
+            {
+                PlayerPrefs.SetString(SaveKey, "terminal-checkpoint-local-sentinel");
+                PlayerPrefs.SetString(bestKey, "terminal-checkpoint-best-sentinel");
+                PlayerPrefs.Save();
+                List<KeyValuePair<int, string>> writes;
+                RaidBootstrap bootstrap = CreateTossBootstrap("Raid Toss terminal checkpoint", out host, out writes);
+                InvokePrivate(bootstrap, "CompletePlatformStartup", TossFactory("TossStartupResult", "NewUser"));
+                host.SetActive(false);
+                RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
+                if (solution.Status != RaidSolverStatus.Solved || Directions(solution.Moves) != "DURDULDRURLU") throw new InvalidOperationException("fixed clear witness unavailable");
+                for (int index = 0; index < solution.Moves.Length - 1; index++)
+                {
+                    RaidDispatchResult step;
+                    if (!bootstrap.TryStartMove(solution.Moves[index].Direction, out step) || !step.Accepted) throw new InvalidOperationException("pre-clear action rejected: " + index);
+                    bootstrap.CompleteActionPresentation();
+                    if (writes.Count != index + 1) throw new InvalidOperationException("pre-clear write did not start: " + index);
+                    InvokePrivate(bootstrap, "CompletePlatformSave", writes[index].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                }
+                int before = writes.Count;
+                RaidDispatchResult finalMove;
+                if (!bootstrap.TryStartMove(solution.Moves[solution.Moves.Length - 1].Direction, out finalMove)
+                    || !finalMove.Accepted || bootstrap.State.Status != RaidRunStatus.Cleared || !bootstrap.Transitioning)
+                    throw new InvalidOperationException("terminal action was not pending presentation");
+                InvokePrivate(bootstrap, "RequestPlatformCheckpoint");
+                string earlyPayload = writes.Count > before ? writes[writes.Count - 1].Value : null;
+                bootstrap.CompleteActionPresentation();
+                string liveObservation = ReadPrivateString(bootstrap, "_lastObservationJsonForCheck");
+                if (!liveObservation.Contains("\"clearComparison\":\"first\"")) throw new InvalidOperationException("live first achievement was lost after checkpoint");
+                for (int index = before; index < writes.Count; index++)
+                    InvokePrivate(bootstrap, "CompletePlatformSave", writes[index].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                if (writes.Count == before) throw new InvalidOperationException("terminal progress was never saved");
+                string checkpointPayload = earlyPayload ?? writes[writes.Count - 1].Value;
+                string best;
+                string progress;
+                ParseTossPayload(checkpointPayload, arena, out best, out progress);
+                RaidSaveEnvelope checkpoint = JsonUtility.FromJson<RaidSaveEnvelope>(progress);
+                if (checkpoint == null || checkpoint.State == null || checkpoint.State.Status != RaidRunStatus.Cleared)
+                    throw new InvalidOperationException("checkpoint did not capture terminal progress");
+                List<KeyValuePair<int, string>> restoredWrites;
+                RaidBootstrap restored = CreateTossBootstrap("Raid Toss terminal checkpoint restore", out restoredHost, out restoredWrites);
+                InvokePrivate(restored, "CompletePlatformStartup", TossFactory("TossStartupResult", "ExistingPayload", checkpointPayload));
+                if (!ReadPrivate<bool>(restored, "_initialized") || restored.State.Status != RaidRunStatus.Cleared
+                    || !ReadPrivate<bool>(restored, "_hasMine") || string.IsNullOrEmpty(best)
+                    || ReadPrivateString(restored, "_mineCapsule") != best)
+                    throw new InvalidOperationException("terminal checkpoint restored a clear without its verified best");
+                if (PlayerPrefs.GetString(SaveKey) != "terminal-checkpoint-local-sentinel" || PlayerPrefs.GetString(bestKey) != "terminal-checkpoint-best-sentinel")
+                    throw new InvalidOperationException("terminal checkpoint changed browser preferences");
+                Debug.Log("RAID_JSON_PROBE case=toss-terminal-checkpoint-before-presentation state=pass");
+            }
+            finally
+            {
+                if (host != null) UnityEngine.Object.DestroyImmediate(host);
+                if (restoredHost != null) UnityEngine.Object.DestroyImmediate(restoredHost);
+                RestorePreference(SaveKey, priorSave);
+                RestorePreference(bestKey, priorBest);
+            }
+        }
+
+        private static void CheckTossSupersededManual(RaidArenaDefinition arena)
+        {
+            PreferenceSnapshot priorSave = CapturePreference(SaveKey);
+            GameObject host = null;
+            try
+            {
+                PlayerPrefs.SetString(SaveKey, "superseded-manual-local-sentinel");
+                PlayerPrefs.Save();
+                List<KeyValuePair<int, string>> writes;
+                RaidBootstrap bootstrap = CreateTossBootstrap("Raid Toss superseded manual", out host, out writes);
+                InvokePrivate(bootstrap, "CompletePlatformStartup", TossFactory("TossStartupResult", "NewUser"));
+                host.SetActive(false);
+                RaidSolverResult solution = RaidSolver.FindSolution(arena, 200000);
+                if (solution.Status != RaidSolverStatus.Solved || solution.Moves.Length < 3) throw new InvalidOperationException("three-action witness unavailable");
+                RaidDispatchResult step;
+                if (!bootstrap.TryStartMove(solution.Moves[0].Direction, out step) || !step.Accepted) throw new InvalidOperationException("auto1 action rejected");
+                bootstrap.CompleteActionPresentation(); // auto1 is active.
+                if (writes.Count != 1) throw new InvalidOperationException("auto1 did not start");
+                bootstrap.HandleCommand("{\"kind\":\"Save\"}"); // manual2 waits.
+                AssertTossSaveState(bootstrap, "pending", true);
+                if (!bootstrap.TryStartMove(solution.Moves[1].Direction, out step) || !step.Accepted) throw new InvalidOperationException("auto3 action rejected");
+                bootstrap.CompleteActionPresentation(); // auto3 supersedes queued manual2.
+                if (writes.Count != 1) throw new InvalidOperationException("auto3 overlapped auto1");
+                InvokePrivate(bootstrap, "CompletePlatformSave", writes[0].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                if (writes.Count != 2) throw new InvalidOperationException("auto3 did not start after auto1");
+                InvokePrivate(bootstrap, "CompletePlatformSave", writes[1].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                if (ReadPrivate<bool>(bootstrap, "_manualSaveAwaiting")) throw new InvalidOperationException("superseded manual2 still controls UI after auto3");
+                if (!bootstrap.TryStartMove(solution.Moves[2].Direction, out step) || !step.Accepted) throw new InvalidOperationException("auto4 action rejected");
+                bootstrap.CompleteActionPresentation(); // auto4 has not completed its native write.
+                if (writes.Count != 3 || ReadTossObservation(bootstrap).saveStatus == "saved")
+                    throw new InvalidOperationException("auto4 reported saved before its native completion");
+                InvokePrivate(bootstrap, "CompletePlatformSave", writes[2].Key, TossFactory("TossPlatformOperationResult", "Success"));
+                AssertTossSaveState(bootstrap, "saved", false);
+                if (PlayerPrefs.GetString(SaveKey) != "superseded-manual-local-sentinel") throw new InvalidOperationException("superseded manual wrote browser preference");
+                Debug.Log("RAID_JSON_PROBE case=toss-superseded-manual-auto-status state=pass");
+            }
+            finally
+            {
+                if (host != null) UnityEngine.Object.DestroyImmediate(host);
+                RestorePreference(SaveKey, priorSave);
+            }
+        }
+
+        private static RaidBootstrap CreateTossBootstrap(string name, out GameObject host, out List<KeyValuePair<int, string>> writes)
+        {
+            host = new GameObject(name);
+            host.SetActive(false); // Awake is deferred until the Editor-only Toss seam is installed.
+            RaidBootstrap bootstrap = host.AddComponent<RaidBootstrap>();
+            writes = new List<KeyValuePair<int, string>>();
+            SetPrivate(bootstrap, "_tossWritesForCheck", writes);
+            host.SetActive(true);
+            // Edit-mode executeMethod can defer Awake even after activation; use the established probe fallback.
+            if (bootstrap.State == null) InvokePrivate(bootstrap, "Awake");
+            if (bootstrap.State == null) throw new InvalidOperationException("Raid Toss bootstrap did not initialize on activation.");
+            return bootstrap;
+        }
+
+        private static void AssertTossBlocked(RaidBootstrap bootstrap, string expectedError)
+        {
+            TossProbeObservation observation = ReadTossObservation(bootstrap);
+            if (observation.initialized || observation.inputEnabled || !observation.startupRetryEnabled
+                || !ReadPrivate<bool>(bootstrap, "_platformStartupBlocked") || bootstrap.State.Actions != 0
+                || !string.Equals(observation.saveError, expectedError, StringComparison.Ordinal))
+                throw new InvalidOperationException("Raid Toss bootstrap did not show blocked startup: " + expectedError);
+        }
+
+        private static void AssertTossPayloadRejected(RaidBootstrap bootstrap, string payload, string expectedError)
+        {
+            InvokePrivate(bootstrap, "CompletePlatformStartup", TossFactory("TossStartupResult", "ExistingPayload", payload));
+            TossProbeObservation observation = ReadTossObservation(bootstrap);
+            if (observation.initialized || observation.inputEnabled || !observation.startupRetryEnabled
+                || !ReadPrivate<bool>(bootstrap, "_platformStartupBlocked") || bootstrap.State.Actions != 0
+                || ReadPrivate<bool>(bootstrap, "_hasMine") || string.IsNullOrEmpty(observation.saveError)
+                || (expectedError != null && !string.Equals(observation.saveError, expectedError, StringComparison.Ordinal)))
+                throw new InvalidOperationException("Raid Toss bootstrap adopted invalid payload: " + expectedError + " actual=" + observation.saveError);
+            bootstrap.HandleCommand("{\"kind\":\"Restart\"}");
+            bootstrap.HandleCommand("{\"kind\":\"Save\"}");
+            if (bootstrap.State.Actions != 0) throw new InvalidOperationException("Raid Toss blocked restore accepted a command.");
+        }
+
+        private static void AssertTossSaveState(RaidBootstrap bootstrap, string status, bool pending)
+        {
+            TossProbeObservation observation = ReadTossObservation(bootstrap);
+            if (!string.Equals(observation.saveStatus, status, StringComparison.Ordinal) || observation.savePending != pending
+                || ReadPrivate<bool>(bootstrap, "_manualSaveAwaiting") != pending)
+                throw new InvalidOperationException("Raid Toss save observation mismatch: expected=" + status + " actual=" + observation.saveStatus);
+        }
+
+        private static void AssertTossPlayerPrefsUntouched(string saveKey, string failedKey, string bestKey, string legacyBestKey)
+        {
+            if (PlayerPrefs.GetString(saveKey) != "toss-probe-local-save-sentinel"
+                || PlayerPrefs.GetString(failedKey) != "toss-probe-failed-save-sentinel"
+                || PlayerPrefs.GetString(bestKey) != "toss-probe-local-best-sentinel"
+                || PlayerPrefs.GetString(LegacyV4SaveKey) != "toss-probe-v4-save-sentinel"
+                || PlayerPrefs.GetString(legacyBestKey) != "toss-probe-v4-best-sentinel")
+                throw new InvalidOperationException("Raid Toss bootstrap read or changed a browser or legacy preference.");
+        }
+
+        private static TossProbeObservation ReadTossObservation(RaidBootstrap bootstrap)
+        {
+            TossProbeObservation observation = JsonUtility.FromJson<TossProbeObservation>(ReadPrivateString(bootstrap, "_lastObservationJsonForCheck"));
+            if (observation == null) throw new InvalidOperationException("Raid Toss observation was missing.");
+            return observation;
+        }
+
+        private static void ParseTossPayload(string payload, RaidArenaDefinition arena, out string best, out string progress)
+        {
+            object[] arguments = { payload, arena.Id, RaidRules.ArenaFingerprint(arena), null, null, null };
+            if (!(bool)TossFactory("TossPlatformPolicy", "TryParseRaidPayload", arguments))
+                throw new InvalidOperationException("Raid Toss queued payload did not parse: " + arguments[5]);
+            best = (string)arguments[3];
+            progress = (string)arguments[4];
+        }
+
+        private static object TossFactory(string typeName, string methodName, params object[] arguments)
+        {
+            Type type = typeof(RaidBootstrap).Assembly.GetType("Nectorial.SlideEscape.Unity." + typeName);
+            MethodInfo method = type == null ? null : type.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            if (method == null) throw new InvalidOperationException("Raid Toss factory was unavailable: " + typeName + "." + methodName);
+            return method.Invoke(null, arguments);
+        }
+
+        private static object InvokePrivate(object target, string methodName, params object[] arguments)
+        {
+            MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (method == null) throw new InvalidOperationException("Raid bootstrap method was unavailable: " + methodName);
+            return method.Invoke(target, arguments);
+        }
+
+        private static void SetPrivate(object target, string fieldName, object value)
+        {
+            FieldInfo field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null) throw new InvalidOperationException("Raid bootstrap field was unavailable: " + fieldName);
+            field.SetValue(target, value);
+        }
+
+        [Serializable]
+        private sealed class TossProbeObservation
+        {
+            public bool initialized;
+            public bool inputEnabled;
+            public bool startupRetryEnabled;
+            public bool savePending;
+            public string saveStatus;
+            public string saveError;
         }
 
         private static PreferenceSnapshot CapturePreference(string key)
