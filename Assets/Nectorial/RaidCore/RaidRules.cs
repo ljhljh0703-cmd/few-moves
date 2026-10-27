@@ -531,7 +531,6 @@ namespace Nectorial.SlideEscape.Raid
                 if (!kinds.Add(item.Kind)) errors.Add("item_kind_duplicate:" + item.Kind);
                 if (!IsFloor(arena, item.Position) || !occupied.Add(PointKey(item.Position))) errors.Add("item_position_invalid:" + item.Id);
             }
-            if (!kinds.Contains(RaidItemKind.Shield) || !kinds.Contains(RaidItemKind.Magnet) || !kinds.Contains(RaidItemKind.Slow)) errors.Add("required_item_kind_missing");
         }
 
         private static void ValidateCollectedIds(RaidTailDefinition[] definitions, string[] ids, string label, List<string> errors)

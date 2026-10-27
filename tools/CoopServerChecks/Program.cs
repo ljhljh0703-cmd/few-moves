@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -23,6 +24,8 @@ internal static class Program
     private static async Task<int> Main()
     {
         await Run("http_lifecycle_auth_static_and_secret_boundary", CheckLifecycleAuthStaticAndSecretBoundary);
+        await Run("http_onestore_post_game_entry_allowlist", CheckOnestorePostGameEntry);
+        await Run("http_hashed_build_transport_compression_and_cache_boundary", CheckHashedBuildTransport);
         await Run("http_catalog_allowlist_and_create_definition_binding", CheckCatalogDefinitionBinding);
         await Run("http_completed_record_capsule_uses_effective_action_stack", CheckCompletedRecordCapsule);
         await Run("http_command_race_idempotency_stale_and_public_pass", CheckCommands);
@@ -98,6 +101,164 @@ internal static class Program
             Assert(!privateState.Contains(session.InviteCode, StringComparison.Ordinal), "private state must not retain invite raw value");
             HttpResponse privatePath = await harness.SendAsync(HttpMethod.Get, "/rooms.v1.json", null, null);
             Assert(privatePath.StatusCode == 404, "private state cannot be reached through static root");
+        }
+    }
+
+    private static async Task CheckOnestorePostGameEntry()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            foreach (string mode in new[] { "solo", "coop", "raid" })
+            {
+                string directory = Path.Combine(harness.Options.PublicRoot, mode);
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(Path.Combine(directory, "index.html"), "<!doctype html><title>entry-" + mode + "</title><script src=\"Build/entry.loader.js\"></script>");
+                Directory.CreateDirectory(Path.Combine(directory, "Build"));
+                File.WriteAllText(Path.Combine(directory, "Build", "entry.loader.js"), "/* loader */");
+            }
+            File.WriteAllText(Path.Combine(harness.Options.PublicRoot, "app.js"), "/* static asset */");
+
+            var entries = new[]
+            {
+                new { Route = "/", Marker = "few-moves-online-check" },
+                new { Route = "/index.html", Marker = "few-moves-online-check" },
+                new { Route = "/solo/", Marker = "entry-solo" },
+                new { Route = "/solo/index.html", Marker = "entry-solo" },
+                new { Route = "/coop/", Marker = "entry-coop" },
+                new { Route = "/coop/index.html", Marker = "entry-coop" },
+                new { Route = "/raid/", Marker = "entry-raid" },
+                new { Route = "/raid/index.html", Marker = "entry-raid" }
+            };
+            foreach (var entry in entries)
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Post, entry.Route, "{\"host\":\"ONE\"}", null);
+                AssertStatus(response, 200, "ONE POST " + entry.Route);
+                AssertEqual("text/html", response.ContentType, "ONE POST HTML MIME " + entry.Route);
+                Assert(response.Body.Contains(entry.Marker, StringComparison.Ordinal), "ONE POST serves the selected game document " + entry.Route);
+                AssertEqual("no-store", response.CacheControl, "ONE POST HTML cache " + entry.Route);
+                AssertEqual("frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net", response.ContentSecurityPolicy,
+                    "ONE POST frame policy " + entry.Route);
+                Assert(string.IsNullOrEmpty(response.XFrameOptions), "ONE POST must not send conflicting X-Frame-Options " + entry.Route);
+            }
+
+            foreach (string mode in new[] { "solo", "coop", "raid" })
+            {
+                string bare = "/" + mode;
+                string canonical = bare + "/?ticket=qa%2Fcheck";
+                foreach (HttpMethod method in new[] { HttpMethod.Get, HttpMethod.Post })
+                {
+                    string body = method == HttpMethod.Post ? "{\"host\":\"ONE\"}" : null;
+                    HttpResponse redirect = await harness.SendAsync(method, bare + "?ticket=qa%2Fcheck", body, null);
+                    AssertStatus(redirect, 307, "bare mode preserves method " + method + " " + bare);
+                    AssertEqual(canonical, redirect.Location, "bare mode preserves query and adds slash " + bare);
+                    AssertEqual("no-store", redirect.CacheControl, "bare mode redirect cache " + bare);
+                    HttpResponse final = await harness.SendAsync(method, redirect.Location, body, null);
+                    AssertStatus(final, 200, "redirected mode HTML " + method + " " + bare);
+                    AssertEqual("text/html", final.ContentType, "redirected mode MIME " + bare);
+                    Assert(final.Body.Contains("Build/entry.loader.js", StringComparison.Ordinal), "redirected HTML retains relative loader " + bare);
+                    Uri loader = new Uri(new Uri(harness.Options.ListenUrl + redirect.Location), "Build/entry.loader.js");
+                    AssertEqual(bare + "/Build/entry.loader.js", loader.AbsolutePath, "relative loader stays inside mode " + bare);
+                    AssertStatus(await harness.SendAsync(HttpMethod.Get, loader.PathAndQuery, null, null), 200, "relative loader GET " + bare);
+                }
+            }
+
+            foreach (string route in new[] { "/", "/index.html", "/solo/", "/solo/index.html", "/coop/", "/coop/index.html", "/raid/", "/raid/index.html" })
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Get, route, null, null);
+                AssertStatus(response, 200, "browser GET " + route);
+                AssertEqual("frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net", response.ContentSecurityPolicy,
+                    "browser GET frame policy " + route);
+            }
+
+            foreach (string route in new[] { "/unknown", "/unknown/index.html", "/app.js", "/game.wasm", "/solo/app.js" })
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Post, route, "{}", null);
+                AssertStatus(response, 404, "POST outside game entry " + route);
+            }
+            AssertStatus(await harness.SendAsync(HttpMethod.Post, "/healthz", "{}", null), 405, "health endpoint does not accept POST");
+            HttpResponse api = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("onestore-post-api-abcdefghijklmnopqrstuvwxyz"), null);
+            AssertStatus(api, 201, "co-op API POST remains available");
+            Assert(api.Root.GetProperty("ok").GetBoolean(), "co-op API POST retains JSON behavior");
+        }
+    }
+
+    private static async Task CheckHashedBuildTransport()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            const string hash = "0123456789abcdef0123456789abcdef";
+            string buildDir = Path.Combine(harness.Options.PublicRoot, "raid", "Build");
+            Directory.CreateDirectory(buildDir);
+            File.WriteAllText(Path.Combine(harness.Options.PublicRoot, "raid", "index.html"), "<title>raid</title>");
+            byte[] wasm = new byte[65536];
+            byte[] data = new byte[32768];
+            for (int index = 0; index < wasm.Length; index++) wasm[index] = (byte)(index % 13);
+            for (int index = 0; index < data.Length; index++) data[index] = (byte)(index % 17);
+            wasm[0] = 0; wasm[1] = 97; wasm[2] = 115; wasm[3] = 109;
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm"), wasm);
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".data"), data);
+            File.WriteAllBytes(Path.Combine(buildDir, "unhashed.wasm"), wasm);
+            File.WriteAllText(Path.Combine(buildDir, hash + ".symbols.json"), "{}");
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm.br"), new byte[] { 1, 2, 3 });
+
+            string wasmPath = "/raid/Build/" + hash + ".wasm";
+            RawHttpResponse br = await harness.SendRawAsync(wasmPath, "br");
+            AssertEqual(200, br.StatusCode, "brotli wasm status");
+            AssertEqual("br", br.ContentEncoding, "brotli wasm encoding");
+            AssertEqual("application/wasm", br.ContentType, "brotli wasm MIME");
+            Assert(br.CacheControl != null && br.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && br.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed wasm cache: " + br.CacheControl);
+            Assert(br.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "compressed response varies by encoding");
+            Assert(br.Bytes.Length < wasm.Length, "brotli must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(br.Bytes, true))), "brotli decoded wasm hash");
+
+            RawHttpResponse gzip = await harness.SendRawAsync(wasmPath, "gzip");
+            AssertEqual("gzip", gzip.ContentEncoding, "gzip wasm encoding");
+            Assert(gzip.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "gzip response varies by encoding");
+            Assert(gzip.Bytes.Length < wasm.Length, "gzip must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(gzip.Bytes, false))), "gzip decoded wasm hash");
+
+            RawHttpResponse identity = await harness.SendRawAsync(wasmPath, "identity");
+            AssertEqual(200, identity.StatusCode, "identity wasm status");
+            Assert(string.IsNullOrEmpty(identity.ContentEncoding), "identity must not be encoded");
+            Assert(identity.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "identity response varies by encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(identity.Bytes)), "identity wasm hash");
+
+            RawHttpResponse brData = await harness.SendRawAsync("/raid/Build/" + hash + ".data", "br");
+            AssertEqual("br", brData.ContentEncoding, "brotli data encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(data), SHA256.HashData(Decompress(brData.Bytes, true))), "brotli decoded data hash");
+            RawHttpResponse symbols = await harness.SendRawAsync("/raid/Build/" + hash + ".symbols.json", "br");
+            Assert(symbols.CacheControl != null && symbols.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && symbols.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed symbols cache: " + symbols.CacheControl);
+            Assert(string.IsNullOrEmpty(symbols.ContentEncoding), "symbols remain uncompressed by scoped middleware");
+
+            RawHttpResponse html = await harness.SendRawAsync("/raid/index.html", "br");
+            AssertEqual("no-store", html.CacheControl, "mode HTML cache");
+            Assert(string.IsNullOrEmpty(html.ContentEncoding), "mode HTML is outside compression scope");
+            RawHttpResponse unhashed = await harness.SendRawAsync("/raid/Build/unhashed.wasm", "br");
+            AssertEqual("no-store", unhashed.CacheControl, "unhashed build cache");
+            Assert(string.IsNullOrEmpty(unhashed.ContentEncoding), "unhashed build is outside compression scope");
+            RawHttpResponse api = await harness.SendRawAsync("/api/coop/v1/definitions", "br");
+            AssertEqual("no-store", api.CacheControl, "API cache");
+            Assert(string.IsNullOrEmpty(api.ContentEncoding), "API is outside compression scope");
+            RawHttpResponse health = await harness.SendRawAsync("/healthz", "br");
+            AssertEqual("no-store", health.CacheControl, "health cache");
+            Assert(string.IsNullOrEmpty(health.ContentEncoding), "health is outside compression scope");
+
+            RawHttpResponse precompressed = await harness.SendRawAsync("/raid/Build/" + hash + ".wasm.br", "br");
+            Assert(precompressed.StatusCode == 404 || (string.IsNullOrEmpty(precompressed.ContentEncoding) && precompressed.CacheControl == "no-store"),
+                "precompressed artifacts cannot be double-encoded or treated as immutable build files");
+        }
+    }
+
+    private static byte[] Decompress(byte[] bytes, bool brotli)
+    {
+        using (var input = new MemoryStream(bytes))
+        using (Stream decoder = brotli ? (Stream)new BrotliStream(input, CompressionMode.Decompress) : new GZipStream(input, CompressionMode.Decompress))
+        using (var output = new MemoryStream())
+        {
+            decoder.CopyTo(output);
+            return output.ToArray();
         }
     }
 
@@ -615,6 +776,9 @@ internal static class Program
         public string Body;
         public string ContentType;
         public string CacheControl;
+        public string ContentSecurityPolicy;
+        public string XFrameOptions;
+        public string Location;
         public JsonDocument Document;
         public JsonElement Root
         {
@@ -624,6 +788,16 @@ internal static class Program
                 return Document.RootElement;
             }
         }
+    }
+
+    private sealed class RawHttpResponse
+    {
+        public int StatusCode;
+        public byte[] Bytes;
+        public string ContentType;
+        public string ContentEncoding;
+        public string CacheControl;
+        public string Vary;
     }
 
     private sealed class ServerHarness : IAsyncDisposable
@@ -684,7 +858,37 @@ internal static class Program
                         Body = responseBody,
                         ContentType = contentType,
                         CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
+                        ContentSecurityPolicy = HeaderValue(response, "Content-Security-Policy"),
+                        XFrameOptions = HeaderValue(response, "X-Frame-Options"),
+                        Location = response.Headers.Location == null ? null : response.Headers.Location.ToString(),
                         Document = contentType != null && contentType.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0 ? JsonDocument.Parse(responseBody) : null
+                    };
+                }
+            }
+        }
+
+        private static string HeaderValue(HttpResponseMessage response, string name)
+        {
+            IEnumerable<string> values;
+            return response.Headers.TryGetValues(name, out values) ? string.Join(",", values) : null;
+        }
+
+        public async Task<RawHttpResponse> SendRawAsync(string path, string acceptEncoding)
+        {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+            {
+                if (!string.IsNullOrEmpty(acceptEncoding)) request.Headers.TryAddWithoutValidation("Accept-Encoding", acceptEncoding);
+                using (HttpResponseMessage response = await _client.SendAsync(request))
+                {
+                    byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+                    return new RawHttpResponse
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Bytes = bytes,
+                        ContentType = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.MediaType,
+                        ContentEncoding = string.Join(",", response.Content.Headers.ContentEncoding),
+                        CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
+                        Vary = string.Join(",", response.Headers.Vary)
                     };
                 }
             }
@@ -722,7 +926,7 @@ internal static class Program
         {
             _app = ServerApplication.Create(Options);
             await _app.StartAsync();
-            _client = new HttpClient { BaseAddress = new Uri(Options.ListenUrl, UriKind.Absolute) };
+            _client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(Options.ListenUrl, UriKind.Absolute) };
         }
 
         private static int FindFreePort()

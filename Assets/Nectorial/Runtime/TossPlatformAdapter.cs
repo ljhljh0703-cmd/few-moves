@@ -77,6 +77,9 @@ namespace Nectorial.SlideEscape.Unity
         private int _sessionGeneration;
         private bool _storageReady;
         private string _storageKey;
+        // Null for the original solo scope; set only by BeginRaidStartup and kept across RetryStartup.
+        private string _raidArenaId;
+        private string _raidArenaFingerprint;
 
 #if UNITY_WEBGL && !UNITY_EDITOR && APPSINTOS_OPTIMIZED
         private Action _unsubscribeBackEvent;
@@ -96,9 +99,31 @@ namespace Nectorial.SlideEscape.Unity
 
         public bool IsStorageReady => _storageReady;
 
+        internal bool IsRaidScoped => _raidArenaId != null;
+
         public event Action CheckpointRequested;
 
         internal void BeginStartup(Action<TossStartupResult> completed)
+        {
+            _raidArenaId = null;
+            _raidArenaFingerprint = null;
+            StartStorageStartup(completed);
+        }
+
+        // Raid storage is scoped explicitly to the anonymous user plus the current arena id and fingerprint.
+        internal void BeginRaidStartup(string arenaId, string arenaFingerprint, Action<TossStartupResult> completed)
+        {
+            if (!TossPlatformPolicy.IsValidRaidScope(arenaId, arenaFingerprint))
+            {
+                throw new ArgumentException("A token arena id and fingerprint are required.", nameof(arenaId));
+            }
+
+            _raidArenaId = arenaId;
+            _raidArenaFingerprint = arenaFingerprint;
+            StartStorageStartup(completed);
+        }
+
+        private void StartStorageStartup(Action<TossStartupResult> completed)
         {
             if (completed == null) throw new ArgumentNullException(nameof(completed));
 
@@ -114,7 +139,7 @@ namespace Nectorial.SlideEscape.Unity
 
         internal void RetryStartup(Action<TossStartupResult> completed)
         {
-            BeginStartup(completed);
+            StartStorageStartup(completed);
         }
 
         internal void Store(int requestId, string payload, Action<int, TossPlatformOperationResult> completed)
@@ -188,7 +213,9 @@ namespace Nectorial.SlideEscape.Unity
                     return;
                 }
 
-                _storageKey = TossPlatformPolicy.BuildScopedStorageKey(success.Hash);
+                _storageKey = _raidArenaId == null
+                    ? TossPlatformPolicy.BuildScopedStorageKey(success.Hash)
+                    : TossPlatformPolicy.BuildRaidStorageKey(success.Hash, _raidArenaId, _raidArenaFingerprint);
                 string stored = await AIT.StorageGetItem(_storageKey, PlatformCallTimeoutMilliseconds);
                 if (!IsCurrent(generation)) return;
 

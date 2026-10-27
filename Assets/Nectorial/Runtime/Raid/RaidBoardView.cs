@@ -10,7 +10,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
     internal sealed class RaidBoardView : IDisposable
     {
         private const int GlyphPixels = 9;
-        private const float GlyphPixelSize = 0.075f;
+        private const float GlyphPixelSize = 0.09f;
 
         private static readonly Color Floor = new Color32(229, 224, 211, 255);
         private static readonly Color Grid = new Color32(210, 203, 187, 150);
@@ -138,10 +138,37 @@ namespace Nectorial.SlideEscape.Unity.Raid
         private Transform _playerActor;
         private Transform _playerBlueGlyph;
         private Transform _playerPoweredGlyph;
+        private Transform _playerPowerCorners;
         private RaidArenaDefinition _staticArena;
         private RaidFrame[] _activeFrames;
         private bool _transitionActive;
         private bool _disposed;
+
+        // Short cell cues: a pickup ring on the collected cell and a caught/clear mark on the final cell.
+        // Pooled, drawn inside one cell, emitted at most once per frame of an action, never by Render or restore.
+        private const int CuePoolSize = 6;
+        private const float PickupCueSeconds = 0.3f;
+        private const float TerminalCueSeconds = 0.55f;
+        private static readonly Color PickupCueColor = new Color32(213, 160, 67, 255);
+        private static readonly Color ClearCueColor = new Color32(246, 205, 102, 255);
+        private static readonly Color CaughtCueColor = new Color32(27, 35, 40, 255);
+        private readonly List<Cue> _cues = new List<Cue>();
+        private int _nextCueFrame;
+        private bool _reducedMotion;
+
+        private sealed class Cue
+        {
+            public Transform Root;
+            public SpriteRenderer[] Bars;
+            public Color Color;
+            public float Age;
+            public float Life;
+            public float From;
+            public float To;
+            public float Thickness;
+            public bool Terminal;
+            public bool Active;
+        }
 
         public RaidBoardView()
         {
@@ -171,6 +198,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             EnsureActors(arena.SnakeBodyLength);
             _activeFrames = frames;
             _transitionActive = true;
+            _nextCueFrame = 0;
             ApplyFrame(arena, frames[0], 0f);
             SetRootPosition(arena);
             return true;
@@ -184,10 +212,12 @@ namespace Nectorial.SlideEscape.Unity.Raid
             int frameIndex = Mathf.Min(_activeFrames.Length - 1, Mathf.FloorToInt(scaled));
             float frameProgress = normalized >= 1f ? 1f : scaled - frameIndex;
             ApplyFrame(_staticArena, _activeFrames[frameIndex], frameProgress);
+            EmitCuesThrough(frameProgress >= 0.999f ? frameIndex : frameIndex - 1);
         }
 
         public void CompleteAction(RaidArenaDefinition arena, RaidState finalState)
         {
+            if (_activeFrames != null) EmitCuesThrough(_activeFrames.Length - 1);
             _activeFrames = null;
             _transitionActive = false;
             Render(arena, finalState);
@@ -197,6 +227,49 @@ namespace Nectorial.SlideEscape.Unity.Raid
         {
             _activeFrames = null;
             _transitionActive = false;
+            ClearEffects();
+        }
+
+        public void SetReducedMotion(bool reduced)
+        {
+            _reducedMotion = reduced;
+        }
+
+        internal int ActiveEffectCount
+        {
+            get
+            {
+                int count = 0;
+                for (int index = 0; index < _cues.Count; index++) if (_cues[index].Active) count++;
+                return count;
+            }
+        }
+
+        public void ClearEffects()
+        {
+            for (int index = 0; index < _cues.Count; index++)
+            {
+                _cues[index].Active = false;
+                if (_cues[index].Root != null) _cues[index].Root.gameObject.SetActive(false);
+            }
+        }
+
+        public void TickEffects(float deltaTime)
+        {
+            if (_disposed) return;
+            for (int index = 0; index < _cues.Count; index++)
+            {
+                Cue cue = _cues[index];
+                if (!cue.Active) continue;
+                cue.Age += Mathf.Max(0f, deltaTime);
+                if (cue.Age >= cue.Life)
+                {
+                    cue.Active = false;
+                    cue.Root.gameObject.SetActive(false);
+                    continue;
+                }
+                ApplyCue(cue);
+            }
         }
 
         public void Dispose()
@@ -206,6 +279,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _activeFrames = null;
             _transitionActive = false;
             Application.quitting -= Dispose;
+            _cues.Clear();
             Clear(_dynamicTiles);
             Clear(_staticTiles);
             _pickupActors.Clear();
@@ -214,6 +288,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _playerChargePips.Clear();
             _playerBlueGlyph = null;
             _playerPoweredGlyph = null;
+            _playerPowerCorners = null;
             if (_root != null) Object.Destroy(_root.gameObject);
             if (_whiteSprite != null) Object.Destroy(_whiteSprite);
         }
@@ -282,6 +357,21 @@ namespace Nectorial.SlideEscape.Unity.Raid
             _playerBlueGlyph = AddPixelGlyph(_playerActor, "Player Blue Glyph", PlayerGlyph, Player, GlyphOutline, Color.clear, 8);
             _playerPoweredGlyph = AddPixelGlyph(_playerActor, "Player Powered Glyph", PlayerGlyph, Tail, PlayerPowerOutline, TailHighlight, 8);
             _playerPoweredGlyph.gameObject.SetActive(false);
+            _playerPowerCorners = new GameObject("Player Power Corners").transform;
+            _playerPowerCorners.SetParent(_playerActor, false);
+            for (int x = -1; x <= 1; x += 2)
+            {
+                for (int y = -1; y <= 1; y += 2)
+                {
+                    Transform horizontal = AddActorPrimitive(_playerPowerCorners, "Power Corner Horizontal", Player,
+                        new Vector2(0.18f, 0.055f), 9, 0f);
+                    horizontal.localPosition = new Vector3(x * 0.33f, y * 0.41f, 0f);
+                    Transform vertical = AddActorPrimitive(_playerPowerCorners, "Power Corner Vertical", Player,
+                        new Vector2(0.055f, 0.18f), 9, 0f);
+                    vertical.localPosition = new Vector3(x * 0.41f, y * 0.33f, 0f);
+                }
+            }
+            _playerPowerCorners.gameObject.SetActive(false);
             for (int index = 0; index < 3; index++)
             {
                 Transform pip = AddActorPrimitive(_playerActor, "Player Charge Pip " + index, ChargeEmpty,
@@ -306,8 +396,9 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 _dynamicTiles.Add(link);
                 var renderer = link.AddComponent<SpriteRenderer>();
                 renderer.sprite = _whiteSprite;
-                renderer.color = Snake;
-                renderer.sortingOrder = 7;
+                renderer.color = GlyphOutline;
+                renderer.sortingOrder = 6;
+                AddActorPrimitive(link.transform, "Snake Link Fill", Snake, new Vector2(1f, 0.82f), 7, 0f);
                 _snakeLinks.Add(link.transform);
             }
         }
@@ -348,6 +439,115 @@ namespace Nectorial.SlideEscape.Unity.Raid
             UpdateSnakeHeadOrientation();
         }
 
+        // Emits the cues of every not-yet-cued frame up to lastFrame (inclusive), so skipped frames are not lost
+        // and a repeated frame or render never emits twice.
+        private void EmitCuesThrough(int lastFrame)
+        {
+            if (_activeFrames == null || _staticArena == null) return;
+            for (; _nextCueFrame <= lastFrame && _nextCueFrame < _activeFrames.Length; _nextCueFrame++)
+            {
+                RaidFrame frame = _activeFrames[_nextCueFrame];
+                if (frame == null) continue;
+                EmitPickupCues(frame.CollectedTailIds);
+                EmitPickupCues(frame.MagnetCollectedTailIds);
+                EmitPickupCues(frame.CollectedItemIds);
+                if (frame.Outcome == RaidFrameOutcome.Cleared) PlayCue(frame.PlayerAfter, ClearCueColor, TerminalCueSeconds, 0.8f, 0.95f, 0.11f, true);
+                else if (frame.Outcome == RaidFrameOutcome.Failed) PlayCue(frame.PlayerAfter, CaughtCueColor, TerminalCueSeconds, 0.8f, 0.95f, 0.11f, true);
+            }
+        }
+
+        private void EmitPickupCues(string[] ids)
+        {
+            if (ids == null) return;
+            for (int index = 0; index < ids.Length; index++)
+            {
+                GridPoint cell;
+                if (TryFindPickupCell(ids[index], out cell)) PlayCue(cell, PickupCueColor, PickupCueSeconds, 0.55f, 0.95f, 0.07f, false);
+            }
+        }
+
+        private bool TryFindPickupCell(string id, out GridPoint cell)
+        {
+            cell = default(GridPoint);
+            if (string.IsNullOrEmpty(id) || _staticArena == null) return false;
+            if (_staticArena.TailFragments != null)
+                for (int index = 0; index < _staticArena.TailFragments.Length; index++)
+                    if (_staticArena.TailFragments[index] != null && _staticArena.TailFragments[index].Id == id) { cell = _staticArena.TailFragments[index].Position; return true; }
+            if (_staticArena.Items != null)
+                for (int index = 0; index < _staticArena.Items.Length; index++)
+                    if (_staticArena.Items[index] != null && _staticArena.Items[index].Id == id) { cell = _staticArena.Items[index].Position; return true; }
+            return false;
+        }
+
+        private void PlayCue(GridPoint cell, Color color, float life, float from, float to, float thickness, bool terminal)
+        {
+            Cue cue = TakeCue();
+            cue.Color = color;
+            cue.Age = 0f;
+            cue.Life = life;
+            cue.From = _reducedMotion ? to : from;
+            cue.To = to;
+            cue.Thickness = thickness;
+            cue.Terminal = terminal;
+            cue.Active = true;
+            cue.Root.localPosition = ToLocalPosition(cell);
+            cue.Root.gameObject.SetActive(true);
+            ApplyCue(cue);
+        }
+
+        private Cue TakeCue()
+        {
+            Cue oldest = null;
+            for (int index = 0; index < _cues.Count; index++)
+            {
+                if (!_cues[index].Active) return _cues[index];
+                if (oldest == null || _cues[index].Age > oldest.Age) oldest = _cues[index];
+            }
+            if (_cues.Count < CuePoolSize)
+            {
+                var root = new GameObject("Cell Cue");
+                root.transform.SetParent(_root, false);
+                var cue = new Cue { Root = root.transform, Bars = new SpriteRenderer[4] };
+                for (int bar = 0; bar < 4; bar++)
+                {
+                    var piece = new GameObject("Cell Cue Bar");
+                    piece.transform.SetParent(root.transform, false);
+                    SpriteRenderer renderer = piece.AddComponent<SpriteRenderer>();
+                    renderer.sprite = _whiteSprite;
+                    renderer.sortingOrder = 11;
+                    cue.Bars[bar] = renderer;
+                }
+                root.SetActive(false);
+                _cues.Add(cue);
+                return cue;
+            }
+            return oldest;
+        }
+
+        // A square ring that stays inside its cell: at scale 0.95 the outer edge is at +/-0.48 of a cell.
+        private void ApplyCue(Cue cue)
+        {
+            float progress = Mathf.Clamp01(cue.Life <= 0f ? 1f : cue.Age / cue.Life);
+            float eased = _reducedMotion ? 1f : 1f - (1f - progress) * (1f - progress);
+            float scale = Mathf.Lerp(cue.From, cue.To, eased);
+            float alpha = cue.Terminal ? (progress < 0.7f ? 1f : 1f - (progress - 0.7f) / 0.3f) : 1f - progress;
+            float half = 0.45f * scale;
+            float length = 0.9f * scale + cue.Thickness;
+            Color color = cue.Color;
+            color.a = Mathf.Clamp01(alpha);
+            SetBar(cue.Bars[0], new Vector3(0f, half, 0f), new Vector2(length, cue.Thickness), color);
+            SetBar(cue.Bars[1], new Vector3(0f, -half, 0f), new Vector2(length, cue.Thickness), color);
+            SetBar(cue.Bars[2], new Vector3(-half, 0f, 0f), new Vector2(cue.Thickness, length), color);
+            SetBar(cue.Bars[3], new Vector3(half, 0f, 0f), new Vector2(cue.Thickness, length), color);
+        }
+
+        private static void SetBar(SpriteRenderer bar, Vector3 position, Vector2 size, Color color)
+        {
+            bar.transform.localPosition = position;
+            bar.transform.localScale = new Vector3(size.x, size.y, 1f);
+            bar.color = color;
+        }
+
         private void UpdatePlayerCharge(RaidState state)
         {
             int collected = state.CollectedTailIds == null ? 0 : state.CollectedTailIds.Length;
@@ -360,6 +560,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
             bool powered = state.Status == RaidRunStatus.Armed || state.Status == RaidRunStatus.Cleared;
             if (_playerBlueGlyph != null) _playerBlueGlyph.gameObject.SetActive(!powered);
             if (_playerPoweredGlyph != null) _playerPoweredGlyph.gameObject.SetActive(powered);
+            if (_playerPowerCorners != null) _playerPowerCorners.gameObject.SetActive(powered);
             for (int index = 0; index < _playerChargePips.Count; index++)
                 if (_playerChargePips[index] != null) _playerChargePips[index].gameObject.SetActive(!powered);
         }
@@ -495,7 +696,7 @@ namespace Nectorial.SlideEscape.Unity.Raid
                 Transform link = _snakeLinks[index];
                 link.localPosition = (from + to) * 0.5f;
                 link.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
-                link.localScale = new Vector3(Mathf.Max(0.2f, delta.magnitude * 0.7f), 0.22f, 1f);
+                link.localScale = new Vector3(Mathf.Max(0.2f, delta.magnitude * 0.9f), 0.44f, 1f);
             }
         }
 

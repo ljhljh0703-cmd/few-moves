@@ -63,7 +63,9 @@ namespace Nectorial.SlideEscape.Unity
                 return false;
             }
 
-            if (completed.IsManual && _pendingManualRequestId == requestId)
+            // Ids only grow and the writer keeps only the newest payload, so completing this id or a newer one
+            // means the pending manual save has either completed itself or been superseded by a newer payload.
+            if (_pendingManualRequestId != 0 && requestId >= _pendingManualRequestId)
             {
                 _pendingManualRequestId = 0;
             }

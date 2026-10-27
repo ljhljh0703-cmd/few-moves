@@ -58,7 +58,7 @@ function element(options = {}) {
 }
 
 function createHarness() {
-  const actionButtons = ["Up", "Down", "Left", "Right", "Undo", "Restart", "Restart", "Next"].map((action) =>
+  const actionButtons = ["Up", "Down", "Left", "Right", "Restart", "Restart", "Next"].map((action) =>
     element({ dataset: { gameAction: action }, tag: "button" }));
   const pieceButtons = [0, 1, 2].map((index) => element({ dataset: { pieceIndex: String(index) }, tag: "button" }));
   const elements = {
@@ -95,6 +95,7 @@ function createHarness() {
     "#share-panel-feedback": element(),
     "#feedback": element(),
     "#play-controls": element(),
+    "#piece-row": element(),
     "#turn-runline": element()
   };
   const documentHandlers = {};
@@ -233,21 +234,36 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.doesNotMatch(board.match(/public void AdvanceTransition[\s\S]*?public void CompleteTransition/)[0], /new GameObject/);
   assert.doesNotMatch(board.match(/public void Render[\s\S]*?public bool BeginTransition/)[0], /ClearDynamicTiles/);
   assert.match(template, /--paper:#eee7d8; --surface:#faf5e9; --ink:#293238/);
-  assert.match(template, /grid-template-rows:24px minmax\(0,1fr\) 220px/);
+  assert.match(template, /grid-template-rows:32px minmax\(0,1fr\) 234px/);
+  assert.match(template, /\.play-controls \{[^}]*height:234px;[^}]*grid-template-rows:48px 168px;[^}]*gap:18px;/, "selector row and pad are clearly separated");
   assert.match(template, /\.direction-console \{ grid-row:2; position:relative; width:180px; height:168px/);
-  assert.match(template, /\.direction-button,\.undo-button \{ position:absolute; width:56px; height:56px/);
+  assert.match(template, /\.direction-button \{ position:absolute; z-index:2; width:56px; height:56px/);
+  assert.match(template, /\.dpad-base::before \{ left:62px; top:0; width:56px; height:164px; \} \.dpad-base::after \{ left:0; top:56px; width:180px; height:52px; \}/);
+  assert.match(template, /\.dpad-base \{[^}]*drop-shadow\(0 4px 0 /, "4px pad shadow ends exactly at the 168px console edge");
+  assert.doesNotMatch(template, /\.utility-bar \{[^}]*border-bottom|\.control-slot \{[^}]*border-(top|left):1px/, "no web-form separator rules around the board and pad");
+  assert.match(template, /\.direction-button span \{ color:var\(--paper\)/, "cream arrows on the charcoal pad");
+  assert.match(template, /<span class="dpad-center" aria-hidden="true"><\/span>/, "pad center is inert decoration");
+  assert.doesNotMatch(template, /class="[^"]*dpad-center[^"]*"[^>]*(tabindex|data-game-action)|<button[^>]*dpad-center/, "pad center has no action or focus");
   assert.match(template, /\.piece-mark \{[^}]*border-radius:50%/);
   assert.match(template, /data-piece-index="1"\] \.piece-mark \{[^}]*rotate\(45deg\)/);
   assert.match(template, /data-piece-index="2"\] \.piece-mark \{[^}]*background:var\(--teal\)/);
-  assert.match(template, /class="goal-hint">파란 말을 목표 칸에 넣어요/);
+  assert.match(template, /class="goal-hint"><span class="goal-mark" aria-hidden="true"><\/span><span><strong class="goal-piece">파란 말<\/strong>을 목표 칸에 넣어요<\/span>/);
+  assert.match(template, /\.goal-hint \{[^}]*font-size:clamp\(18px,/, "quest line stays at least 18px");
   assert.match(template, /현재 진행을 지우고 첫 번째 판부터 다시 시작해요/);
   assert.match(template, /Math\.floor\(Math\.min\(bounds\.width, bounds\.height, 560\)\)/);
   assert.match(template, /id="turn-runline" class="moves">0번 이동/);
-  assert.match(template, /id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
+  assert.match(template, /class="top-actions"><button id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
+  assert.match(template, /\.utility-bar \{ width:min\(100%,560px\); justify-self:center;/, "HUD stays on the board axis on wide screens");
   assert.match(template, /id="help-toggle"/);
   assert.match(template, /id="help-dialog"/);
   assert.match(template, /\.play-controls\[hidden\] \{ display:grid!important; visibility:hidden; pointer-events:none; \}/);
-  assert.match(template, /data-game-action="Undo"/);
+  assert.doesNotMatch(template, /data-game-action="Undo"|undo-button|되돌/, "solo play has no undo button, style, or help text");
+  assert.doesNotMatch(runtime, /"Undo"/, "the web layer can neither map nor dispatch Undo");
+  assert.match(template, /canvas \{[^}]*border:0; border-radius:0; background:var\(--stage\)/, "no card frame around the 3D board");
+  assert.match(template, /--stage:#f0ece2/, "page paper matches the Unity camera background");
+  assert.match(template, /html,body \{[^}]*background:var\(--stage\)/);
+  assert.match(template, /id="piece-row" class="piece-row" hidden/, "selector row starts hidden until a multi-piece state arrives");
+  assert.match(template, /\.piece-row\[hidden\] \{ display:flex!important; visibility:hidden; pointer-events:none; \}/, "hidden selector keeps its slot so the pad does not move");
   assert.match(template, /data-piece-index="0"/);
   assert.match(template, /id="menu-save"[^>]*>저장하기/);
   assert.match(template, /id="menu-start-over"[^>]*>처음부터 하기/);
@@ -262,7 +278,8 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(runtime, /selectionForKeyboardEvent/);
   assert.match(template, /reportReducedMotionPreference/);
   assert.doesNotMatch(template, /button:hover:enabled/);
-  assert.match(template, /\.direction-button:enabled:hover::before/);
+  assert.match(template, /\.direction-button:enabled:hover \{/);
+  assert.match(template, /\.direction-button:enabled:active span \{ transform:translateY\(2px\); \}/);
   assert.match(template, /button:focus-visible,a:focus-visible,canvas:focus-visible,textarea:focus-visible/);
   assert.match(runtime, /event\.repeat/);
   assert.doesNotMatch(runtime, /focusCanvas/);
@@ -359,31 +376,34 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(keyboard(h, "ArrowRight", "ArrowRight", body), true);
   assert.equal(h.sent.at(-1).action, "Right");
   receive(state({ turn: 1, fingerprint: "after-slide" }));
-  assert.equal(keyboard(h, "Space", " ", body), true);
-  assert.equal(h.sent.at(-1).action, "Undo");
+  const beforeSpace = h.sent.length;
+  assert.equal(keyboard(h, "Space", " ", body), false, "Space is not a hidden undo shortcut in solo play");
+  assert.equal(keyboard(h, "Space", "Spacebar", body), false);
+  assert.equal(h.sent.length, beforeSpace, "Space on the page dispatches nothing");
   assert.equal(keyboard(h, "KeyR", "r", body), true);
   assert.equal(h.sent.at(-1).action, "Restart");
 
-  const undoButton = h.actionButtons.find((button) => button.dataset.gameAction === "Undo");
+  const upButton = h.actionButtons.find((button) => button.dataset.gameAction === "Up");
   const sentBeforeNativeButton = h.sent.length;
-  assert.equal(keyboard(h, "Space", " ", undoButton), false, "native button default is simulated separately");
-  undoButton.dispatch("click");
+  assert.equal(keyboard(h, "Space", " ", upButton), false, "native button default is simulated separately");
+  upButton.dispatch("click");
   assert.equal(h.sent.length, sentBeforeNativeButton + 1, "button Space/Enter default produces one click path");
-  assert.equal(h.sent.at(-1).action, "Undo");
-  assert.equal(keyboard(h, "Space", " ", undoButton, true), true, "repeated native button activation is suppressed");
+  assert.equal(h.sent.at(-1).action, "Up");
+  assert.equal(keyboard(h, "Space", " ", upButton, true), true, "repeated native button activation is suppressed");
+  receive(state({ turn: 2, fingerprint: "after-native-space" }));
   const sentBeforeEnter = h.sent.length;
-  assert.equal(keyboard(h, "Enter", "Enter", undoButton), false, "native Enter default is simulated separately");
-  undoButton.dispatch("click");
+  assert.equal(keyboard(h, "Enter", "Enter", upButton), false, "native Enter default is simulated separately");
+  upButton.dispatch("click");
   assert.equal(h.sent.length, sentBeforeEnter + 1, "button Enter default produces one click path");
-  assert.equal(h.sent.at(-1).action, "Undo");
-  assert.equal(keyboard(h, "Enter", "Enter", undoButton, true), true, "repeated Enter activation is suppressed");
+  assert.equal(h.sent.at(-1).action, "Up");
+  assert.equal(keyboard(h, "Enter", "Enter", upButton, true), true, "repeated Enter activation is suppressed");
   assert.equal(h.sent.length, sentBeforeEnter + 1, "held Enter cannot add another turn");
-  assert.equal(keyboard(h, "ArrowLeft", "ArrowLeft", undoButton), true, "focused game buttons still accept directional hotkeys");
+  assert.equal(keyboard(h, "ArrowLeft", "ArrowLeft", upButton), true, "focused game buttons still accept directional hotkeys");
   assert.equal(h.sent.at(-1).action, "Left");
-  assert.equal(keyboard(h, "KeyR", "r", undoButton), true, "focused game buttons still accept restart hotkeys");
+  assert.equal(keyboard(h, "KeyR", "r", upButton), true, "focused game buttons still accept restart hotkeys");
   assert.equal(h.sent.at(-1).action, "Restart");
   const beforeModifiedButtonClick = h.sent.length;
-  undoButton.dispatch("click", { ctrlKey: true });
+  upButton.dispatch("click", { ctrlKey: true });
   assert.equal(h.sent.length, beforeModifiedButtonClick, "modified button activation cannot bypass the hotkey guard");
 
   const beforeRepeat = h.sent.length;
@@ -401,6 +421,18 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(keyboard(h, "ArrowDown", "ArrowDown", body, false, { ctrlKey: true }), false);
   assert.equal(keyboard(h, "KeyR", "r", body, false, { metaKey: true }), false);
   assert.equal(h.sent.length, beforeModifier, "modified keyboard shortcuts cannot feed gameplay");
+
+  assert.equal(h.elements["#piece-row"].hidden, false, "multi-piece rooms show the piece selector");
+  receive(state({ pieceCount: 1, selectedPieceIndex: 0, fingerprint: "single-piece" }));
+  assert.equal(h.elements["#piece-row"].hidden, true, "a single-piece room shows no selector");
+  const beforeSingleSelection = h.sent.length;
+  assert.equal(keyboard(h, "Digit1", "1", body), false, "a lone piece has nothing to select");
+  h.pieceButtons[0].dispatch("click");
+  assert.equal(h.sent.length, beforeSingleSelection, "no selection message for a single-piece room");
+  assert.equal(keyboard(h, "ArrowRight", "ArrowRight", body), true, "directions still work in a single-piece room");
+  assert.equal(h.sent.at(-1).action, "Right");
+  receive(state({ fingerprint: "multi-piece-again" }));
+  assert.equal(h.elements["#piece-row"].hidden, false, "the selector returns for multi-piece rooms");
 
   const selectionCount = h.sent.length;
   h.pieceButtons[1].dispatch("click");
@@ -424,8 +456,8 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   const sentBeforeTransitionInput = h.sent.length;
   keyboard(h, "ArrowDown", "ArrowDown", body);
   assert.equal(h.sent.length, sentBeforeTransitionInput, "movement input is locked during the board transition");
-  assert.equal(keyboard(h, "Space", " ", body), true, "Undo stays available to cancel an uncommitted glide");
-  assert.equal(h.sent.at(-1).action, "Undo");
+  assert.equal(keyboard(h, "Space", " ", body), false, "Space does not undo or cancel a glide from the page");
+  assert.equal(h.sent.length, sentBeforeTransitionInput, "no web input reaches Unity during the glide");
   const transitionRetry = h.actionButtons.find((button) => button.dataset.gameAction === "Restart");
   assert.equal(transitionRetry.disabled, false, "restart remains available during transition cancellation");
 
@@ -434,6 +466,10 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.elements["#result-title"].textContent, "클리어");
   assert.equal(h.elements["#result-turn"].textContent, "9수");
   assert.equal(h.elements["#result-par"].textContent, "최단 5수");
+  receive(clearedState({ turn: 5, fingerprint: "cleared-at-optimum" }));
+  assert.equal(h.elements["#result-par"].textContent, "최단 5수 달성", "matching the proven optimum is stated as a fact");
+  receive(clearedState());
+  assert.equal(h.elements["#result-par"].textContent, "최단 5수", "no achievement line above the optimum");
   assert.equal(h.elements["#result-share"].hidden, false, "share is reachable inside the cleared result dialog");
   assert.equal(h.elements["#result-next"].hidden, false, "next is visible only for a cleared state with a next room");
   const beforeResultInput = h.sent.length;
@@ -532,6 +568,11 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.elements["#result-dialog"].open, false);
   keyboard(h, "ArrowDown", "ArrowDown", body);
   assert.equal(h.sent.length, sentBeforeMalformed, "malformed state fails closed before keyboard dispatch");
+
+  assert.equal(h.sent.some((entry) => entry.action === "Undo"), false, "Undo was never dispatched from solo UI");
+  receive(state());
+  h.sandbox.window.__nectorial.receiveState("{}");
+  assert.equal(h.elements["#piece-row"].hidden, true, "invalid observations hide the selector");
 
   console.log("mobile UI contract checks passed");
 })().catch((error) => {
