@@ -25,6 +25,7 @@ namespace FewMoves.Coop.Server
         private static readonly string[] JoinFields = { "inviteCode", "joinRequestId" };
         private static readonly string[] HeartbeatFields = new string[0];
         private static readonly string[] CommandFields = { "commandId", "expectedRevision", "kind", "direction", "requestId", "approve", "expression" };
+        private const string GameFrameAncestors = "frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net";
         private static readonly Regex HashedBuildPath = new Regex(
             @"^/(?:solo|coop|raid|shared)/Build/[0-9a-fA-F]{32}\.(?:data|wasm|framework\.js|loader\.js|symbols\.json)$",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -73,12 +74,16 @@ namespace FewMoves.Coop.Server
             {
                 await Execute(context, Json(200, new HealthView { Version = options.Version, BuildId = options.BuildId, PublicRootConfigured = true }));
             });
-            app.MapGet("/", async context =>
+            // ONE opens the registered game URL, including restart, with POST.
+            // Keep GET for browser navigation; only game documents may answer POST.
+            MapGameEntry(app, options, "/", "index.html");
+            MapGameEntry(app, options, "/index.html", "index.html");
+            foreach (string mode in new[] { "solo", "coop", "raid" })
             {
-                context.Response.Headers["Cache-Control"] = "no-store";
-                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-                await Execute(context, Results.File(Path.Combine(options.PublicRoot, "index.html"), "text/html; charset=utf-8", enableRangeProcessing: false));
-            });
+                string document = Path.Combine(mode, "index.html");
+                MapGameEntry(app, options, "/" + mode, document, normalizeDirectory: true);
+                MapGameEntry(app, options, "/" + mode + "/index.html", document);
+            }
             app.MapGet("/api/coop/v1/definitions", async context =>
             {
                 RoomStore roomStore = context.RequestServices.GetRequiredService<RoomStore>();
@@ -214,6 +219,36 @@ namespace FewMoves.Coop.Server
                         context.Context.Response.Headers["Vary"] = "Accept-Encoding";
                 }
             });
+        }
+
+        private static void MapGameEntry(WebApplication app, ServerOptions options, string route, string relativePath, bool normalizeDirectory = false)
+        {
+            app.MapMethods(route, new[] { "GET", "POST" }, async context =>
+            {
+                if (normalizeDirectory && !context.Request.Path.Value.EndsWith("/", StringComparison.Ordinal))
+                {
+                    // A bare mode path resolves relative Build/ URLs at the root.
+                    // 307 preserves ONE's POST and its query while adding the base slash.
+                    context.Response.Headers["Cache-Control"] = "no-store";
+                    await Execute(context, Results.Redirect(route + "/" + context.Request.QueryString.Value, permanent: false, preserveMethod: true));
+                    return;
+                }
+                string document = Path.Combine(options.PublicRoot, relativePath);
+                if (!File.Exists(document))
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+                SetGameHtmlHeaders(context.Response);
+                await Execute(context, Results.File(document, "text/html; charset=utf-8", enableRangeProcessing: false));
+            });
+        }
+
+        private static void SetGameHtmlHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Content-Security-Policy"] = GameFrameAncestors;
         }
 
         private static bool IsHashedBuildAsset(PathString path)
