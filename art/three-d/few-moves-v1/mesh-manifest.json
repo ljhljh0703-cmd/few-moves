@@ -1,0 +1,185 @@
+{
+  "state": "provisional",
+  "gate": "runtime_import_pending",
+  "source_room": "Assets/Nectorial/Resources/SlideRooms/room-01.json",
+  "source_room_sha256": "a18477f7198a937d7460205709abf334a0f0f3c6ccd20f4a262003338b00e49e",
+  "room_id": "slide-01",
+  "room_size": [
+    8,
+    8
+  ],
+  "room_rows": [
+    "########",
+    "#......#",
+    "#......#",
+    "#..#...#",
+    "#.....##",
+    "#......#",
+    "#......#",
+    "########"
+  ],
+  "room_target_xy": [
+    1,
+    1
+  ],
+  "room_goal_xy": [
+    4,
+    3
+  ],
+  "blender_version": "5.2.2 LTS",
+  "unit": "1 cell = 1 Blender unit = 1 Unity unit",
+  "mesh_origin": "Each reusable mesh origin is center of bottom face; local z=0 is ground.",
+  "blender_to_unity": "FBX axis_forward=-Z, axis_up=Y, bake_space_transform=True; Blender (x,y,z) maps to Unity (x,z,y). Room data (X,Y) maps to Blender (X,-Y) and Unity (X, height, -Y).",
+  "palette_srgb": {
+    "cream": "#eee7d8",
+    "charcoal": "#293238",
+    "blue": "#4374b7",
+    "gold": "#d5a043",
+    "teal": "#377e78"
+  },
+  "textures": "none; embedded material colors only",
+  "fbx_sha256": "b90765d6559a4e8cfe7b4eac0d23d60325c3b56130ebc6e246611dea14256fce",
+  "blend_sha256": "ab4f1b9c33874eebabf04a449018e239abc57b5d9467fe62953a4fb30778c103",
+  "total_source_triangles": 1000,
+  "meshes": [
+    {
+      "name": "FloorTile",
+      "vertices": 56,
+      "triangles": 108,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.4925,
+          -0.4925,
+          -0.0
+        ],
+        "max": [
+          0.4925,
+          0.4925,
+          0.07
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Cream_Mat"
+    },
+    {
+      "name": "WallTile",
+      "vertices": 56,
+      "triangles": 108,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.47,
+          -0.47,
+          0.0
+        ],
+        "max": [
+          0.47,
+          0.47,
+          0.32
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Charcoal_Mat"
+    },
+    {
+      "name": "TargetPuck",
+      "vertices": 144,
+      "triangles": 284,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.35,
+          -0.35,
+          -0.0
+        ],
+        "max": [
+          0.35,
+          0.35,
+          0.2
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Blue_Mat"
+    },
+    {
+      "name": "HelperSquare",
+      "vertices": 56,
+      "triangles": 108,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.32,
+          -0.32,
+          0.0
+        ],
+        "max": [
+          0.32,
+          0.32,
+          0.19
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Teal_Mat"
+    },
+    {
+      "name": "HelperDiamond",
+      "vertices": 56,
+      "triangles": 108,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.31991,
+          -0.31991,
+          0.0
+        ],
+        "max": [
+          0.31991,
+          0.31991,
+          0.19
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Gold_Mat"
+    },
+    {
+      "name": "GoalDisk",
+      "vertices": 144,
+      "triangles": 284,
+      "bounds_blender_xyz": {
+        "min": [
+          -0.3,
+          -0.3,
+          -0.0
+        ],
+        "max": [
+          0.3,
+          0.3,
+          0.035
+        ]
+      },
+      "origin_blender_xyz": [
+        0,
+        0,
+        0
+      ],
+      "material": "Gold_Mat"
+    }
+  ],
+  "reference_scene": "Room 01 instances only. Helper meshes are library objects and absent from the room render."
+}

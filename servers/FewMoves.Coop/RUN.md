@@ -1,31 +1,36 @@
-# Few Moves co-op server — host-neutral run input
+# Few Moves co-op server — local run contract
 
-This service has no provider SDK, account integration, or deployment command. It needs two absolute directories supplied by the operator:
+This service needs absolute operator paths:
 
-- `FEW_MOVES_WEB_ROOT`: the finished, uncompressed Unity WebGL output containing `index.html` and its assets.
-- `FEW_MOVES_STATE_ROOT`: an empty/private directory outside that public root. For a local checkout, use an ignored path such as `Builds/FewMoves.Coop/private-state`; the service creates `rooms.v1.json` there with Unix owner-only permissions.
+- `FEW_MOVES_WEB_ROOT`: an uncompressed public WebGL root with `index.html`, `solo/index.html`, `coop/index.html`, and `raid/index.html` plus their build assets.
+- `FEW_MOVES_STATE_ROOT`: an empty/private directory outside the public root. The service creates owner-only `rooms.v1.json` there.
 
-Run locally with a loopback listener:
+The catalog is strict: `coop-c1`, `coop-c2`, and `coop-c3` must all exist and validate. `FEW_MOVES_ROOM_PATH` selects the C1 file; `FEW_MOVES_ROOM_CATALOG_ROOT` selects the directory containing all three. When omitted, both default to the copied binary resources.
+
+Run locally on loopback:
 
 ```text
 FEW_MOVES_WEB_ROOT=/absolute/public-webgl \
 FEW_MOVES_STATE_ROOT=/absolute/private-room-state \
+FEW_MOVES_ROOM_PATH=/absolute/source/Assets/Nectorial/Resources/CoopRooms/coop-c1.json \
+FEW_MOVES_ROOM_CATALOG_ROOT=/absolute/source/Assets/Nectorial/Resources/CoopRooms \
 FEW_MOVES_LISTEN_URL=http://127.0.0.1:5088 \
 dotnet run --project servers/FewMoves.Coop/FewMoves.Coop.csproj --configuration Release
 ```
 
-`FEW_MOVES_SERVER_BUILD_ID` is optional and only labels `/healthz`; it must not contain a token, path, or credential. The server’s default C1 resource is copied with the binary. Override it only with a reviewed `FEW_MOVES_ROOM_PATH` that has the same intended online content contract.
+`POST /api/coop/v1/rooms/{roomId}/record` is Bearer-authenticated and only derives a completed room's verified replay capsule. A capsule is portable replay input, not author identity or an official leaderboard record; it excludes bearer tokens, room UUIDs, and request IDs, and compares only exact mode/definition/rules/content/fingerprint identities.
 
-Build a container from the repository root only after the public Unity build is available:
+Build a local container from the repository root after the public WebGL build exists:
 
 ```text
 docker build -f servers/FewMoves.Coop/Dockerfile -t few-moves-coop-server .
-docker run --rm -p 8080:8080 \
+docker run --rm -p 127.0.0.1:8080:8080 \
   -e FEW_MOVES_WEB_ROOT=/srv/public \
   -e FEW_MOVES_STATE_ROOT=/srv/private-state \
+  -e FEW_MOVES_LISTEN_URL=http://+:8080 \
   -v /absolute/public-webgl:/srv/public:ro \
   -v /absolute/private-room-state:/srv/private-state \
   few-moves-coop-server
 ```
 
-The static root is the named public mount only. Do not place private state, raw logs, bearer tokens, or build source under it. A QuickTunnel or other host exposure is a separate root-owned test step; this document does not publish a service.
+Container build/run was not run for this change. Keep private state, raw logs, bearer tokens, and source outside the public mount. Any tunnel or public exposure is a separate root-owned test step.

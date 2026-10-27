@@ -11,6 +11,8 @@
     <Compile Include="Server/**/*.cs" />
     <Compile Include="../../Assets/Nectorial/SlideCore/**/*.cs" Link="SlideCore/%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="../../Assets/Nectorial/CoopCore/**/*.cs" Link="CoopCore/%(RecursiveDir)%(Filename)%(Extension)" />
-    <None Include="../../Assets/Nectorial/Resources/CoopRooms/coop-c1.json" Link="CoopRooms/coop-c1.json" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="../../Assets/Nectorial/RaidCore/**/*.cs" Link="RaidCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../../Assets/Nectorial/RecordCore/**/*.cs" Link="RecordCore/%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="../../Assets/Nectorial/Resources/CoopRooms/coop-c*.json" Link="CoopRooms/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

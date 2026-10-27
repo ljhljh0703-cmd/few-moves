@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -13,6 +14,7 @@ using FewMoves.Coop.Server;
 using Microsoft.AspNetCore.Builder;
 using Nectorial.SlideEscape;
 using Nectorial.SlideEscape.Coop;
+using Nectorial.SlideEscape.Record;
 
 internal static class Program
 {
@@ -22,6 +24,10 @@ internal static class Program
     private static async Task<int> Main()
     {
         await Run("http_lifecycle_auth_static_and_secret_boundary", CheckLifecycleAuthStaticAndSecretBoundary);
+        await Run("http_onestore_post_game_entry_allowlist", CheckOnestorePostGameEntry);
+        await Run("http_hashed_build_transport_compression_and_cache_boundary", CheckHashedBuildTransport);
+        await Run("http_catalog_allowlist_and_create_definition_binding", CheckCatalogDefinitionBinding);
+        await Run("http_completed_record_capsule_uses_effective_action_stack", CheckCompletedRecordCapsule);
         await Run("http_command_race_idempotency_stale_and_public_pass", CheckCommands);
         await Run("http_consent_expression_cooldown_and_reconnect", CheckConsentExpressionAndReconnect);
         await Run("http_atomic_persistence_restart_and_corrupt_fail_closed", CheckPersistenceRestartAndCorruption);
@@ -95,6 +101,267 @@ internal static class Program
             Assert(!privateState.Contains(session.InviteCode, StringComparison.Ordinal), "private state must not retain invite raw value");
             HttpResponse privatePath = await harness.SendAsync(HttpMethod.Get, "/rooms.v1.json", null, null);
             Assert(privatePath.StatusCode == 404, "private state cannot be reached through static root");
+        }
+    }
+
+    private static async Task CheckOnestorePostGameEntry()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            foreach (string mode in new[] { "solo", "coop", "raid" })
+            {
+                string directory = Path.Combine(harness.Options.PublicRoot, mode);
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(Path.Combine(directory, "index.html"), "<!doctype html><title>entry-" + mode + "</title><script src=\"Build/entry.loader.js\"></script>");
+                Directory.CreateDirectory(Path.Combine(directory, "Build"));
+                File.WriteAllText(Path.Combine(directory, "Build", "entry.loader.js"), "/* loader */");
+            }
+            File.WriteAllText(Path.Combine(harness.Options.PublicRoot, "app.js"), "/* static asset */");
+
+            var entries = new[]
+            {
+                new { Route = "/", Marker = "few-moves-online-check" },
+                new { Route = "/index.html", Marker = "few-moves-online-check" },
+                new { Route = "/solo/", Marker = "entry-solo" },
+                new { Route = "/solo/index.html", Marker = "entry-solo" },
+                new { Route = "/coop/", Marker = "entry-coop" },
+                new { Route = "/coop/index.html", Marker = "entry-coop" },
+                new { Route = "/raid/", Marker = "entry-raid" },
+                new { Route = "/raid/index.html", Marker = "entry-raid" }
+            };
+            foreach (var entry in entries)
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Post, entry.Route, "{\"host\":\"ONE\"}", null);
+                AssertStatus(response, 200, "ONE POST " + entry.Route);
+                AssertEqual("text/html", response.ContentType, "ONE POST HTML MIME " + entry.Route);
+                Assert(response.Body.Contains(entry.Marker, StringComparison.Ordinal), "ONE POST serves the selected game document " + entry.Route);
+                AssertEqual("no-store", response.CacheControl, "ONE POST HTML cache " + entry.Route);
+                AssertEqual("frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net", response.ContentSecurityPolicy,
+                    "ONE POST frame policy " + entry.Route);
+                Assert(string.IsNullOrEmpty(response.XFrameOptions), "ONE POST must not send conflicting X-Frame-Options " + entry.Route);
+            }
+
+            foreach (string mode in new[] { "solo", "coop", "raid" })
+            {
+                string bare = "/" + mode;
+                string canonical = bare + "/?ticket=qa%2Fcheck";
+                foreach (HttpMethod method in new[] { HttpMethod.Get, HttpMethod.Post })
+                {
+                    string body = method == HttpMethod.Post ? "{\"host\":\"ONE\"}" : null;
+                    HttpResponse redirect = await harness.SendAsync(method, bare + "?ticket=qa%2Fcheck", body, null);
+                    AssertStatus(redirect, 307, "bare mode preserves method " + method + " " + bare);
+                    AssertEqual(canonical, redirect.Location, "bare mode preserves query and adds slash " + bare);
+                    AssertEqual("no-store", redirect.CacheControl, "bare mode redirect cache " + bare);
+                    HttpResponse final = await harness.SendAsync(method, redirect.Location, body, null);
+                    AssertStatus(final, 200, "redirected mode HTML " + method + " " + bare);
+                    AssertEqual("text/html", final.ContentType, "redirected mode MIME " + bare);
+                    Assert(final.Body.Contains("Build/entry.loader.js", StringComparison.Ordinal), "redirected HTML retains relative loader " + bare);
+                    Uri loader = new Uri(new Uri(harness.Options.ListenUrl + redirect.Location), "Build/entry.loader.js");
+                    AssertEqual(bare + "/Build/entry.loader.js", loader.AbsolutePath, "relative loader stays inside mode " + bare);
+                    AssertStatus(await harness.SendAsync(HttpMethod.Get, loader.PathAndQuery, null, null), 200, "relative loader GET " + bare);
+                }
+            }
+
+            foreach (string route in new[] { "/", "/index.html", "/solo/", "/solo/index.html", "/coop/", "/coop/index.html", "/raid/", "/raid/index.html" })
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Get, route, null, null);
+                AssertStatus(response, 200, "browser GET " + route);
+                AssertEqual("frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net", response.ContentSecurityPolicy,
+                    "browser GET frame policy " + route);
+            }
+
+            foreach (string route in new[] { "/unknown", "/unknown/index.html", "/app.js", "/game.wasm", "/solo/app.js" })
+            {
+                HttpResponse response = await harness.SendAsync(HttpMethod.Post, route, "{}", null);
+                AssertStatus(response, 404, "POST outside game entry " + route);
+            }
+            AssertStatus(await harness.SendAsync(HttpMethod.Post, "/healthz", "{}", null), 405, "health endpoint does not accept POST");
+            HttpResponse api = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("onestore-post-api-abcdefghijklmnopqrstuvwxyz"), null);
+            AssertStatus(api, 201, "co-op API POST remains available");
+            Assert(api.Root.GetProperty("ok").GetBoolean(), "co-op API POST retains JSON behavior");
+        }
+    }
+
+    private static async Task CheckHashedBuildTransport()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            const string hash = "0123456789abcdef0123456789abcdef";
+            string buildDir = Path.Combine(harness.Options.PublicRoot, "raid", "Build");
+            Directory.CreateDirectory(buildDir);
+            File.WriteAllText(Path.Combine(harness.Options.PublicRoot, "raid", "index.html"), "<title>raid</title>");
+            byte[] wasm = new byte[65536];
+            byte[] data = new byte[32768];
+            for (int index = 0; index < wasm.Length; index++) wasm[index] = (byte)(index % 13);
+            for (int index = 0; index < data.Length; index++) data[index] = (byte)(index % 17);
+            wasm[0] = 0; wasm[1] = 97; wasm[2] = 115; wasm[3] = 109;
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm"), wasm);
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".data"), data);
+            File.WriteAllBytes(Path.Combine(buildDir, "unhashed.wasm"), wasm);
+            File.WriteAllText(Path.Combine(buildDir, hash + ".symbols.json"), "{}");
+            File.WriteAllBytes(Path.Combine(buildDir, hash + ".wasm.br"), new byte[] { 1, 2, 3 });
+
+            string wasmPath = "/raid/Build/" + hash + ".wasm";
+            RawHttpResponse br = await harness.SendRawAsync(wasmPath, "br");
+            AssertEqual(200, br.StatusCode, "brotli wasm status");
+            AssertEqual("br", br.ContentEncoding, "brotli wasm encoding");
+            AssertEqual("application/wasm", br.ContentType, "brotli wasm MIME");
+            Assert(br.CacheControl != null && br.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && br.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed wasm cache: " + br.CacheControl);
+            Assert(br.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "compressed response varies by encoding");
+            Assert(br.Bytes.Length < wasm.Length, "brotli must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(br.Bytes, true))), "brotli decoded wasm hash");
+
+            RawHttpResponse gzip = await harness.SendRawAsync(wasmPath, "gzip");
+            AssertEqual("gzip", gzip.ContentEncoding, "gzip wasm encoding");
+            Assert(gzip.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "gzip response varies by encoding");
+            Assert(gzip.Bytes.Length < wasm.Length, "gzip must reduce wasm transfer bytes");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(Decompress(gzip.Bytes, false))), "gzip decoded wasm hash");
+
+            RawHttpResponse identity = await harness.SendRawAsync(wasmPath, "identity");
+            AssertEqual(200, identity.StatusCode, "identity wasm status");
+            Assert(string.IsNullOrEmpty(identity.ContentEncoding), "identity must not be encoded");
+            Assert(identity.Vary.Contains("Accept-Encoding", StringComparison.OrdinalIgnoreCase), "identity response varies by encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(wasm), SHA256.HashData(identity.Bytes)), "identity wasm hash");
+
+            RawHttpResponse brData = await harness.SendRawAsync("/raid/Build/" + hash + ".data", "br");
+            AssertEqual("br", brData.ContentEncoding, "brotli data encoding");
+            Assert(CryptographicOperations.FixedTimeEquals(SHA256.HashData(data), SHA256.HashData(Decompress(brData.Bytes, true))), "brotli decoded data hash");
+            RawHttpResponse symbols = await harness.SendRawAsync("/raid/Build/" + hash + ".symbols.json", "br");
+            Assert(symbols.CacheControl != null && symbols.CacheControl.Contains("max-age=31536000", StringComparison.Ordinal)
+                && symbols.CacheControl.Contains("immutable", StringComparison.Ordinal), "hashed symbols cache: " + symbols.CacheControl);
+            Assert(string.IsNullOrEmpty(symbols.ContentEncoding), "symbols remain uncompressed by scoped middleware");
+
+            RawHttpResponse html = await harness.SendRawAsync("/raid/index.html", "br");
+            AssertEqual("no-store", html.CacheControl, "mode HTML cache");
+            Assert(string.IsNullOrEmpty(html.ContentEncoding), "mode HTML is outside compression scope");
+            RawHttpResponse unhashed = await harness.SendRawAsync("/raid/Build/unhashed.wasm", "br");
+            AssertEqual("no-store", unhashed.CacheControl, "unhashed build cache");
+            Assert(string.IsNullOrEmpty(unhashed.ContentEncoding), "unhashed build is outside compression scope");
+            RawHttpResponse api = await harness.SendRawAsync("/api/coop/v1/definitions", "br");
+            AssertEqual("no-store", api.CacheControl, "API cache");
+            Assert(string.IsNullOrEmpty(api.ContentEncoding), "API is outside compression scope");
+            RawHttpResponse health = await harness.SendRawAsync("/healthz", "br");
+            AssertEqual("no-store", health.CacheControl, "health cache");
+            Assert(string.IsNullOrEmpty(health.ContentEncoding), "health is outside compression scope");
+
+            RawHttpResponse precompressed = await harness.SendRawAsync("/raid/Build/" + hash + ".wasm.br", "br");
+            Assert(precompressed.StatusCode == 404 || (string.IsNullOrEmpty(precompressed.ContentEncoding) && precompressed.CacheControl == "no-store"),
+                "precompressed artifacts cannot be double-encoded or treated as immutable build files");
+        }
+    }
+
+    private static byte[] Decompress(byte[] bytes, bool brotli)
+    {
+        using (var input = new MemoryStream(bytes))
+        using (Stream decoder = brotli ? (Stream)new BrotliStream(input, CompressionMode.Decompress) : new GZipStream(input, CompressionMode.Decompress))
+        using (var output = new MemoryStream())
+        {
+            decoder.CopyTo(output);
+            return output.ToArray();
+        }
+    }
+
+    private static async Task CheckCatalogDefinitionBinding()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            HttpResponse definitions = await harness.SendAsync(HttpMethod.Get, "/api/coop/v1/definitions", null, null);
+            AssertStatus(definitions, 200, "definition catalog");
+            JsonElement list = definitions.Root.GetProperty("definitions");
+            AssertEqual(3, list.GetArrayLength(), "definition catalog has fixed allowlist count");
+            AssertEqual("coop-c1", list[0].GetProperty("definitionId").GetString(), "C1 catalog identity");
+            AssertEqual("coop-c2", list[1].GetProperty("definitionId").GetString(), "C2 catalog identity");
+            AssertEqual("coop-c3", list[2].GetProperty("definitionId").GetString(), "C3 catalog identity");
+
+            const string createId = "create-catalog-c2-abcdefghijklmnopqrstuvwxyz";
+            HttpResponse c2 = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c2"), null);
+            AssertStatus(c2, 201, "C2 create");
+            AssertEqual("coop-c2", c2.Root.GetProperty("room").GetProperty("definitionId").GetString(), "C2 room binds definition identity");
+            AssertEqual("CoopRooms/coop-c2", c2.Root.GetProperty("room").GetProperty("roomResource").GetString(), "C2 room resource projection");
+            HttpResponse c2Retry = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c2"), null);
+            AssertStatus(c2Retry, 200, "same definition create retry");
+            HttpResponse c2Conflict = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody(createId, "coop-c1"), null);
+            AssertStatus(c2Conflict, 409, "different definition create retry conflicts");
+            AssertEqual("create_request_payload_conflict", ErrorCode(c2Conflict), "definition retry conflict code");
+            HttpResponse unknown = await harness.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-unknown-definition-abcdefgh", "coop-unknown"), null);
+            AssertStatus(unknown, 400, "unknown definition rejects");
+            AssertEqual("definition_not_allowed", ErrorCode(unknown), "unknown definition error code");
+        }
+
+        await using (ServerHarness legacy = await ServerHarness.StartAsync())
+        {
+            SessionInfo session = await CreateAndJoin(legacy);
+            await legacy.StopAsync();
+            JsonObject state = JsonNode.Parse(File.ReadAllText(legacy.StateFilePath)).AsObject();
+            JsonObject room = state["rooms"].AsArray()[0].AsObject();
+            room.Remove("definitionId");
+            room.Remove("createPayloadHash");
+            File.WriteAllText(legacy.StateFilePath, state.ToJsonString());
+            await legacy.RestartAsync();
+            HttpResponse restored = await legacy.SendAsync(HttpMethod.Get, StatePath(session.RoomId), null, session.CircleToken);
+            AssertStatus(restored, 200, "legacy C1 room restores");
+            AssertEqual("coop-c1", restored.Root.GetProperty("room").GetProperty("definitionId").GetString(), "legacy C1 infers only C1 identity");
+            HttpResponse legacyRetry = await legacy.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-primary-abcdefghijklmnopqrstuvwxyz"), null);
+            AssertStatus(legacyRetry, 200, "legacy C1 create retry remains compatible");
+            HttpResponse legacySwitch = await legacy.SendAsync(HttpMethod.Post, "/api/coop/v1/rooms", CreateBody("create-primary-abcdefghijklmnopqrstuvwxyz", "coop-c2"), null);
+            AssertStatus(legacySwitch, 409, "legacy C1 retry cannot switch definition");
+            AssertEqual("create_request_payload_conflict", ErrorCode(legacySwitch), "legacy definition switch code");
+        }
+    }
+
+    private static async Task CheckCompletedRecordCapsule()
+    {
+        await using (ServerHarness harness = await ServerHarness.StartAsync())
+        {
+            SessionInfo session = await CreateAndJoin(harness);
+            HttpResponse beforeClear = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.CircleToken);
+            AssertStatus(beforeClear, 409, "record before clear");
+            AssertEqual("record_not_cleared", ErrorCode(beforeClear), "record before clear code");
+            HttpResponse unauthenticated = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", null);
+            AssertStatus(unauthenticated, 401, "record requires bearer");
+
+            CoopCommand[] trace = NoPassTrace();
+            long revision = 0;
+            HttpResponse first = await SendSlide(harness, session, "record-undo-seed", revision, trace[0].Seat, trace[0].Direction);
+            revision = Revision(first);
+            int requester = ActiveActor(first);
+            HttpResponse undoRequest = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ConsentBody("record-undo-request", revision, CoopCommandKind.RequestUndo, "record-undo-request-id-abcdef"), TokenFor(session, requester));
+            AssertStatus(undoRequest, 200, "record undo request");
+            revision = Revision(undoRequest);
+            HttpResponse undoApproval = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("record-undo-approve", revision, CoopCommandKind.ResolveUndo, "record-undo-request-id-abcdef", true), TokenFor(session, 1 - requester));
+            AssertStatus(undoApproval, 200, "record undo approval");
+            revision = Revision(undoApproval);
+
+            HttpResponse restartSeed = await SendSlide(harness, session, "record-restart-seed", revision, trace[0].Seat, trace[0].Direction);
+            revision = Revision(restartSeed);
+            requester = ActiveActor(restartSeed);
+            HttpResponse restartRequest = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ConsentBody("record-restart-request", revision, CoopCommandKind.RequestRestart, "record-restart-request-id-abc"), TokenFor(session, requester));
+            AssertStatus(restartRequest, 200, "record restart request");
+            revision = Revision(restartRequest);
+            HttpResponse restartApproval = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), ResolveBody("record-restart-approve", revision, CoopCommandKind.ResolveRestart, "record-restart-request-id-abc", true), TokenFor(session, 1 - requester));
+            AssertStatus(restartApproval, 200, "record restart approval");
+            revision = Revision(restartApproval);
+
+            for (int index = 0; index < trace.Length; index++)
+            {
+                HttpResponse slide = await SendSlide(harness, session, "record-final-" + index.ToString(), revision, trace[index].Seat, trace[index].Direction);
+                revision = Revision(slide);
+            }
+            HttpResponse record = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.CircleToken);
+            AssertStatus(record, 200, "completed record");
+            Assert(record.Root.GetProperty("ok").GetBoolean(), "completed record reports success");
+            string capsuleText = record.Root.GetProperty("capsule").GetString();
+            RecordCapsule capsule;
+            string decodeError;
+            Assert(RecordCapsuleCodec.TryDecode(capsuleText, out capsule, out decodeError), "record capsule decodes: " + decodeError);
+            AssertEqual(Directions(trace), capsule.InputSequence, "undo/restart actions are absent from record capsule");
+            JsonElement verification = record.Root.GetProperty("verification");
+            AssertEqual("Cleared", verification.GetProperty("statusCode").GetString(), "record verification clears");
+            AssertEqual(trace.Length, verification.GetProperty("logicalActionCount").GetInt32(), "record logical count is derived from replay");
+            HttpResponse duplicateRecord = await harness.SendAsync(HttpMethod.Post, RecordPath(session.RoomId), "{}", session.DiamondToken);
+            AssertStatus(duplicateRecord, 200, "same cleared room record remains available to peer");
+            AssertEqual(capsuleText, duplicateRecord.Root.GetProperty("capsule").GetString(), "record capsule is deterministic across seats");
         }
     }
 
@@ -400,9 +667,11 @@ internal static class Program
     }
 
     private static string CreateBody(string createId) { return "{\"createRequestId\":\"" + createId + "\"}"; }
+    private static string CreateBody(string createId, string definitionId) { return "{\"createRequestId\":\"" + createId + "\",\"definitionId\":\"" + definitionId + "\"}"; }
     private static string JoinBody(string inviteCode, string joinId) { return "{\"inviteCode\":\"" + inviteCode + "\",\"joinRequestId\":\"" + joinId + "\"}"; }
     private static string StatePath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/state"; }
     private static string CommandPath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/commands"; }
+    private static string RecordPath(string roomId) { return "/api/coop/v1/rooms/" + roomId + "/record"; }
     private static string CommandBody(string commandId, long revision, CoopCommandKind kind, GameCommand direction)
     {
         return "{\"commandId\":\"" + commandId + "\",\"expectedRevision\":" + revision + ",\"kind\":" + (int)kind + ",\"direction\":" + (int)direction + "}";
@@ -418,6 +687,28 @@ internal static class Program
     private static string ExpressionBody(string commandId, long revision, int expression)
     {
         return "{\"commandId\":\"" + commandId + "\",\"expectedRevision\":" + revision + ",\"kind\":6,\"expression\":" + expression + "}";
+    }
+
+    private static async Task<HttpResponse> SendSlide(ServerHarness harness, SessionInfo session, string commandId, long revision, CoopActor actor, GameCommand direction)
+    {
+        HttpResponse response = await harness.SendAsync(HttpMethod.Post, CommandPath(session.RoomId), CommandBody(commandId, revision, CoopCommandKind.Slide, direction), TokenFor(session, (int)actor));
+        AssertStatus(response, 200, "record slide " + commandId);
+        Assert(response.Root.GetProperty("accepted").GetBoolean(), "record slide accepted " + commandId);
+        return response;
+    }
+
+    private static string TokenFor(SessionInfo session, int actor) { return actor == 0 ? session.CircleToken : session.DiamondToken; }
+    private static long Revision(HttpResponse response) { return response.Root.GetProperty("state").GetProperty("authorityRevision").GetInt64(); }
+    private static int ActiveActor(HttpResponse response) { return response.Root.GetProperty("state").GetProperty("activeActor").GetInt32(); }
+
+    private static string Directions(CoopCommand[] commands)
+    {
+        var values = new char[commands.Length];
+        for (int index = 0; index < commands.Length; index++)
+        {
+            values[index] = commands[index].Direction == GameCommand.Up ? 'U' : commands[index].Direction == GameCommand.Down ? 'D' : commands[index].Direction == GameCommand.Left ? 'L' : 'R';
+        }
+        return new string(values);
     }
 
     private static void AssertStatus(HttpResponse response, int expected, string label)
@@ -485,6 +776,9 @@ internal static class Program
         public string Body;
         public string ContentType;
         public string CacheControl;
+        public string ContentSecurityPolicy;
+        public string XFrameOptions;
+        public string Location;
         public JsonDocument Document;
         public JsonElement Root
         {
@@ -494,6 +788,16 @@ internal static class Program
                 return Document.RootElement;
             }
         }
+    }
+
+    private sealed class RawHttpResponse
+    {
+        public int StatusCode;
+        public byte[] Bytes;
+        public string ContentType;
+        public string ContentEncoding;
+        public string CacheControl;
+        public string Vary;
     }
 
     private sealed class ServerHarness : IAsyncDisposable
@@ -517,6 +821,8 @@ internal static class Program
             string root = Path.Combine(Path.GetTempPath(), "few-moves-coop-serverchecks-" + Guid.NewGuid().ToString("N"));
             string publicRoot = Path.Combine(root, "public");
             string stateRoot = Path.Combine(root, "private-state");
+            string roomPath = FindRoomPath();
+            string catalogRoot = Path.GetDirectoryName(roomPath);
             Directory.CreateDirectory(publicRoot);
             File.WriteAllText(Path.Combine(publicRoot, "index.html"), "<!doctype html><title>few-moves-online-check</title>");
             File.WriteAllBytes(Path.Combine(publicRoot, "game.wasm"), new byte[] { 0, 97, 115, 109 });
@@ -524,7 +830,8 @@ internal static class Program
             {
                 PublicRoot = publicRoot,
                 StateRoot = stateRoot,
-                RoomPath = FindRoomPath(),
+                RoomPath = roomPath,
+                RoomCatalogRoot = catalogRoot,
                 ListenUrl = "http://127.0.0.1:" + FindFreePort().ToString(),
                 BuildId = "server-check"
             };
@@ -551,7 +858,37 @@ internal static class Program
                         Body = responseBody,
                         ContentType = contentType,
                         CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
+                        ContentSecurityPolicy = HeaderValue(response, "Content-Security-Policy"),
+                        XFrameOptions = HeaderValue(response, "X-Frame-Options"),
+                        Location = response.Headers.Location == null ? null : response.Headers.Location.ToString(),
                         Document = contentType != null && contentType.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) >= 0 ? JsonDocument.Parse(responseBody) : null
+                    };
+                }
+            }
+        }
+
+        private static string HeaderValue(HttpResponseMessage response, string name)
+        {
+            IEnumerable<string> values;
+            return response.Headers.TryGetValues(name, out values) ? string.Join(",", values) : null;
+        }
+
+        public async Task<RawHttpResponse> SendRawAsync(string path, string acceptEncoding)
+        {
+            using (var request = new HttpRequestMessage(HttpMethod.Get, path))
+            {
+                if (!string.IsNullOrEmpty(acceptEncoding)) request.Headers.TryAddWithoutValidation("Accept-Encoding", acceptEncoding);
+                using (HttpResponseMessage response = await _client.SendAsync(request))
+                {
+                    byte[] bytes = await response.Content.ReadAsByteArrayAsync();
+                    return new RawHttpResponse
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Bytes = bytes,
+                        ContentType = response.Content.Headers.ContentType == null ? null : response.Content.Headers.ContentType.MediaType,
+                        ContentEncoding = string.Join(",", response.Content.Headers.ContentEncoding),
+                        CacheControl = response.Headers.CacheControl == null ? null : response.Headers.CacheControl.ToString(),
+                        Vary = string.Join(",", response.Headers.Vary)
                     };
                 }
             }
@@ -589,7 +926,7 @@ internal static class Program
         {
             _app = ServerApplication.Create(Options);
             await _app.StartAsync();
-            _client = new HttpClient { BaseAddress = new Uri(Options.ListenUrl, UriKind.Absolute) };
+            _client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(Options.ListenUrl, UriKind.Absolute) };
         }
 
         private static int FindFreePort()
@@ -600,5 +937,6 @@ internal static class Program
                 return ((IPEndPoint)listener.LocalEndpoint).Port;
             }
         }
+
     }
 }

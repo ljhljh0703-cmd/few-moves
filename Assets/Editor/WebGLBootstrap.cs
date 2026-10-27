@@ -28,28 +28,55 @@ namespace Nectorial.Editor
                 throw new InvalidOperationException("Missing required -buildOutput argument.");
             }
 
-            ValidateRequiredAssets();
-            EnsureBootstrapScene();
-            ConfigurePlayer();
+            string previousCompanyName = PlayerSettings.companyName;
+            string previousProductName = PlayerSettings.productName;
+            string previousBundleVersion = PlayerSettings.bundleVersion;
+            bool previousRunInBackground = PlayerSettings.runInBackground;
+            bool previousStripEngineCode = PlayerSettings.stripEngineCode;
+            bool previousSplash = PlayerSettings.SplashScreen.show;
+            string previousTemplate = PlayerSettings.WebGL.template;
+            WebGLCompressionFormat previousCompression = PlayerSettings.WebGL.compressionFormat;
+            bool previousDecompressionFallback = PlayerSettings.WebGL.decompressionFallback;
+            bool previousDataCaching = PlayerSettings.WebGL.dataCaching;
+            EditorBuildSettingsScene[] previousScenes = EditorBuildSettings.scenes;
 
-            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            try
             {
-                scenes = new[] { ScenePath },
-                locationPathName = outputPath,
-                target = BuildTarget.WebGL,
-                options = BuildOptions.None
-            });
+                ValidateRequiredAssets();
+                EnsureBootstrapScene();
+                ConfigurePlayer();
 
-            var summary = report.summary;
-            Debug.Log(
-                $"WEBGL_BOOTSTRAP_RESULT result={summary.result} " +
-                $"errors={summary.totalErrors} warnings={summary.totalWarnings} " +
-                $"bytes={summary.totalSize} output={outputPath}");
+                var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { ScenePath },
+                    locationPathName = outputPath,
+                    target = BuildTarget.WebGL,
+                    options = BuildOptions.None
+                });
 
-            if (summary.result != BuildResult.Succeeded)
+                var summary = report.summary;
+                Debug.Log(
+                    $"WEBGL_BOOTSTRAP_RESULT result={summary.result} " +
+                    $"errors={summary.totalErrors} warnings={summary.totalWarnings} " +
+                    $"bytes={summary.totalSize} output={outputPath}");
+
+                if (summary.result != BuildResult.Succeeded)
+                    throw new InvalidOperationException(
+                        $"WebGL bootstrap build failed: {summary.result}, errors={summary.totalErrors}");
+            }
+            finally
             {
-                throw new InvalidOperationException(
-                    $"WebGL bootstrap build failed: {summary.result}, errors={summary.totalErrors}");
+                PlayerSettings.companyName = previousCompanyName;
+                PlayerSettings.productName = previousProductName;
+                PlayerSettings.bundleVersion = previousBundleVersion;
+                PlayerSettings.runInBackground = previousRunInBackground;
+                PlayerSettings.stripEngineCode = previousStripEngineCode;
+                PlayerSettings.SplashScreen.show = previousSplash;
+                PlayerSettings.WebGL.template = previousTemplate;
+                PlayerSettings.WebGL.compressionFormat = previousCompression;
+                PlayerSettings.WebGL.decompressionFallback = previousDecompressionFallback;
+                PlayerSettings.WebGL.dataCaching = previousDataCaching;
+                EditorBuildSettings.scenes = previousScenes;
             }
         }
 

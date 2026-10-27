@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Nectorial.SlideEscape.Coop;
+using Nectorial.SlideEscape.Record;
 
 namespace FewMoves.Coop.Server
 {
@@ -17,6 +18,7 @@ namespace FewMoves.Coop.Server
     public sealed class CreateRoomRequest
     {
         public string CreateRequestId;
+        public string DefinitionId;
     }
 
     public sealed class JoinRoomRequest
@@ -50,11 +52,27 @@ namespace FewMoves.Coop.Server
     public sealed class PublicRoomView
     {
         public string RoomId;
-        public string RoomResource = "CoopRooms/coop-c1";
+        public string DefinitionId;
+        public string RoomResource;
         public string RulesVersion;
         public string ContentVersion;
         public string RoomFingerprint;
         public DateTimeOffset ExpiresAtUtc;
+    }
+
+    public sealed class DefinitionView
+    {
+        public string DefinitionId;
+        public string RoomResource;
+        public string RulesVersion;
+        public string ContentVersion;
+        public string RoomFingerprint;
+    }
+
+    public sealed class DefinitionsView
+    {
+        public bool Ok = true;
+        public DefinitionView[] Definitions;
     }
 
     public sealed class AvailabilityView
@@ -137,6 +155,14 @@ namespace FewMoves.Coop.Server
         public bool PublicRootConfigured;
     }
 
+    public sealed class RecordView
+    {
+        public bool Ok;
+        public string Capsule;
+        public RecordVerification Verification;
+        public ApiError Error;
+    }
+
     public sealed class PersistedServerState
     {
         public int SchemaVersion = 1;
@@ -172,6 +198,8 @@ namespace FewMoves.Coop.Server
     public sealed class PersistedRoom
     {
         public string RoomId;
+        public string DefinitionId;
+        public string CreatePayloadHash;
         public string InviteCodeHash;
         public PersistedSeat Circle;
         public PersistedSeat Diamond;
@@ -192,6 +220,7 @@ namespace FewMoves.Coop.Server
     {
         public PersistedRoom Record;
         public CoopSession Session;
+        public CoopRoomDefinition Definition;
         public DateTimeOffset? CircleLastSeen;
         public DateTimeOffset? DiamondLastSeen;
         public readonly Queue<DateTimeOffset> CircleCommands = new Queue<DateTimeOffset>();
@@ -233,6 +262,8 @@ namespace FewMoves.Coop.Server
         public bool Idempotent;
         public string Reason;
         public CoopEvent[] Events;
+        public string Capsule;
+        public RecordVerification Verification;
         public StateSnapshot Snapshot;
     }
 

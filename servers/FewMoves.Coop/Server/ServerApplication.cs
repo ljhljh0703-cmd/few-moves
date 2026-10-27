@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -18,10 +21,14 @@ namespace FewMoves.Coop.Server
 {
     public static class ServerApplication
     {
-        private static readonly string[] CreateFields = { "createRequestId" };
+        private static readonly string[] CreateFields = { "createRequestId", "definitionId" };
         private static readonly string[] JoinFields = { "inviteCode", "joinRequestId" };
         private static readonly string[] HeartbeatFields = new string[0];
         private static readonly string[] CommandFields = { "commandId", "expectedRevision", "kind", "direction", "requestId", "approve", "expression" };
+        private const string GameFrameAncestors = "frame-ancestors 'self' https://*.onestore.co.kr https://*.onestore.net";
+        private static readonly Regex HashedBuildPath = new Regex(
+            @"^/(?:solo|coop|raid|shared)/Build/[0-9a-fA-F]{32}\.(?:data|wasm|framework\.js|loader\.js|symbols\.json)$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public static WebApplication Create(ServerOptions options)
         {
@@ -31,6 +38,16 @@ namespace FewMoves.Coop.Server
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = Array.Empty<string>() });
             builder.WebHost.UseUrls(options.ListenUrl);
             builder.Logging.ClearProviders();
+            builder.Services.AddResponseCompression(compression =>
+            {
+                // The middleware is reached only by public, uncompressed Unity build files.
+                compression.EnableForHttps = true;
+                compression.Providers.Add<BrotliCompressionProvider>();
+                compression.Providers.Add<GzipCompressionProvider>();
+                compression.MimeTypes = new[] { "application/wasm", "application/octet-stream", "application/javascript", "text/javascript" };
+            });
+            builder.Services.Configure<BrotliCompressionProviderOptions>(compression => compression.Level = CompressionLevel.Optimal);
+            builder.Services.Configure<GzipCompressionProviderOptions>(compression => compression.Level = CompressionLevel.Optimal);
             builder.Services.AddSingleton(options);
             builder.Services.AddSingleton(store);
             builder.Services.AddSingleton(new ApiRequestLimiter(options.MaxRequestBuckets, options.MaxRequestsPerWindow, options.RequestWindow));
@@ -51,16 +68,26 @@ namespace FewMoves.Coop.Server
                 await next(context);
             });
 
+            app.UseWhen(context => IsCompressibleBuildAsset(context.Request.Path), branch => branch.UseResponseCompression());
             ConfigureStaticFiles(app, options);
             app.MapGet("/healthz", async context =>
             {
                 await Execute(context, Json(200, new HealthView { Version = options.Version, BuildId = options.BuildId, PublicRootConfigured = true }));
             });
-            app.MapGet("/", async context =>
+            // ONE opens the registered game URL, including restart, with POST.
+            // Keep GET for browser navigation; only game documents may answer POST.
+            MapGameEntry(app, options, "/", "index.html");
+            MapGameEntry(app, options, "/index.html", "index.html");
+            foreach (string mode in new[] { "solo", "coop", "raid" })
             {
-                context.Response.Headers["Cache-Control"] = "no-store";
-                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-                await Execute(context, Results.File(Path.Combine(options.PublicRoot, "index.html"), "text/html; charset=utf-8", enableRangeProcessing: false));
+                string document = Path.Combine(mode, "index.html");
+                MapGameEntry(app, options, "/" + mode, document, normalizeDirectory: true);
+                MapGameEntry(app, options, "/" + mode + "/index.html", document);
+            }
+            app.MapGet("/api/coop/v1/definitions", async context =>
+            {
+                RoomStore roomStore = context.RequestServices.GetRequiredService<RoomStore>();
+                await Execute(context, Json(200, new DefinitionsView { Definitions = roomStore.Definitions() }));
             });
 
             app.MapPost("/api/coop/v1/rooms", async (HttpContext context) =>
@@ -154,6 +181,20 @@ namespace FewMoves.Coop.Server
                 await Execute(context, ToCommandOrError(result));
             });
 
+            app.MapPost("/api/coop/v1/rooms/{roomId}/record", async (HttpContext context) =>
+            {
+                string roomId = Convert.ToString(context.Request.RouteValues["roomId"]);
+                ParsedRequest<object> parsed = await ReadJsonAsync<object>(context.Request, HeartbeatFields, options.MaxRequestBodyBytes);
+                if (!parsed.Ok)
+                {
+                    await Execute(context, Json(parsed.StatusCode, new RecordView { Ok = false, Error = new ApiError { Code = parsed.ErrorCode } }));
+                    return;
+                }
+                RoomStore roomStore = context.RequestServices.GetRequiredService<RoomStore>();
+                StoreResult result = roomStore.CreateRecord(roomId, ReadBearer(context.Request), DateTimeOffset.UtcNow);
+                await Execute(context, ToRecord(result));
+            });
+
             return app;
         }
 
@@ -170,9 +211,58 @@ namespace FewMoves.Coop.Server
                 OnPrepareResponse = delegate (StaticFileResponseContext context)
                 {
                     context.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-                    context.Context.Response.Headers["Cache-Control"] = "no-store";
+                    PathString path = context.Context.Request.Path;
+                    context.Context.Response.Headers["Cache-Control"] = IsHashedBuildAsset(path)
+                        ? "public,max-age=31536000,immutable"
+                        : "no-store";
+                    if (IsCompressibleBuildAsset(path))
+                        context.Context.Response.Headers["Vary"] = "Accept-Encoding";
                 }
             });
+        }
+
+        private static void MapGameEntry(WebApplication app, ServerOptions options, string route, string relativePath, bool normalizeDirectory = false)
+        {
+            app.MapMethods(route, new[] { "GET", "POST" }, async context =>
+            {
+                if (normalizeDirectory && !context.Request.Path.Value.EndsWith("/", StringComparison.Ordinal))
+                {
+                    // A bare mode path resolves relative Build/ URLs at the root.
+                    // 307 preserves ONE's POST and its query while adding the base slash.
+                    context.Response.Headers["Cache-Control"] = "no-store";
+                    await Execute(context, Results.Redirect(route + "/" + context.Request.QueryString.Value, permanent: false, preserveMethod: true));
+                    return;
+                }
+                string document = Path.Combine(options.PublicRoot, relativePath);
+                if (!File.Exists(document))
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return;
+                }
+                SetGameHtmlHeaders(context.Response);
+                await Execute(context, Results.File(document, "text/html; charset=utf-8", enableRangeProcessing: false));
+            });
+        }
+
+        private static void SetGameHtmlHeaders(HttpResponse response)
+        {
+            response.Headers["Cache-Control"] = "no-store";
+            response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Content-Security-Policy"] = GameFrameAncestors;
+        }
+
+        private static bool IsHashedBuildAsset(PathString path)
+        {
+            return path.HasValue && HashedBuildPath.IsMatch(path.Value);
+        }
+
+        private static bool IsCompressibleBuildAsset(PathString path)
+        {
+            if (!IsHashedBuildAsset(path)) return false;
+            string value = path.Value;
+            return value.EndsWith(".wasm", StringComparison.Ordinal)
+                || value.EndsWith(".data", StringComparison.Ordinal)
+                || value.EndsWith(".js", StringComparison.Ordinal);
         }
 
         private static IResult ToStateOrError(StoreResult result)
@@ -208,6 +298,17 @@ namespace FewMoves.Coop.Server
                 Reason = result.Reason ?? result.ErrorCode,
                 Events = result.Events ?? new CoopEvent[0],
                 Error = result.Accepted ? null : new ApiError { Code = code }
+            });
+        }
+
+        private static IResult ToRecord(StoreResult result)
+        {
+            return Json(result.StatusCode, new RecordView
+            {
+                Ok = result.Ok,
+                Capsule = result.Ok ? result.Capsule : null,
+                Verification = result.Verification,
+                Error = result.Ok ? null : new ApiError { Code = result.ErrorCode }
             });
         }
 
