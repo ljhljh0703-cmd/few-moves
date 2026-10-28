@@ -1,0 +1,22 @@
+{
+  "id": "solo-first",
+  "version": 1,
+  "description": "First public release: solo and raid only. Multi (online co-op) stays private for a later release.",
+  "include_modes": ["solo", "raid"],
+  "exclude_modes": ["coop"],
+  "copy_root_files": ["index.html", "style.css"],
+  "copy_dirs": ["solo", "raid", "shared"],
+  "drop_root_files": ["derived-package.json", "preview-package.json"],
+  "portal": {
+    "path": "index.html",
+    "remove_menu_href": "coop/index.html"
+  },
+  "public_text_forbidden": ["coop/", "/api/coop", "멀티", "친구와 번갈아", "Online Pilot", "온라인 협력"],
+  "public_text_suffixes": [".html", ".css", ".json"],
+  "compiled_residuals": {
+    "note": "Compiled Unity output shared by every mode. The co-op bridge is reachable only from CoopOnlineBootstrap, which runs only under productName 'Few Moves Online Pilot'. Removing it needs a Unity rebuild.",
+    "allowed": {
+      "Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": {"/api/coop/v1": 1}
+    }
+  }
+}

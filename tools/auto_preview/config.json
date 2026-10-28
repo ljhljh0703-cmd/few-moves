@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "purpose": "Few Moves Apps in Toss self-only preview (unlisted test upload). Never review, release, rollback, terms, account or payment.",
+  "binding": {
+    "appName": "few-moves",
+    "workspaceId": 18499,
+    "miniAppId": 92477,
+    "platform": "WEB",
+    "sdkVersion": "3.2.0"
+  },
+  "native": {
+    "lock": "tools/auto_preview/native-base.lock.json",
+    "input_prefixes": ["Assets/", "Packages/", "ProjectSettings/"],
+    "note": "Any change under these prefixes needs a licensed Unity rebuild on the Mac (outside CI). The pipeline stops and writes a rebuild request."
+  },
+  "ui_overlay": {
+    "toss_ui_dir": "web/platforms/toss/r6",
+    "portal_files": ["web/content/index.html", "web/content/style.css"],
+    "release_profile": "web/release-profiles/solo-first/profile.json",
+    "packaging_tools": ["tools/prepare_solo_release.py", "tools/prepare_web_release.py", "tools/prepare_onestore_web.py"]
+  },
+  "ait_project": "tools/auto_preview/ait-project",
+  "limits": {
+    "uncompressed_max_bytes": 100000000,
+    "receipt_max_age_hours": 12
+  },
+  "verify_gate": {
+    "workflow_path": ".github/workflows/verify.yml",
+    "polls": 20,
+    "interval_seconds": 30,
+    "rule": "newest run of exactly this workflow file, event push, head_sha = receipt commit, branch codex/few-moves-preview, repository and head_repository = ljhljh0703-cmd/few-moves, status completed, conclusion success"
+  },
+  "deploy": {
+    "cli_package": "@apps-in-toss/cli",
+    "cli_version": "3.2.0",
+    "profile_name": "few-moves-preview",
+    "status_endpoint": "https://apps-in-toss.toss.im/console/api-public/v3/openapi/bundles/{appName}/deployments/{deploymentId}",
+    "status_endpoint_source": "@apps-in-toss/cli 3.2.0 dist/index.js checkBundleStatus (lines 557-576), same GET the official deploy uses",
+    "memo_max_chars": 120
+  }
+}

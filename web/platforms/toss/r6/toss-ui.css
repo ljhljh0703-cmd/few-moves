@@ -1,0 +1,72 @@
+/* Few Moves — Apps in Toss only (added by tools/prepare_solo_release.py --toss-ui; never in web or ONE builds).
+ *
+ * Problem: in Toss the native game navigation capsule (더보기 + 닫기 X) floats over the page's top-right
+ * corner, on the same line as our header buttons.
+ *
+ * Official (developers-apps-in-toss.toss.im /documentation/common/screen/safe-area):
+ *   X button: x = insets.right + 10, y = insets.top + 5 (iOS) / insets.top + 10 (Android).
+ *   Insets come from SafeArea.get()/subscribe() (fed in by toss-safearea.js as --fm-sdk-*).
+ * Project values (NOT official; the docs give no capsule size): --fm-cap-w 108px, --fm-cap-h 44px,
+ *   --fm-cap-gap 6px. The capsule measured about 96 x 37 pt on the user's iPhone screenshot (393 pt wide);
+ *   the reserve is that plus margin.
+ *
+ * OS inset = max(CSS env(), SDK value); the two are never added together.
+ * Portrait: our header starts below a reserved capsule band. Landscape: the header keeps the top line but
+ * leaves the capsule's right-hand area empty. Dialogs (and their close buttons) sit below the band.
+ */
+:root {
+  --fm-os-top: max(env(safe-area-inset-top, 0px), var(--fm-sdk-top, 0px), var(--fm-top-floor, 0px));
+  --fm-os-right: max(env(safe-area-inset-right, 0px), var(--fm-sdk-right, 0px));
+  --fm-os-bottom: max(env(safe-area-inset-bottom, 0px), var(--fm-sdk-bottom, 0px));
+  --fm-os-left: max(env(safe-area-inset-left, 0px), var(--fm-sdk-left, 0px));
+  --fm-cap-offset: 10px; /* official y offset; 10px (Android) until the OS is known, 5px on iOS */
+  --fm-cap-w: 108px;
+  --fm-cap-h: 44px;
+  --fm-cap-gap: 6px;
+  --fm-band: calc(var(--fm-os-top) + var(--fm-cap-offset) + var(--fm-cap-h) + var(--fm-cap-gap));
+  --fm-cap-clear-x: calc(var(--fm-os-right) + 10px + var(--fm-cap-w) + var(--fm-cap-gap));
+}
+
+/* Game pages (solo, raid): main#app is the 48px header row + play area grid. */
+main#app {
+  padding: var(--fm-band) max(8px, var(--fm-os-right)) max(3px, var(--fm-os-bottom)) max(8px, var(--fm-os-left));
+}
+
+/* Home page. */
+.home-shell {
+  padding: max(10px, var(--fm-band)) max(14px, var(--fm-os-right)) max(16px, var(--fm-os-bottom)) max(14px, var(--fm-os-left));
+}
+@media (max-width: 359px) {
+  .home-shell { padding-left: max(10px, var(--fm-os-left)); padding-right: max(10px, var(--fm-os-right)); }
+}
+
+@media (orientation: landscape) {
+  main#app {
+    padding-top: max(3px, var(--fm-os-top));
+  }
+  /* The header is centred; cap its width so neither end reaches the capsule column. */
+  .utility-bar, .topbar {
+    max-width: calc(100vw - 2 * var(--fm-cap-clear-x) - max(var(--fm-os-left), var(--fm-os-right)) - 16px);
+  }
+}
+
+/* Modal dialogs: centred inside the area below the capsule band, so their close buttons never meet it. */
+dialog {
+  inset: var(--fm-band) var(--fm-os-right) var(--fm-os-bottom) var(--fm-os-left);
+  max-height: calc(100dvh - var(--fm-band) - var(--fm-os-bottom) - 16px);
+}
+
+/* r5 home: title + the two modes as one compact group, centred (slightly above middle) in the area below the
+ * capsule band, instead of the title growing (flex:1) and pushing the mode buttons to the bottom edge.
+ * Buttons keep their own size (>= 96px tall), colours and shadows. */
+.home-shell { justify-content: center; }
+.home-title { flex: 0 0 auto; min-height: 0; padding-bottom: 24px; } /* r6: title -> first mode button gap 24px (was 18) */
+.home-content { margin-bottom: clamp(0px, 4vh, 40px); }
+
+/* Short landscape: title beside the modes so nothing scrolls or hides under the band. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .home-shell { flex-direction: row; align-items: center; justify-content: center; gap: 24px; }
+  .home-title { padding: 0; }
+  .home-content { flex: 1 1 auto; max-width: 380px; margin-bottom: 0; }
+  .wordmark { font-size: clamp(40px, 9vh, 56px); }
+}

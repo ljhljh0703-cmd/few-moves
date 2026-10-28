@@ -1,0 +1,24 @@
+{
+ "appName": "few-moves",
+ "miniAppId": 92477,
+ "workspaceId": 18499,
+ "note": "Seed: uploads made before automation (self-only test registrations by root's instruction). Content hash = tree digest of the .ait sources/.",
+ "entries": [
+  {
+   "deploymentId": "01a17cc3-4362-70d7-a164-dc492c8c4ba7",
+   "versionName": "20261027-1",
+   "content_sha256": "1d414da917fc3163f920dab379712b18964545a111b72e4f8674f03ba37f2ef2",
+   "ait_sha256": "c049c8f992a98ca763596c1d0e8f0346b9d6f4e74942cd984e57ef66627e078e",
+   "status": "created",
+   "source": "manual r3 registration"
+  },
+  {
+   "deploymentId": "01a17d4f-c4c8-74f7-bed1-abbe6ae49b7a",
+   "versionName": "20261027-2",
+   "content_sha256": "fca82b72677faa05f235372d669fb5823ac3da2c068c43ecb8029d5db8c22a72",
+   "ait_sha256": "84d04a5da1e389426bfd7bcb0fe376d5433bf80a648d2103805081590954e895",
+   "status": "created",
+   "source": "manual r6 registration"
+  }
+ ]
+}

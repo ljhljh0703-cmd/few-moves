@@ -1,0 +1,188 @@
+# Few Moves — Apps in Toss self-only preview (unlisted test upload). OFF by default.
+#
+# Triggers: push to codex/few-moves-preview of this repository, or workflow_dispatch ON THAT REF (the gate refuses any
+# other ref for both). Never pull requests or forks.
+#   - GitHub lists/dispatches a workflow only if this file exists on the DEFAULT branch (main). main is currently an
+#     older public snapshot without it, so until it is added there, the push trigger (which runs the workflow file
+#     of the pushed commit) is the only working path. codex/few-moves-preview does not exist yet.
+#   - push without vars.FEW_MOVES_PREVIEW_ENABLED == 'true' -> build + verify only (dry-run); nothing is uploaded.
+# - build: no credentials. Verifies the reviewed native base (tools/auto_preview/native-base.lock.json), stops if any
+#   Unity input changed (GitHub-hosted runners have no Unity license; rebuild on the licensed Mac), applies the Toss UI
+#   overlay, runs the official `ait build`, verifies the .ait.
+# - publish: first requires the successful Verify (verify.yml) push run for the same commit/branch/repository
+#   (read-only actions permission, before the key), then only with the enable variable, only on
+#   refs/heads/codex/few-moves-preview, only in environment
+#   few-moves-preview (restrict its deployment branches to that branch). The only job with the deploy key. Official
+#   `ait deploy` uploads the verified .ait as-is to the test environment. No test push on this path (no API-key
+#   route), no review, release or rollback.
+# Settings (none exist yet): variables FEW_MOVES_NATIVE_BASE_TAG, FEW_MOVES_PREVIEW_ENABLED; environment
+# few-moves-preview with secret FEW_MOVES_AIT_DEPLOY_KEY. See tools/auto_preview/README.md.
+name: Few Moves Toss preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dry-run (build and verify only) or publish (needs the enable variable and the key)
+        type: choice
+        options: [dry-run, publish]
+        default: dry-run
+  push:
+    branches:
+      - 'codex/few-moves-preview'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: few-moves-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      state: ${{ steps.gate.outputs.state }}
+      run_build: ${{ steps.gate.outputs.run_build }}
+      run_publish: ${{ steps.gate.outputs.run_publish }}
+    steps:
+      # actions/checkout v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      # actions/setup-python v6.2.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+      - id: gate
+        name: Decide automation state
+        env:
+          PREVIEW_MODE: ${{ inputs.mode || 'publish' }}
+          FEW_MOVES_PREVIEW_ENABLED: ${{ vars.FEW_MOVES_PREVIEW_ENABLED }}
+          FEW_MOVES_NATIVE_BASE_TAG: ${{ vars.FEW_MOVES_NATIVE_BASE_TAG }}
+        run: python3 -B tools/auto_preview/pipeline.py gate | tee gate.json
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.run_build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # actions/checkout v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # actions/setup-python v6.2.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+      # actions/setup-node v6.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - name: Enable pinned pnpm (packageManager pnpm@11.6.0)
+        run: corepack enable
+      - name: Pipeline counterexample tests
+        run: python3 -m unittest tests.auto_preview.test_auto_preview
+      - name: Download the reviewed native base (verified against the committed lock next)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ vars.FEW_MOVES_NATIVE_BASE_TAG }}
+        run: |
+          name=$(python3 -c "import json;print(json.load(open('tools/auto_preview/native-base.lock.json'))['tar']['name'])")
+          gh release download "$TAG" --pattern "$name" --dir native-base
+          python3 -B tools/auto_preview/native_base.py verify --tar "native-base/$name"
+      - name: Build and verify (official ait build; stops on native change)
+        env:
+          BASE_REF: ${{ github.event.before }}
+        run: |
+          name=$(python3 -c "import json;print(json.load(open('tools/auto_preview/native-base.lock.json'))['tar']['name'])")
+          base=""; if [ -n "$BASE_REF" ] && [ "$BASE_REF" != "0000000000000000000000000000000000000000" ]; then base="--base-ref $BASE_REF"; fi
+          python3 -B tools/auto_preview/pipeline.py build --native-tar "native-base/$name" --work work $base
+      - name: Keep the rebuild request when native inputs changed
+        if: failure()
+        run: test -f work/native-rebuild-request.json && cat work/native-rebuild-request.json || true
+      # actions/upload-artifact v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: few-moves-preview-build
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            work/ait-project/few-moves.ait
+            work/build-receipt.json
+            work/native-rebuild-request.json
+            work/logs/
+
+  publish:
+    needs: [gate, build]
+    if: >-
+      needs.gate.outputs.run_publish == 'true' &&
+      github.repository == 'ljhljh0703-cmd/few-moves' &&
+      github.ref == 'refs/heads/codex/few-moves-preview' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: few-moves-preview
+    permissions:
+      contents: read
+      actions: read
+    concurrency:
+      group: few-moves-preview-publish
+      cancel-in-progress: false
+    steps:
+      # actions/checkout v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      # actions/setup-python v6.2.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+      - name: Require the successful Verify push run for this exact commit (no deploy key in this step)
+        # Fail closed: newest run of .github/workflows/verify.yml, event push, this SHA, this branch, this repository,
+        # completed + success. Bounded polling while it is still running; never forced through.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B tools/auto_preview/pipeline.py verify-gate --commit "$GITHUB_SHA"
+      # actions/setup-node v6.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '24'
+      - run: corepack enable
+      # actions/download-artifact v8.0.2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: few-moves-preview-build
+          path: work
+      # actions/cache/restore v6.1.0
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: preview-ledger.json
+          key: few-moves-preview-ledger-${{ github.run_id }}
+          restore-keys: few-moves-preview-ledger-
+      - name: Seed the duplicate ledger if no cache exists
+        run: test -f preview-ledger.json || cp tools/auto_preview/ledger.seed.json preview-ledger.json
+      - name: Install the pinned official CLI (no secret in this step)
+        working-directory: tools/auto_preview/ait-project
+        run: pnpm install --frozen-lockfile
+      - name: Publish (official ait deploy, unlisted test upload)
+        env:
+          FEW_MOVES_AIT_DEPLOY_KEY: ${{ secrets.FEW_MOVES_AIT_DEPLOY_KEY }}
+        # CI-only: creates ~/.ait/credentials on this fresh hosted runner exclusively (refuses if one exists) and removes it.
+        run: |
+          python3 -B tools/auto_preview/pipeline.py publish --receipt work/build-receipt.json --ait work/ait-project/few-moves.ait \
+            --project tools/auto_preview/ait-project --ledger preview-ledger.json --out publish-receipt.json --log publish.log
+      - name: Summary (once per deployment; test push stays manual)
+        if: always()
+        run: |
+          test -f publish-receipt.json && python3 -c "import json;d=json.load(open('publish-receipt.json'));print('state:',d.get('state'));print('deploymentId:',d.get('deploymentId'));print('privateLink (self-only test, not a release URL):',d.get('private_link'));print('uploaded: ' + str(d.get('state') == 'uploaded'));print('test push: not on this path (manual outside CI); isTested ready=false; user tested=false')" >> "$GITHUB_STEP_SUMMARY" || true
+      # actions/cache/save v6.1.0
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: always()
+        with:
+          path: preview-ledger.json
+          key: few-moves-preview-ledger-${{ github.run_id }}

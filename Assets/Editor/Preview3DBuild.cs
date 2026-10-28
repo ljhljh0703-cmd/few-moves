@@ -66,7 +66,8 @@ namespace Nectorial.Editor
                     scenes = new[] { ScenePath },
                     locationPathName = outputPath,
                     target = BuildTarget.WebGL,
-                    options = BuildOptions.None
+                    options = BuildOptions.None,
+                    extraScriptingDefines = AitNativeDefines()
                 });
 
                 BuildSummary summary = report.summary;
@@ -199,6 +200,16 @@ namespace Nectorial.Editor
             if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(StateBridgePath)) ||
                 AssetImporter.GetAtPath(StateBridgePath) == null)
                 throw new InvalidOperationException("Required WebGL state bridge is missing: " + StateBridgePath);
+        }
+
+        // Opt-in Apps in Toss native build: -aitNative compiles the existing APPSINTOS_OPTIMIZED paths
+        // (TossPlatformAdapter: anonymous user key + user-scoped Toss Storage) for this build only.
+        // Build-local define; ProjectSettings are not changed. Without the flag the build is unchanged.
+        private static string[] AitNativeDefines()
+        {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-aitNative") < 0) return null;
+            Debug.Log("AIT_NATIVE_DEFINES applied=APPSINTOS_OPTIMIZED entry=Preview3DBuild.Build");
+            return new[] { "APPSINTOS_OPTIMIZED" };
         }
 
         private static string ReadArgument(string name)

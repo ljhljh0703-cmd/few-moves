@@ -47,7 +47,8 @@ namespace Nectorial.Editor
                     scenes = new[] { ScenePath },
                     locationPathName = outputPath,
                     target = BuildTarget.WebGL,
-                    options = BuildOptions.None
+                    options = BuildOptions.None,
+                    extraScriptingDefines = AitNativeDefines()
                 });
                 BuildSummary summary = report.summary;
                 Debug.Log($"RAID_WEBGL_RESULT result={summary.result} errors={summary.totalErrors} warnings={summary.totalWarnings} bytes={summary.totalSize} output={outputPath} template=PROJECT:Raid entry=RaidBuild.Build");
@@ -143,6 +144,16 @@ namespace Nectorial.Editor
             if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(TemplatePath))) throw new InvalidOperationException("Required Raid WebGL template is missing: " + TemplatePath);
             if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(StateBridgePath)) || AssetImporter.GetAtPath(StateBridgePath) == null)
                 throw new InvalidOperationException("Required Raid WebGL state bridge is missing: " + StateBridgePath);
+        }
+
+        // Opt-in Apps in Toss native build: -aitNative compiles the existing APPSINTOS_OPTIMIZED paths
+        // (TossPlatformAdapter: anonymous user key + user-scoped Toss Storage) for this build only.
+        // Build-local define; ProjectSettings are not changed. Without the flag the build is unchanged.
+        private static string[] AitNativeDefines()
+        {
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-aitNative") < 0) return null;
+            Debug.Log("AIT_NATIVE_DEFINES applied=APPSINTOS_OPTIMIZED entry=RaidBuild.Build");
+            return new[] { "APPSINTOS_OPTIMIZED" };
         }
 
         private static string ReadArgument(string name)
