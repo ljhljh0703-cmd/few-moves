@@ -1,0 +1,199 @@
+:root {
+  color-scheme: light;
+  font-family: "Avenir Next", "Pretendard", ui-sans-serif, system-ui, sans-serif;
+  --stage: #f0ece2;
+  --surface: #faf5e9;
+  --floor: #e5e0d3;
+  --ink: #293238;
+  --edge: #171e1f;
+  --muted: #535a55;
+  --line: #c9c0b0;
+  --blue: #4374b7;
+  --orange: #d09743;
+  --teal: #377e78;
+  --tongue: #b9473a;
+  --focus: #5d8960;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  background: var(--stage);
+  color: var(--ink);
+}
+
+body { min-height: 100svh; }
+
+a {
+  min-width: 48px;
+  min-height: 48px;
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.home-shell {
+  width: min(100%, 640px);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+}
+
+/* The game's own name opens the screen; the three bars sit below it in the thumb zone. */
+.home-title {
+  flex: 1 0 auto;
+  min-height: 132px;
+  display: grid;
+  place-items: center;
+  padding: 12px 0 18px;
+}
+
+.wordmark {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  color: var(--ink);
+  font-size: clamp(46px, 14vw, 64px);
+  font-weight: 900;
+  line-height: .92;
+  letter-spacing: -.07em;
+  text-align: center;
+  text-shadow: 0 3px 0 var(--line);
+}
+
+.wordmark-line { display: block; }
+
+.wordmark-o { color: var(--blue); }
+
+.home-content { flex: 0 0 auto; }
+
+.menu {
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 14px;
+}
+
+.menu-bar {
+  width: 100%;
+  min-height: 96px;
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 4px 0 var(--edge);
+  cursor: pointer;
+}
+
+.menu-bar:hover { background: color-mix(in srgb, var(--surface) 72%, var(--floor)); }
+
+.menu-bar:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--edge); }
+
+.menu-icon {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+}
+
+.menu-icon-multi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.solo-circle {
+  width: 30px;
+  height: 30px;
+  border: 2px solid color-mix(in srgb, var(--blue) 70%, var(--ink));
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.multi-square,
+.multi-diamond {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+}
+
+.multi-square {
+  border: 2px solid color-mix(in srgb, var(--blue) 70%, var(--ink));
+  background: var(--blue);
+}
+
+/* Rotated 20px square spans ~28px; the margin keeps its corners inside the gap instead of touching the square. */
+.multi-diamond {
+  margin: 0 4px;
+  border: 2px solid color-mix(in srgb, var(--orange) 70%, var(--ink));
+  background: var(--orange);
+  transform: rotate(45deg);
+}
+
+.snake-face { width: 48px; height: 48px; display: block; overflow: visible; }
+.snake-head { fill: var(--teal); stroke: var(--edge); stroke-width: 2; }
+.snake-eye { fill: var(--surface); stroke: var(--edge); stroke-width: 1.5; }
+.snake-pupil { fill: var(--edge); }
+.snake-tongue { fill: none; stroke: var(--tongue); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.menu-copy { min-width: 0; display: grid; gap: 4px; }
+
+.menu-copy strong { font-size: 22px; font-weight: 850; line-height: 1.2; letter-spacing: -.03em; }
+
+.menu-copy > span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.menu-arrow { color: var(--ink); font-size: 22px; font-weight: 850; text-align: center; }
+
+@media (min-width: 620px) {
+  .home-shell { justify-content: center; }
+  .home-title { flex: 0 0 auto; padding: 28px 0 32px; }
+  .wordmark { font-size: 76px; }
+  .menu { gap: 16px; }
+  .menu-bar { min-height: 104px; padding: 16px 20px; gap: 18px; }
+  .menu-copy > span { font-size: 15px; }
+}
+
+@media (max-width: 359px) {
+  .wordmark { font-size: 44px; }
+  .home-shell { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+  .menu-bar { grid-template-columns: 52px minmax(0, 1fr) 18px; gap: 10px; padding: 12px; }
+  .menu-icon { width: 52px; height: 52px; }
+  .snake-face { width: 42px; height: 42px; }
+  .solo-circle { width: 26px; height: 26px; }
+  .menu-icon-multi { gap: 7px; }
+  .multi-square,
+  .multi-diamond { width: 18px; height: 18px; }
+  .multi-diamond { margin: 0 4px 0 3px; }
+  .menu-arrow { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after { transition: none !important; animation: none !important; }
+}

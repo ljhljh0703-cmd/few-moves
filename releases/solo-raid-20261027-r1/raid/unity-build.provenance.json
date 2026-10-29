@@ -1,0 +1,21 @@
+{
+  "state": "provisional",
+  "gate": "browser_qa_pending",
+  "kind": "unity-build-provenance",
+  "entry": "Nectorial.Editor.RaidBuild.Build",
+  "mode": "raid",
+  "unity_version": "6000.4.3f1",
+  "build_receipt_sha256": "44110e651ad491ab6d1fe650eec2003ef0d14a632a0873eccf44f7e28bc6fd06",
+  "log_sha256": "c86feea03663328b3e13702b51d2005f2ba924dcd53dca39dc63063918218184",
+  "source_freeze_sha256": "c60530b314639a92b5c5b8ba08e2616732c85b4242934a3c69a3d6f56ee730aa",
+  "result": "Succeeded",
+  "errors": 0,
+  "payload": {
+    "Build/3aa011ed3972568aa93388d304bf8d64.loader.js": "19a2f6769623bc78cdd00f6d2ac9036fc1829a82825e4b7f95b45c8df0c1e591",
+    "Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": "2b2ab9f3552899c835887a2c9830bc8487bfe8dd3acff540dfefb375139b98db",
+    "Build/52340ed46e985d9a1d268c276433fe63.symbols.json": "d5fe56e2caa562f40ad5d07514dbc945b74218541736faa1fac7001466ab00b4",
+    "Build/bf0907728e94a8908068043c76cbbac4.wasm": "3b1e0910f4eb51b4595ddc3d1beaee3b5350cdcabcd1e8637d729243f56044b8",
+    "Build/bfe98245a92901fbde73e85103e54837.data": "d9ee1d7174519d3abcff269d901082911c9ebff12549f04b302450091653e733",
+    "index.html": "d76b532e889b2759d124fa7b65fff7e67256ecb7b996f597658e254397c6f849"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "compiled_coop_api_path_occurrences": {
+    "raid/Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": 1,
+    "solo/Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": 1
+  },
+  "edits": {
+    "index.html": {
+      "changes": [
+        "removed excluded-mode menu block",
+        "ONE bridge script at offset 65"
+      ],
+      "output_sha256": "b24388d50c676483f2a8de87989ca2156e466fc154109be00295dca05324d3e6",
+      "source_sha256": "d4ab142f02d7245df9e6ee1eb80ace82d46acb17c6f1357eecd6b545367d3601"
+    },
+    "raid/index.html": {
+      "changes": [
+        "ONE bridge script at offset 65"
+      ],
+      "output_sha256": "7d2069be0a6538866c29f9aac58ec27f2f92f3608b72673befd7ddc9044fc931",
+      "source_sha256": "c58fdd4311fdb495f72462aacc4a61757fce594028753388d5ee93ba76695bb8"
+    },
+    "solo/index.html": {
+      "changes": [
+        "ONE bridge script at offset 65"
+      ],
+      "output_sha256": "6ee4fe610a955aa2f72fa778d616f63f5a401728bb1bcb158ebc444bcca8952a",
+      "source_sha256": "5b94f3f1cf730469956a4eb2ceea1c39287620042fbf59d907e11ac483238888"
+    }
+  },
+  "files": {
+    "index.html": "b24388d50c676483f2a8de87989ca2156e466fc154109be00295dca05324d3e6",
+    "platform/fewmoves-onestore.js": "da588f98c4862d2a8c5da96ad1c720f513f0f58b9d6162f90929d408b078a2d3",
+    "raid/Build/3aa011ed3972568aa93388d304bf8d64.loader.js": "19a2f6769623bc78cdd00f6d2ac9036fc1829a82825e4b7f95b45c8df0c1e591",
+    "raid/Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": "2b2ab9f3552899c835887a2c9830bc8487bfe8dd3acff540dfefb375139b98db",
+    "raid/Build/52340ed46e985d9a1d268c276433fe63.symbols.json": "d5fe56e2caa562f40ad5d07514dbc945b74218541736faa1fac7001466ab00b4",
+    "raid/Build/bfe98245a92901fbde73e85103e54837.data": "d9ee1d7174519d3abcff269d901082911c9ebff12549f04b302450091653e733",
+    "raid/index.html": "7d2069be0a6538866c29f9aac58ec27f2f92f3608b72673befd7ddc9044fc931",
+    "raid/unity-build.provenance.json": "efe5249b870de98da683306628278f7d40cef56592db33bef7f6cabfe6555617",
+    "shared/Build/bf0907728e94a8908068043c76cbbac4.wasm": "3b1e0910f4eb51b4595ddc3d1beaee3b5350cdcabcd1e8637d729243f56044b8",
+    "solo/Build/3aa011ed3972568aa93388d304bf8d64.loader.js": "19a2f6769623bc78cdd00f6d2ac9036fc1829a82825e4b7f95b45c8df0c1e591",
+    "solo/Build/427d670ff41660465423ed7003083f21.data": "b751914ba02c312ee4f95c0fb8ea6beb1102dcfb15efeda14206ea037cf76bbe",
+    "solo/Build/42ea6d2a8e2577bbaff4acc375cb5fbb.framework.js": "2b2ab9f3552899c835887a2c9830bc8487bfe8dd3acff540dfefb375139b98db",
+    "solo/Build/52340ed46e985d9a1d268c276433fe63.symbols.json": "d5fe56e2caa562f40ad5d07514dbc945b74218541736faa1fac7001466ab00b4",
+    "solo/index.html": "6ee4fe610a955aa2f72fa778d616f63f5a401728bb1bcb158ebc444bcca8952a",
+    "solo/unity-build.provenance.json": "c8b5fc6604cdfa195e01fc8d2cddba5ec3491c263761f58530e0866cfb1c1eff",
+    "style.css": "a425d5baa8f0b5acc38b25056319b6e95e1d74f306afe1442f62a9c03c5c59ab"
+  },
+  "gate": "gate_pending",
+  "kind": "few-moves-release-web-onestore",
+  "modes": [
+    "solo",
+    "raid"
+  ],
+  "not_an_upload": true,
+  "onestore_bridge": {
+    "path": "platform/fewmoves-onestore.js",
+    "sdk_url": "https://h5sdk.onestore.net/lib/v1.1.0/onestore-h5-sdk.min.js",
+    "sha256": "da588f98c4862d2a8c5da96ad1c720f513f0f58b9d6162f90929d408b078a2d3"
+  },
+  "profile": {
+    "id": "solo-first",
+    "sha256": "863ad052348c1d682f1b9f17790a75484d65072154f4491e77c5ace35c9426bf",
+    "version": 1
+  },
+  "source_root_sha256": "90cd12b04cb406ba2325e9b526ace111a4d9cc4c2edd1e1fd2d6c3e354f2dc2f",
+  "state": "provisional"
+}
