@@ -1,0 +1,119 @@
+# Few Moves ONE Worker only. Push-triggered on a dedicated branch; no workflow_dispatch
+# because the repository default branch does not contain this workflow.
+# CF upload is OFF until vars.FEW_MOVES_ONE_DEPLOY_ENABLED is exactly "true".
+name: Few Moves ONE Worker
+
+on:
+  push:
+    branches:
+      - 'codex/few-moves-onestore-deploy'
+    paths:
+      - '.github/workflows/few-moves-onestore.yml'
+      - 'deploy/onestore-solo-proxy/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: few-moves-onestore-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # actions/checkout v6.0.2; no persisted repository credential.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # actions/setup-node v6.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '22'
+      - name: Fixed source, bundle, configuration and cumulative ownership gate
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: node deploy/onestore-solo-proxy/ci-check.mjs
+      - name: Require successful Verify push run for this exact commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node deploy/onestore-solo-proxy/ci-verify-run.mjs
+      - name: Verify all 17 published upstream files and prepare the original test fixture
+        run: node deploy/onestore-solo-proxy/ci-prepare-fixture.mjs
+      - name: Existing seven proxy checks and direct-upload boundary checks
+        run: |
+          node --test deploy/onestore-solo-proxy/test-worker.mjs
+          node --test deploy/onestore-solo-proxy/deploy-worker.test.mjs deploy/onestore-solo-proxy/ci-check.test.mjs deploy/onestore-solo-proxy/ci-verify-run.test.mjs
+      - name: Install only pinned official Wrangler dependencies without lifecycle scripts
+        run: |
+          mkdir -p "$RUNNER_TEMP/few-moves-wrangler-tools"
+          cp deploy/onestore-solo-proxy/package.json deploy/onestore-solo-proxy/package-lock.json "$RUNNER_TEMP/few-moves-wrangler-tools/"
+          npm ci --prefix "$RUNNER_TEMP/few-moves-wrangler-tools" --ignore-scripts --no-audit --no-fund --omit=dev --registry=https://registry.npmjs.org
+      - name: Recheck no-bundle package with the pinned CLI
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+          WRANGLER_SEND_ERROR_REPORTS: 'false'
+          WRANGLER_LOG_PATH: ${{ runner.temp }}/few-moves-wrangler-logs
+        run: |
+          "$RUNNER_TEMP/few-moves-wrangler-tools/node_modules/.bin/wrangler" deploy --dry-run --no-bundle \
+            --config deploy/onestore-solo-proxy/wrangler.onestore-live.jsonc \
+            --outdir "$RUNNER_TEMP/few-moves-one-dry-run"
+          test "$(sha256sum "$RUNNER_TEMP/few-moves-one-dry-run/worker.bundle.r1.js" | cut -d ' ' -f1)" = ae3309f679adce5504309784750add1536ea5020bf60aae6f492a37d86861478
+          test "$(find "$RUNNER_TEMP/few-moves-one-dry-run" -type f | wc -l)" -eq 2
+
+  deploy:
+    needs: verify
+    if: >-
+      needs.verify.result == 'success' &&
+      github.repository == 'ljhljh0703-cmd/few-moves' &&
+      github.ref == 'refs/heads/codex/few-moves-onestore-deploy' &&
+      github.event_name == 'push' &&
+      vars.FEW_MOVES_ONE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: few-moves-onestore
+    permissions:
+      contents: read
+    steps:
+      # actions/checkout v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # actions/setup-node v6.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: '22'
+      - name: Recheck commit and fixed bundle before the deployment token is supplied
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: |
+          node deploy/onestore-solo-proxy/ci-check.mjs
+          node deploy/onestore-solo-proxy/deploy-worker.mjs --dry-run
+      - name: Upload only the approved module to the existing ONE Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.FEW_MOVES_CF_DEPLOY_TOKEN }}
+        run: node deploy/onestore-solo-proxy/deploy-worker.mjs > "$RUNNER_TEMP/few-moves-one-upload-receipt.json"
+      - name: Verify the live Worker before reporting success
+        run: |
+          node deploy/onestore-solo-proxy/verify-live.mjs > "$RUNNER_TEMP/few-moves-one-live-receipt.json"
+          node -e "const fs=require('node:fs');const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/few-moves-one-live-receipt.json'));console.log('live:',x.state,'static:',x.staticHashPass,'canonical:',x.canonicalEntryMethodChecks,'blocked:',x.blockedPathChecks)"
+      - name: Summary of allowed upload and live evidence
+        if: always()
+        run: |
+          node -e "const fs=require('node:fs');for(const [label,file] of [['upload','few-moves-one-upload-receipt.json'],['live','few-moves-one-live-receipt.json']]){const p=process.env.RUNNER_TEMP+'/'+file;if(!fs.existsSync(p)||!fs.statSync(p).size)continue;const x=JSON.parse(fs.readFileSync(p));console.log(label,'state:',x.state,'bundle:',x.bundleSha256||'', 'etag:',x.etag||'', 'version:',x.versionId||'', 'static:',x.staticHashPass??'')}"
+      # actions/upload-artifact v7.0.2; both JSON files contain only allowlisted public/status fields.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: few-moves-one-deploy-receipts
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/few-moves-one-upload-receipt.json
+            ${{ runner.temp }}/few-moves-one-live-receipt.json

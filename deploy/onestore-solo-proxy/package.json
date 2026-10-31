@@ -1,0 +1,9 @@
+{
+  "name": "few-moves-onestore-worker-local-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned local Wrangler for the reviewed ONE proxy candidate; no deploy script.",
+  "dependencies": {
+    "wrangler": "4.155.0"
+  }
+}

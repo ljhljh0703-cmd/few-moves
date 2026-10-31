@@ -1,0 +1,31 @@
+{
+  "name": "few-moves-onestore",
+  "main": "./worker.bundle.r1.js",
+  "account_id": "957eada44e00cdb84fec322133a89349",
+  "compatibility_date": "2026-10-31",
+  "workers_dev": true,
+  "preview_urls": false,
+  "send_metrics": false,
+  "dependencies_instrumentation": {
+    "enabled": false
+  },
+  "upload_source_maps": false,
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": false
+    },
+    "traces": {
+      "enabled": false
+    },
+    "issues": {
+      "enabled": false
+    }
+  },
+  "vars": {
+    "UPSTREAM_ORIGIN": "https://ljhljh0703-cmd.github.io",
+    "UPSTREAM_BASE_PATH": "/few-moves/releases/solo-raid-20261027-r1/",
+    "PACKAGE_MANIFEST_SHA256": "a925b9dbd3c6996e202aaac570fdc7dd5e368bebe19a3471f7583c880b423daf"
+  }
+}
