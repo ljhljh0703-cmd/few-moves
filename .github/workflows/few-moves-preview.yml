@@ -159,7 +159,8 @@ jobs:
           name: few-moves-preview-build
           path: work
       # actions/cache/restore v6.1.0
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - id: ledger_restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: preview-ledger.json
           key: few-moves-preview-ledger-${{ github.run_id }}
@@ -172,6 +173,9 @@ jobs:
       - name: Publish (official ait deploy, unlisted test upload)
         env:
           FEW_MOVES_AIT_DEPLOY_KEY: ${{ secrets.FEW_MOVES_AIT_DEPLOY_KEY }}
+          # Incident-specific requirement: only the evidenced cache/record may be reconciled.
+          FEW_MOVES_LEDGER_MATCHED_CACHE_KEY: ${{ steps.ledger_restore.outputs.cache-matched-key }}
+          FEW_MOVES_REQUIRE_RECOVERY_41304371611: ${{ github.event_name == 'push' && github.event.before == 'bbdb69d9c01eea8e13b7f87f3df5941243557d56' && '1' || '0' }}
         # CI-only: creates ~/.ait/credentials on this fresh hosted runner exclusively (refuses if one exists) and removes it.
         run: |
           python3 -B tools/auto_preview/pipeline.py publish --receipt work/build-receipt.json --ait work/ait-project/few-moves.ait \

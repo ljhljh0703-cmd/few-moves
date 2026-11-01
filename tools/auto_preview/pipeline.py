@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import io
 import json
 import os
@@ -180,6 +181,36 @@ def run(cmd: list[str], cwd: Path, log: Path, env: dict | None = None, redactor:
     return proc
 
 
+class DeployNotStarted(Exception):
+    """The executable or working directory failed before the target program could start."""
+
+
+def run_deploy(cmd: list[str], cwd: Path, log: Path, env: dict, redactor: Redactor) -> subprocess.CompletedProcess:
+    # Only the explicit exec/chdir failures raised by Popen carry a definite pre-exec outcome.
+    # Other Popen errors and all errors after it returns remain unknown and block another upload.
+    try:
+        process = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+    except OSError as error:
+        if error.errno in (errno.ENOENT, errno.EACCES, errno.ENOEXEC, errno.ENOTDIR) and error.filename in (cmd[0], str(cwd)):
+            raise DeployNotStarted(type(error).__name__) from error
+        raise
+    try:
+        stdout, stderr = process.communicate()
+    except BaseException:
+        try:
+            process.kill()
+            process.wait()
+        except (OSError, subprocess.SubprocessError):
+            pass
+        raise
+    result = subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
+    text = redactor((stdout or "") + (stderr or ""))
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write(f"$ {' '.join(redactor(c) for c in cmd)}\n{text}\n[exit {result.returncode}]\n")
+    return result
+
+
 def inspect_ait(project: Path, ait: Path) -> dict:
     modules = project / "node_modules" / ".pnpm"
     candidates = sorted(modules.glob("@apps-in-toss+ait-format@1.0.0*/node_modules"))
@@ -304,8 +335,9 @@ def build(args: argparse.Namespace) -> dict:
 def load_ledger(path: Path) -> dict:
     if path.is_file():
         ledger = json.loads(path.read_text(encoding="utf-8"))
-        if ledger.get("appName") != BIND["appName"] or ledger.get("miniAppId") != BIND["miniAppId"]:
-            raise Stop(EXIT_INPUT, "ledger belongs to another app")
+        if (ledger.get("appName") != BIND["appName"] or ledger.get("miniAppId") != BIND["miniAppId"]
+                or ledger.get("workspaceId") != BIND["workspaceId"]):
+            raise Stop(EXIT_INPUT, "ledger belongs to another app or workspace")
         return ledger
     return {"appName": BIND["appName"], "miniAppId": BIND["miniAppId"], "workspaceId": BIND["workspaceId"], "entries": []}
 
@@ -430,6 +462,62 @@ def trusted_remote_head() -> str:
 
 
 PENDING = ("uploading", "unknown_after_failure", "uploaded_unconfirmed")  # outcome not confirmed: blocks every new upload
+
+# One narrowly reviewed historical failure. This is not a general facility for clearing pending uploads.
+HISTORICAL_CACHE_KEY = "few-moves-preview-ledger-41304371611"
+HISTORICAL_ENTRY = {
+    "deploymentId": "01a196fb-e3a9-7802-83a8-45d5746544e5",
+    "ait_sha256": "250aa742060e7d73c276e7814eb0c697735419aa78cf0a2f7e94d198bf1d4249",
+    "content_sha256": "4483ca12d8a4a8b481bf9f2e7814dbcf8abf4d8b712c01c05dfe2fd7eadec99e",
+    "commit": "bbdb69d9c01eea8e13b7f87f3df5941243557d56",
+}
+HISTORICAL_AUDIT = {
+    "run_id": 41304371611,
+    "run_attempt": 1,
+    "workflow": ".github/workflows/few-moves-preview.yml",
+    "evidence": {
+        "ops/publish-failed.log": "a204a5456dbd0f28815c6195afc165b9ce1b8a4523c827aaf3dd626f5c9ee73a",
+        "ops/preview-first-all.log": "1e5bc63811d21343e80a2f09c28d54883fba942d3c4947a9832ea502e848b76f",
+        "ops/ci-build-first/build-receipt.json": "8ada6a85e1aeb2fcecc556b75483c9c1159acb6e886be8ddae206ba8e91d0958",
+    },
+    "reason": "The recorded relative-path FileNotFoundError occurred before the official CLI started.",
+}
+
+
+def reconcile_historical_41304371611(ledger: dict, matched_cache_key: str, required: bool) -> dict | None:
+    """Correct exactly one evidenced pre-exec failure; all other uncertain uploads remain pending."""
+    if (ledger.get("appName") != BIND["appName"] or ledger.get("miniAppId") != BIND["miniAppId"]
+            or ledger.get("workspaceId") != BIND["workspaceId"]):
+        raise Stop(EXIT_INPUT, "ledger belongs to another app or workspace")
+    matches = [entry for entry in ledger["entries"] if entry.get("deploymentId") == HISTORICAL_ENTRY["deploymentId"]]
+    if not matches:
+        if required or matched_cache_key == HISTORICAL_CACHE_KEY:
+            raise Stop(EXIT_REFUSED, "required historical ledger entry is absent; no upload")
+        return None
+    if len(matches) != 1:
+        raise Stop(EXIT_REFUSED, "historical deployment has duplicate ledger entries; no upload")
+    entry = matches[0]
+    if any(entry.get(key) != value for key, value in HISTORICAL_ENTRY.items()):
+        raise Stop(EXIT_REFUSED, "historical deployment conflicts with fixed evidence; no upload")
+    if entry.get("status") == "not_started":
+        if entry.get("reconciliation") != HISTORICAL_AUDIT:
+            raise Stop(EXIT_REFUSED, "historical reconciliation audit is missing or inconsistent; no upload")
+        return {"changed": False, "records": [{"deploymentId": HISTORICAL_ENTRY["deploymentId"],
+                                                 "status": "not_started", "audit": HISTORICAL_AUDIT}]}
+    if entry.get("status") != "uploading":
+        if required or matched_cache_key == HISTORICAL_CACHE_KEY:
+            raise Stop(EXIT_REFUSED, "historical deployment is not in the evidenced uploading state; no upload")
+        return None  # Retain existing created, failed, or uncertain statuses and normal duplicate guards.
+    if matched_cache_key != HISTORICAL_CACHE_KEY:
+        raise Stop(EXIT_REFUSED, "historical uploading entry came from a different or missing cache; no upload")
+    if "reconciliation" in entry:
+        raise Stop(EXIT_REFUSED, "historical uploading entry already has an audit; no upload")
+    entry["status"] = "not_started"
+    entry["reconciliation"] = {**HISTORICAL_AUDIT, "evidence": dict(HISTORICAL_AUDIT["evidence"])}
+    return {"changed": True, "records": [{"deploymentId": HISTORICAL_ENTRY["deploymentId"],
+                                            "status": "not_started", "audit": HISTORICAL_AUDIT}]}
+
+
 VERIFY_WORKFLOW = ".github/workflows/verify.yml"
 TRUSTED_BRANCH = TRUSTED_REF.removeprefix("refs/heads/")
 
@@ -492,6 +580,26 @@ def publish(args: argparse.Namespace) -> dict:
               "ait_sha256": receipt["ait"]["sha256"], "content_sha256": content, "commit": receipt["commit"], "binding": BIND,
               "test_push": "not available on this API-key + GitHub-hosted path (the official CLI/deploy key have no test-push route); possible outside it via the console MCP account session (root, once) or the console test QR",
               "isTested_ready": False, "user_tested": False, "uploaded": False}
+    project = Path(args.project).resolve()
+    ait_bin = (project / "node_modules" / ".bin" / "ait").resolve()
+    if testing():
+        ait_bin, result["fake_cli_for_tests"] = Path(os.environ["AUTO_PREVIEW_TEST_FAKE_AIT"]).resolve(), True
+    # Validate before touching credentials or writing any ledger, including the historical correction.
+    if not args.dry_run and (not project.is_dir() or not ait_bin.is_file() or not os.access(ait_bin, os.X_OK)):
+        raise Stop(EXIT_INPUT, "AIT project or executable is missing or not executable; upload was not started")
+    if not args.dry_run:
+        matched_cache_key = os.environ.get("FEW_MOVES_LEDGER_MATCHED_CACHE_KEY", "")
+        recovery_required = os.environ.get("FEW_MOVES_REQUIRE_RECOVERY_41304371611") == "1"
+        has_historical_entry = any(e.get("deploymentId") == HISTORICAL_ENTRY["deploymentId"] for e in ledger["entries"])
+        if recovery_required or has_historical_entry or matched_cache_key == HISTORICAL_CACHE_KEY:
+            require_ci()
+            reconciliation = reconcile_historical_41304371611(ledger, matched_cache_key, recovery_required)
+            if reconciliation is not None:
+                if reconciliation["changed"]:
+                    write_json(ledger_path, ledger)
+                result.update(state="historical_reconciled", reconciliation=reconciliation)
+                # Retain evidence in the receipt even if a different pending upload blocks the new attempt.
+                write_json(out, result)
     for entry in ledger["entries"]:
         if entry["content_sha256"] == content and entry["status"] == "created":  # only a confirmed CREATED counts
             result.update(state="skipped_duplicate_content", previous=entry)
@@ -507,9 +615,6 @@ def publish(args: argparse.Namespace) -> dict:
         ids = ", ".join(e["deploymentId"] for e in pending)
         raise Stop(EXIT_REFUSED, f"unresolved earlier upload(s) {ids}: resolve with `status` (same deployment only); no new upload until then")
     memo = f"auto preview · {receipt['commit'][:8]} · {receipt['ait']['sha256'][:8]}"[: CONFIG["deploy"]["memo_max_chars"]]
-    ait_bin = Path(args.project) / "node_modules" / ".bin" / "ait"
-    if testing():
-        ait_bin, result["fake_cli_for_tests"] = Path(os.environ["AUTO_PREVIEW_TEST_FAKE_AIT"]), True
     command = [str(ait_bin), "deploy", "--location", str(ait.resolve()), "--profile", CONFIG["deploy"]["profile_name"], "--memo", memo, "--scheme-only"]
     result["command"] = command
     if args.dry_run:
@@ -525,12 +630,27 @@ def publish(args: argparse.Namespace) -> dict:
     redactor = Redactor([key])
     entry = {"deploymentId": dep_id, "content_sha256": content, "ait_sha256": receipt["ait"]["sha256"], "commit": receipt["commit"],
              "status": "uploading", "started_utc": now()}
-    ledger["entries"].append(entry)
-    write_json(ledger_path, ledger)
     env = {k: v for k, v in os.environ.items() if k != "FEW_MOVES_AIT_DEPLOY_KEY"}
     env.update(CI="true", NO_COLOR="1")
     with CiCredentials(key):
-        proc = run(command, Path(args.project), Path(args.log), env=env, redactor=redactor)
+        # The credentials file is ready before recording an attempt; a credentials failure is not an upload.
+        ledger["entries"].append(entry)
+        write_json(ledger_path, ledger)
+        try:
+            proc = run_deploy(command, project, Path(args.log), env=env, redactor=redactor)
+        except DeployNotStarted as error:
+            entry.update(status="not_started", error=str(error), finished_utc=now())
+            write_json(ledger_path, ledger)
+            result.update(state="not_started", error=str(error), note="target program did not start; no upload was attempted")
+            write_json(out, result)
+            raise Stop(EXIT_FAIL, "official ait deploy could not start", publish_receipt=str(out))
+        except (OSError, subprocess.SubprocessError) as error:
+            # The process may have started or uploaded even if communication/logging then failed.
+            entry.update(status="unknown_after_failure", error=type(error).__name__, finished_utc=now())
+            write_json(ledger_path, ledger)
+            result.update(state="failed", error=type(error).__name__, resume="run `status` for this deploymentId; do not re-upload")
+            write_json(out, result)
+            raise Stop(EXIT_FAIL, "official ait deploy outcome is unknown", publish_receipt=str(out))
     output = redactor((proc.stdout or "") + (proc.stderr or "")).strip()
     link = next((line.strip() for line in output.splitlines() if line.strip().startswith("intoss-private://")), None)
     expected = f"intoss-private://{BIND['appName']}?_deploymentId={dep_id}&host=appsInTossHost"

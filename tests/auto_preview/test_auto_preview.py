@@ -6,11 +6,13 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import errno
 import http.server
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -181,6 +183,89 @@ class StatusServer(http.server.BaseHTTPRequestHandler):
         pass
 
 
+HISTORICAL_ROW = {
+    "deploymentId": "01a196fb-e3a9-7802-83a8-45d5746544e5",
+    "ait_sha256": "250aa742060e7d73c276e7814eb0c697735419aa78cf0a2f7e94d198bf1d4249",
+    "content_sha256": "4483ca12d8a4a8b481bf9f2e7814dbcf8abf4d8b712c01c05dfe2fd7eadec99e",
+    "commit": "bbdb69d9c01eea8e13b7f87f3df5941243557d56",
+    "status": "uploading",
+    "started_utc": "2026-11-01T12:01:18Z",
+}
+HISTORICAL_CACHE = "few-moves-preview-ledger-41304371611"
+
+
+def historical_ledger(*entries):
+    return {"appName": pl.BIND["appName"], "workspaceId": pl.BIND["workspaceId"],
+            "miniAppId": pl.BIND["miniAppId"], "entries": [copy.deepcopy(e) for e in entries]}
+
+
+class HistoricalReconciliationTests(unittest.TestCase):
+    def test_exact_evidence_changes_one_entry_and_is_idempotent_under_new_cache(self):
+        created = {"deploymentId": "other-created", "status": "created", "content_sha256": "a" * 64}
+        failed = {"deploymentId": "other-failed", "status": "build_failed", "content_sha256": "b" * 64}
+        pending = {"deploymentId": "other-pending", "status": "uploading", "content_sha256": "c" * 64}
+        ledger = historical_ledger(created, HISTORICAL_ROW, failed, pending)
+        before = copy.deepcopy(ledger)
+        result = pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+        self.assertTrue(result["changed"])
+        for i in (0, 2, 3): self.assertEqual(ledger["entries"][i], before["entries"][i])
+        entry = ledger["entries"][1]
+        self.assertEqual(entry["status"], "not_started")
+        self.assertEqual(entry["reconciliation"]["run_id"], 41304371611)
+        self.assertEqual(entry["reconciliation"]["run_attempt"], 1)
+        self.assertEqual(entry["reconciliation"]["evidence"]["ops/publish-failed.log"],
+                         "a204a5456dbd0f28815c6195afc165b9ce1b8a4523c827aaf3dd626f5c9ee73a")
+        after = copy.deepcopy(ledger)
+        repeated = pl.reconcile_historical_41304371611(ledger, "few-moves-preview-ledger-new-run", True)
+        self.assertFalse(repeated["changed"])
+        self.assertEqual(ledger, after)
+
+    def test_mismatch_and_duplicate_never_modify_ledger(self):
+        for field in ("ait_sha256", "content_sha256", "commit"):
+            altered = {**HISTORICAL_ROW, field: "wrong"}
+            ledger = historical_ledger(altered)
+            before = copy.deepcopy(ledger)
+            with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+            self.assertEqual(ledger, before)
+        ledger = historical_ledger(HISTORICAL_ROW, HISTORICAL_ROW)
+        before = copy.deepcopy(ledger)
+        with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+        self.assertEqual(ledger, before)
+
+    def test_missing_or_wrong_cache_refuses_required_recovery(self):
+        for key in ("", "few-moves-preview-ledger-other"):
+            for entries in ((), (HISTORICAL_ROW,)):
+                ledger = historical_ledger(*entries)
+                before = copy.deepcopy(ledger)
+                with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, key, True)
+                self.assertEqual(ledger, before)
+        with self.assertRaises(pl.Stop):
+            pl.reconcile_historical_41304371611(historical_ledger(), HISTORICAL_CACHE, False)
+        self.assertIsNone(pl.reconcile_historical_41304371611(historical_ledger(), "", False),
+                          "unrelated ordinary ledgers retain existing behavior")
+
+    def test_wrong_binding_or_contradictory_status_is_never_corrected(self):
+        for field in ("appName", "workspaceId", "miniAppId"):
+            ledger = historical_ledger(HISTORICAL_ROW)
+            ledger[field] = "wrong"
+            before = copy.deepcopy(ledger)
+            with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+            self.assertEqual(ledger, before)
+        for status in ("created", "build_failed", "unknown_after_failure", "uploaded_unconfirmed"):
+            ledger = historical_ledger({**HISTORICAL_ROW, "status": status})
+            before = copy.deepcopy(ledger)
+            with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+            self.assertEqual(ledger, before)
+
+    def test_already_corrected_requires_matching_audit(self):
+        ledger = historical_ledger(HISTORICAL_ROW)
+        pl.reconcile_historical_41304371611(ledger, HISTORICAL_CACHE, True)
+        ledger["entries"][0]["reconciliation"]["run_id"] = 1
+        before = copy.deepcopy(ledger)
+        with self.assertRaises(pl.Stop): pl.reconcile_historical_41304371611(ledger, "new-cache", True)
+        self.assertEqual(ledger, before)
+
+
 class PublishTests(unittest.TestCase):
     KEY = "test-deploy-key-0123456789"
 
@@ -200,7 +285,8 @@ class PublishTests(unittest.TestCase):
         StatusServer.verify_replies, StatusServer.verify_status = [[run()]], 200
         self.cred = self.tmp / "runner-home" / ".ait" / "credentials"
         self.cred.parent.parent.mkdir()
-        self.env = {"AUTO_PREVIEW_TEST_FAKE_AIT": str(FAKE_AIT), "AUTO_PREVIEW_TEST_STATUS_BASE": f"http://127.0.0.1:{self.server.server_port}/api",
+        self.env = {"FEW_MOVES_LEDGER_MATCHED_CACHE_KEY": "", "FEW_MOVES_REQUIRE_RECOVERY_41304371611": "",
+                    "AUTO_PREVIEW_TEST_FAKE_AIT": str(FAKE_AIT), "AUTO_PREVIEW_TEST_STATUS_BASE": f"http://127.0.0.1:{self.server.server_port}/api",
                     "AUTO_PREVIEW_TEST_GITHUB_API": f"http://127.0.0.1:{self.server.server_port}", "AUTO_PREVIEW_TEST_VERIFY_POLL": "3,0",
                     "AUTO_PREVIEW_TEST_CREDENTIALS": str(self.cred), "FAKE_AIT_CREDENTIALS": str(self.cred), "AUTO_PREVIEW_TEST_REMOTE_HEAD": HEAD,
                     "FAKE_EXPECT_HOME": os.environ.get("HOME", ""), "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
@@ -216,8 +302,9 @@ class PublishTests(unittest.TestCase):
     def write_receipt(self):
         (self.tmp / "build-receipt.json").write_text(json.dumps(self.receipt))
 
-    def publish(self, *extra, behavior="success", **env_over):
-        args = ["publish", "--receipt", str(self.tmp / "build-receipt.json"), "--ait", str(self.ait), "--project", str(self.tmp),
+    def publish(self, *extra, behavior="success", project=None, **env_over):
+        project = self.tmp if project is None else project
+        args = ["publish", "--receipt", str(self.tmp / "build-receipt.json"), "--ait", str(self.ait), "--project", str(project),
                 "--ledger", str(self.ledger), "--out", str(self.tmp / "publish.json"), "--log", str(self.tmp / "publish.log"), *extra]
         with mock.patch.dict(os.environ, {**self.env, "FAKE_AIT_BEHAVIOR": behavior, **env_over}, clear=False):
             return pl.main(args)
@@ -239,6 +326,132 @@ class PublishTests(unittest.TestCase):
         self.assertTrue(verify_calls and all(c[1] != f"Bearer {self.KEY}" for c in verify_calls), "deploy key never sent to GitHub")
         self.assertEqual(out["verify_gate"]["verify_run_id"], 1)
         self.assertEqual(len(self.calls_made()), 1)
+
+    def test_relative_project_spawns_the_project_cli_in_its_own_directory(self):
+        project = self.tmp / "relative-project"
+        cli = project / "node_modules" / ".bin" / "ait"
+        cli.parent.mkdir(parents=True)
+        stub = FAKE_AIT.read_text().replace(
+            "args = sys.argv[1:]", "assert str(Path.cwd()) == os.environ['FAKE_EXPECT_PROJECT']\nargs = sys.argv[1:]")
+        cli.write_text(stub)
+        cli.chmod(0o755)
+        relative_project = os.path.relpath(project, Path.cwd())
+        with mock.patch.object(pl, "trusted_remote_head", return_value=HEAD), \
+             mock.patch.object(pl, "verify_gate", return_value={"conclusion": "success"}), \
+             mock.patch.object(pl, "credentials_path", return_value=self.cred), \
+             mock.patch.object(pl, "fetch_status", return_value="CREATED"):
+            code = self.publish(project=relative_project, AUTO_PREVIEW_TEST_FAKE_AIT="", FAKE_EXPECT_PROJECT=str(project.resolve()))
+        self.assertEqual(code, 0)
+        result = json.loads((self.tmp / "publish.json").read_text())
+        self.assertEqual(result["command"][0], str(cli.resolve()))
+        self.assertEqual(result["state"], "uploaded")
+        self.assertEqual(len(self.calls_made()), 1, "the local executable actually ran")
+        self.assertFalse(self.cred.exists())
+
+    def test_missing_or_nonexecutable_cli_leaves_no_upload_or_credentials(self):
+        project = self.tmp / "missing-project-cli"
+        cli = project / "node_modules" / ".bin" / "ait"
+        cli.parent.mkdir(parents=True)
+        for create_nonexecutable in (False, True):
+            if create_nonexecutable:
+                cli.write_text("#!/bin/sh\nexit 0\n")
+                cli.chmod(0o644)
+            with mock.patch.object(pl, "deploy_key", side_effect=AssertionError("key must not be read")):
+                self.assertEqual(self.publish(project=project, AUTO_PREVIEW_TEST_FAKE_AIT=""), pl.EXIT_INPUT)
+            self.assertFalse(self.ledger.exists())
+            self.assertFalse(self.cred.exists())
+            self.assertFalse(self.cred.parent.exists())
+            self.assertEqual(self.calls_made(), [])
+        self.assertEqual(StatusServer.seen, [], "preflight does not reach remote checks")
+
+    def test_missing_cli_does_not_write_even_the_evidenced_historical_ledger(self):
+        original = historical_ledger(HISTORICAL_ROW)
+        self.ledger.write_text(json.dumps(original))
+        before = self.ledger.read_bytes()
+        project = self.tmp / "missing-cli-before-reconciliation"
+        project.mkdir()
+        with mock.patch.object(pl, "deploy_key", side_effect=AssertionError("key must not be read")):
+            self.assertEqual(self.publish(project=project, AUTO_PREVIEW_TEST_FAKE_AIT="",
+                                          FEW_MOVES_REQUIRE_RECOVERY_41304371611="1",
+                                          FEW_MOVES_LEDGER_MATCHED_CACHE_KEY=HISTORICAL_CACHE), pl.EXIT_INPUT)
+        self.assertEqual(self.ledger.read_bytes(), before)
+        self.assertFalse(self.cred.exists())
+        self.assertFalse((self.tmp / "publish.json").exists())
+        self.assertEqual(self.calls_made(), [])
+
+    def test_exec_failure_records_not_started_but_never_reuses_the_same_id(self):
+        error = FileNotFoundError(errno.ENOENT, "interpreter missing", str(FAKE_AIT.resolve()))
+        with mock.patch.object(pl.subprocess, "Popen", side_effect=error):
+            self.assertEqual(self.publish(), pl.EXIT_FAIL)
+        entry = json.loads(self.ledger.read_text())["entries"][0]
+        self.assertEqual(entry["status"], "not_started")
+        result = json.loads((self.tmp / "publish.json").read_text())
+        self.assertEqual((result["state"], result["uploaded"]), ("not_started", False))
+        self.assertFalse(self.cred.exists())
+        self.assertEqual(self.calls_made(), [])
+        self.assertEqual(self.publish(), pl.EXIT_REFUSED, "even a not-started deployment ID is never reused")
+
+    def test_ambiguous_popen_oserror_stays_unknown(self):
+        with mock.patch.object(pl.subprocess, "Popen", side_effect=OSError("ambiguous launch error")):
+            self.assertEqual(self.publish(), pl.EXIT_FAIL)
+        self.assertEqual(json.loads(self.ledger.read_text())["entries"][0]["status"], "unknown_after_failure")
+        self.assertFalse(self.cred.exists())
+        self.rebuild("01a17d97-0000-7000-8000-0000000000d1", "d" * 64)
+        self.assertEqual(self.publish(), pl.EXIT_REFUSED, "unknown outcomes block new uploads")
+
+    def test_timeout_after_launch_stays_unknown_and_blocks_new_uploads(self):
+        with mock.patch.object(pl, "run_deploy", side_effect=subprocess.TimeoutExpired("ait", 1)):
+            self.assertEqual(self.publish(), pl.EXIT_FAIL)
+        self.assertEqual(json.loads(self.ledger.read_text())["entries"][0]["status"], "unknown_after_failure")
+        self.assertFalse(self.cred.exists())
+        self.rebuild("01a17d97-0000-7000-8000-0000000000d2", "e" * 64)
+        self.assertEqual(self.publish(), pl.EXIT_REFUSED, "a timed out upload cannot be assumed absent")
+
+    def test_historical_recovery_receipt_and_other_entries_are_preserved(self):
+        created = {"deploymentId": "other-created", "status": "created", "content_sha256": "a" * 64}
+        failed = {"deploymentId": "other-failed", "status": "build_failed", "content_sha256": "b" * 64}
+        original = historical_ledger(created, HISTORICAL_ROW, failed)
+        self.ledger.write_text(json.dumps(original))
+        self.assertEqual(self.publish(FEW_MOVES_REQUIRE_RECOVERY_41304371611="1",
+                                      FEW_MOVES_LEDGER_MATCHED_CACHE_KEY=HISTORICAL_CACHE), 0)
+        ledger = json.loads(self.ledger.read_text())
+        self.assertEqual(ledger["entries"][0], original["entries"][0])
+        self.assertEqual(ledger["entries"][2], original["entries"][2])
+        self.assertEqual(ledger["entries"][1]["status"], "not_started")
+        receipt = json.loads((self.tmp / "publish.json").read_text())
+        self.assertEqual(receipt["reconciliation"]["records"][0]["deploymentId"], HISTORICAL_ROW["deploymentId"])
+        self.assertEqual(receipt["reconciliation"]["records"][0]["audit"]["run_id"], 41304371611)
+        self.assertEqual(len(self.calls_made()), 1)
+
+    def test_other_pending_remains_blocked_after_historical_recovery(self):
+        other = {"deploymentId": "other-pending", "status": "uploading", "content_sha256": "f" * 64}
+        self.ledger.write_text(json.dumps(historical_ledger(HISTORICAL_ROW, other)))
+        with mock.patch.object(pl, "deploy_key", side_effect=AssertionError("key must not be read")):
+            self.assertEqual(self.publish(FEW_MOVES_REQUIRE_RECOVERY_41304371611="1",
+                                          FEW_MOVES_LEDGER_MATCHED_CACHE_KEY=HISTORICAL_CACHE), pl.EXIT_REFUSED)
+        ledger = json.loads(self.ledger.read_text())
+        self.assertEqual(ledger["entries"][0]["status"], "not_started")
+        self.assertEqual(ledger["entries"][1], other)
+        self.assertEqual(json.loads((self.tmp / "publish.json").read_text())["reconciliation"]["records"][0]["status"], "not_started")
+        self.assertEqual(self.calls_made(), [])
+        self.assertEqual(StatusServer.seen, [])
+
+    def test_historical_deployment_id_is_never_reused(self):
+        self.ledger.write_text(json.dumps(historical_ledger(HISTORICAL_ROW)))
+        self.receipt["ait"]["deploymentId"] = HISTORICAL_ROW["deploymentId"]
+        self.write_receipt()
+        self.assertEqual(self.publish(FEW_MOVES_REQUIRE_RECOVERY_41304371611="1",
+                                      FEW_MOVES_LEDGER_MATCHED_CACHE_KEY=HISTORICAL_CACHE), pl.EXIT_REFUSED)
+        self.assertEqual(self.calls_made(), [])
+        self.assertEqual(json.loads(self.ledger.read_text())["entries"][0]["status"], "not_started")
+
+    def test_dry_run_does_not_reconcile_historical_ledger(self):
+        original = historical_ledger(HISTORICAL_ROW)
+        self.ledger.write_text(json.dumps(original))
+        self.assertEqual(self.publish("--dry-run", FEW_MOVES_REQUIRE_RECOVERY_41304371611="1",
+                                      FEW_MOVES_LEDGER_MATCHED_CACHE_KEY=HISTORICAL_CACHE), pl.EXIT_REFUSED)
+        self.assertEqual(json.loads(self.ledger.read_text()), original)
+        self.assertFalse(self.cred.exists())
 
     def test_same_deployment_or_content_is_not_uploaded_again(self):
         self.assertEqual(self.publish(), 0)
@@ -380,6 +593,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.publish(), pl.EXIT_INPUT)
         self.assertEqual(self.cred.read_text(), '{"someone": "theirs"}')
         self.assertEqual(self.calls_made(), [])
+        self.assertFalse(self.ledger.exists(), "credentials failures do not record an upload attempt")
 
     def test_existing_ait_dir_is_kept(self):
         self.cred.parent.mkdir()
@@ -563,6 +777,11 @@ class RealArtifactTests(unittest.TestCase):
 class WorkflowPolicyTests(unittest.TestCase):
     def setUp(self):
         self.text = (ROOT / ".github" / "workflows" / "few-moves-preview.yml").read_text()
+
+    def test_recovery_is_bound_to_the_restored_cache_identity(self):
+        self.assertIn("id: ledger_restore", self.text)
+        self.assertIn("FEW_MOVES_LEDGER_MATCHED_CACHE_KEY: ${{ steps.ledger_restore.outputs.cache-matched-key }}", self.text)
+        self.assertIn("FEW_MOVES_REQUIRE_RECOVERY_41304371611: ${{ github.event_name == 'push' && github.event.before == 'bbdb69d9c01eea8e13b7f87f3df5941243557d56' && '1' || '0' }}", self.text)
 
     def test_triggers_and_permissions(self):
         self.assertNotIn("pull_request", self.text)
