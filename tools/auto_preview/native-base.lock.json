@@ -1,5 +1,5 @@
 {
- "base_id": "few-moves-native-base-r3",
+ "base_id": "few-moves-native-base-r4",
  "binding": {
   "appName": "few-moves",
   "miniAppId": 92477,
@@ -12,57 +12,49 @@
    "bytes": 230594,
    "sha256": "b99f3df735b2a8d0354437eb56760d7a4ea94aa24ba7a6a0737d022e1d3b84be"
   },
+  "raid/Build/09070c53efd0a3724de723309c1d78b9.symbols.json": {
+   "bytes": 9028881,
+   "sha256": "fc81fa7439e7a53e04a44d4ebe57d90d51f626c374d10c66bb7fdd3ab4a10b74"
+  },
+  "raid/Build/0ff2eee517e9a83c5b4dcad9bd81740c.loader.js": {
+   "bytes": 19870,
+   "sha256": "14d4d9abdf7fa9639820f0085160c9ca1091007438459b76288733b49442f559"
+  },
   "raid/Build/59faedfb933ee4e91137dca72da0c84c.framework.js": {
    "bytes": 675655,
    "sha256": "ad84dcf80133b04a7bf4d242dc184b19809781397fa4b4227ec04f05009f5395"
   },
-  "raid/Build/75a77672d1e7c4ae52c9dc869457dcd2.loader.js": {
-   "bytes": 19870,
-   "sha256": "a9ebe43a0c230196726ab89efd06b55372877082f67c8116b5cbb380ca11ade4"
-  },
-  "raid/Build/76fc5d4e9a422b1ab8f03b24bbbd1f5b.symbols.json": {
-   "bytes": 9027808,
-   "sha256": "99b40b284af42ba5415d0022f5b7ab7fe3289a65b410142493598e19d61d293c"
-  },
-  "raid/Build/c31da264a904c570760174bf2d880635.data": {
-   "bytes": 6457529,
-   "sha256": "18e55e60470a12ca271276a38249291884e10c7ea8f9b0a6819fd1cdbeea9e29"
+  "raid/Build/93740a05fe25c0440408abac8433045b.data": {
+   "bytes": 6459230,
+   "sha256": "f1654cc82b62c66435c3df3994e4fda2f5f710b1134caf62e403d916b84079ee"
   },
   "raid/index.html": {
    "bytes": 42848,
-   "sha256": "439b7313ab7f9b81f22061be8fc1e5f16d5c9e98c1b5a4ed5259082898e5100f"
+   "sha256": "f426b0e02b0fd9aee57931db0ffe40927dd0ae9ee99906ae88caea3db8a4b7ee"
   },
-  "raid/unity-build.provenance.json": {
-   "bytes": 371,
-   "sha256": "eedb6e5af59df264dcb46cdfa1fd716d79195d38827c7deadda58817396bda49"
+  "shared/Build/617c1ecb412a365768405d12cd56ac96.wasm": {
+   "bytes": 59283387,
+   "sha256": "587c943dae7d4f94d25668d27be55ecff585d62c2105583cbe1ed19856e54fb5"
   },
-  "shared/Build/45dc71ba162cdbdc38da3bf26cb77843.wasm": {
-   "bytes": 59274555,
-   "sha256": "d0df24bd564228aaeb17ae7e9b155a8375efaa5903056515c1782488e20b8dae"
+  "solo/Build/09070c53efd0a3724de723309c1d78b9.symbols.json": {
+   "bytes": 9028881,
+   "sha256": "fc81fa7439e7a53e04a44d4ebe57d90d51f626c374d10c66bb7fdd3ab4a10b74"
+  },
+  "solo/Build/0ff2eee517e9a83c5b4dcad9bd81740c.loader.js": {
+   "bytes": 19870,
+   "sha256": "14d4d9abdf7fa9639820f0085160c9ca1091007438459b76288733b49442f559"
+  },
+  "solo/Build/30910903b1decf6a4ff5e3587f66fceb.data": {
+   "bytes": 6459211,
+   "sha256": "a77c5550890a9d5a590e167fe9863131722eba64da43f06d979318494eb9d687"
   },
   "solo/Build/59faedfb933ee4e91137dca72da0c84c.framework.js": {
    "bytes": 675655,
    "sha256": "ad84dcf80133b04a7bf4d242dc184b19809781397fa4b4227ec04f05009f5395"
   },
-  "solo/Build/75a77672d1e7c4ae52c9dc869457dcd2.loader.js": {
-   "bytes": 19870,
-   "sha256": "a9ebe43a0c230196726ab89efd06b55372877082f67c8116b5cbb380ca11ade4"
-  },
-  "solo/Build/76fc5d4e9a422b1ab8f03b24bbbd1f5b.symbols.json": {
-   "bytes": 9027808,
-   "sha256": "99b40b284af42ba5415d0022f5b7ab7fe3289a65b410142493598e19d61d293c"
-  },
-  "solo/Build/96d8ad30e9a1275fbc5b0561f028eaf9.data": {
-   "bytes": 6457512,
-   "sha256": "19420188cc0af6a9865bfed4ebb4a071ff009c114ab4884485e8dd76eec80e21"
-  },
   "solo/index.html": {
-   "bytes": 45212,
-   "sha256": "7b64c8d754c58dd82fedfc142b44d87d8c73f0566b0407059d69d7eaa3af37dc"
-  },
-  "solo/unity-build.provenance.json": {
-   "bytes": 381,
-   "sha256": "7ccab2ba83d663fdc012db39b5bed366bbfb77579804e4ea7d5da261acc2c823"
+   "bytes": 48897,
+   "sha256": "6431572f5d7b694c14b8e6925ef51b8d1a4f4d38eeeb30b6ed3676059e3d0295"
   }
  },
  "framework": {
@@ -206,6 +198,8 @@
    "Assets/Nectorial/Resources/SlideRooms/room-12.json": "9d24d2d8c3a62c6c412964fe98f1e88c8badc299e088becd02f0047e5c422734",
    "Assets/Nectorial/Resources/SlideRooms/room-12.json.meta": "e058e8650dcbbe0e90943ba916a87259d20d92d22eae294b93f392587c81a264",
    "Assets/Nectorial/Resources/Visuals.meta": "febff9469c7c4e57145f755cded5c3714b58a689a4302b6ab73c4e713a59c070",
+   "Assets/Nectorial/Resources/Visuals/GoalFocus.shader": "9492bae112e56761b5073c09f675e62e4db5a1aaf51be82e79968e095dad59bf",
+   "Assets/Nectorial/Resources/Visuals/GoalFocus.shader.meta": "26e8cf1bb247c5969fb2be26639e7e06488f9145b1fc84408dc1dab2812782db",
    "Assets/Nectorial/Resources/Visuals/MatteSprite.shader": "1dc7324f468ee2699c8ccfcbbd1593f5343d14bb713659373ba8e52a0f102207",
    "Assets/Nectorial/Resources/Visuals/MatteSprite.shader.meta": "23d8257850c18e03a53bd81c91f02f1c7c9ad2f500b4001abefd58abca8e41b3",
    "Assets/Nectorial/Resources/Visuals/turn-escape-tiles.png": "3135818fc44dee271ba645ea4486eb552e6372c32b729a03ce60fa4e19731dcc",
@@ -231,11 +225,11 @@
    "Assets/Nectorial/Runtime/Editor.meta": "4a3d940b2b311c5ad8eb357fd7acb97c682e2c3f54bebc9f37a956fd67d0f27e",
    "Assets/Nectorial/Runtime/Editor/generate_tile_atlas.py": "1adcffe9adf12df4be1288afae27e4820df8979301f6cd9a475686b1ba6b3980",
    "Assets/Nectorial/Runtime/Editor/generate_tile_atlas.py.meta": "a3a473d238e3b8af0a5ff2d75a24ea85c32b7b60f06d15e36e3466364e03f0d2",
-   "Assets/Nectorial/Runtime/GameBoardView.cs": "b96c996b4e01de15b039488fa09cc3d17580a381fc72a11d71e227fe73edebe4",
+   "Assets/Nectorial/Runtime/GameBoardView.cs": "5f592f84a87e7b5d07bb75ba599dada97eb41c07afae5401a2b7ead334500aad",
    "Assets/Nectorial/Runtime/GameBoardView.cs.meta": "7645468d5bae7231de9f448492589a0bda2977a4e125423fe7f320c2f4ec80c6",
-   "Assets/Nectorial/Runtime/GameBootstrap.cs": "552a221950e7b278a9a87d2619313db0a8a44741d82c1a55e7d0b45f9fae1df9",
+   "Assets/Nectorial/Runtime/GameBootstrap.cs": "8b8a53a5f96a26f850efae80656fd9f1ef35a85652a008732d4bfde20254d57a",
    "Assets/Nectorial/Runtime/GameBootstrap.cs.meta": "61531ae21a28e69e242698624fd30507f5c7e85ceacd24de97b07a5d4ff7348d",
-   "Assets/Nectorial/Runtime/IBoardView.cs": "08fe4de3a86360b0eed378cbdf0a1ed6bac0283fc93988ae443cd8883422fe43",
+   "Assets/Nectorial/Runtime/IBoardView.cs": "82cc0928bea6cd14028ac1b7029bb54cdc43f029618693d1e2da6704133ca488",
    "Assets/Nectorial/Runtime/IBoardView.cs.meta": "bf689ed9056a7424bb7096709cc6adbc4f41325981898d78afd55597bbdd580a",
    "Assets/Nectorial/Runtime/Nectorial.Runtime.asmdef": "7260d0af8699f91a78bc06c6cbb4197abebef982325473045f602f65e2cd9e88",
    "Assets/Nectorial/Runtime/Nectorial.Runtime.asmdef.meta": "92d3f52010f7a4ddd40bd156e87501495866ddf3d6f882b0e8b9cb122b1fce71",
@@ -252,7 +246,7 @@
    "Assets/Nectorial/Runtime/Record/RecordObservationContract.cs": "9d0f013185026a42cd01c30a4c203120ff7c7e495cb885393476a04a17b5cc8a",
    "Assets/Nectorial/Runtime/Record/RecordObservationContract.cs.meta": "574b067b28df50a2421eda8db3872a2b40ee72850723fc4fd7deabf917e04e27",
    "Assets/Nectorial/Runtime/ThreeD.meta": "bb796851a138fe485bdf0059dbc7233924f9c0e0f3df44289f2203fbf3f0ce0a",
-   "Assets/Nectorial/Runtime/ThreeD/Board3DView.cs": "cf7ec585c28a3f764f2bdf516fb2cfba21dc795c5b2f562e76707a6c4cd0a0f2",
+   "Assets/Nectorial/Runtime/ThreeD/Board3DView.cs": "ae83f359a8f15316426e53060c1d132040106fc2fd72d87513120baccaf21765",
    "Assets/Nectorial/Runtime/ThreeD/Board3DView.cs.meta": "b40a6d2d335da727f660952f476aa3a8c5d03192d3fb5eabd1fe0e4122401f6d",
    "Assets/Nectorial/Runtime/ThreeD/Preview3DAssetCheck.cs": "a1bc6c70393db653f65a8218d41e1169390a188ed8476a9dddc0d07c8521d9e1",
    "Assets/Nectorial/Runtime/ThreeD/Preview3DAssetCheck.cs.meta": "853b592aebb8d58f3930f8d71cef39bd3c0e7852a9a7e50bbceb358427dd85ff",
@@ -307,7 +301,7 @@
    "Assets/WebGLTemplates/Raid/index.html": "c832cc59cbfc8064ab6fe5e65caf60d15ae0d7667f0970035ecd4363ed2063d6",
    "Assets/WebGLTemplates/Raid/index.html.meta": "ab01ccdf6ebe748186836c2c0cffef58a9581d3faaab27c74cfbef9e9951c917",
    "Assets/WebGLTemplates/TurnEscape.meta": "c453c43bbceba53f0d522fce28cbcd03ef259c1f2e2a6e4a494c18ba2902ad59",
-   "Assets/WebGLTemplates/TurnEscape/index.html": "12e46b484a57019ca1261352f69ca01178ecfad6e612657843bbce5ea0fbe455",
+   "Assets/WebGLTemplates/TurnEscape/index.html": "6d5fd0f1ccdcd823495c1625e41c1cc47f9e76413801e89be08456d50d8f6007",
    "Assets/WebGLTemplates/TurnEscape/index.html.meta": "752ad1a3c868e228d7b939b7ce08c3f13aa95d473b25074583ce3df7bde299d5",
    "Assets/link.xml": "9fcd215e113660d7fa9f5c75c05e538fa01b04a5b85495fc184d2d6f9d87c317",
    "Assets/link.xml.meta": "181d02926f8e53f92495198d6ef13a91a62c4b7623af6360c3f746ff05829186",
@@ -339,24 +333,65 @@
    "Packages/",
    "ProjectSettings/"
   ],
-  "sha256": "102519f2bc37125b352b7c391ff47f6df66ff059df969ae34e495181dce61a75"
+  "sha256": "113ecdbe0e34e5f5f1bae47ef5f033c5a9bf66465ab5f3e8cdb3e2359c5a1351"
  },
  "provenance": {
-  "bridge": "SDK BuildConfig~/unity-bridge.ts built verbatim with the pinned vite 8.2.1 (sha in files)",
-  "git_head": "050e2747a24cf995945f26598f05efa77ee7458a plus uncommitted Assets/Editor/RaidBuild.cs 034c5d01..., Assets/Editor/Preview3DBuild.cs f9cddffa...",
-  "native_source_dir": "assembled ait-r3 native source (solo <- preview3d-ait, raid <- raid-ait, shared wasm deduplicated)",
-  "reviewed_as": "ait-r3 native APPSINTOS_OPTIMIZED build (independent native-r3 PASS); reused unchanged by ait-r4/r5/r6 UI-only packages",
-  "server_accepted": [
-   "20261027-1 deploymentId 01a17cc3-4362-70d7-a164-dc492c8c4ba7 (r3, .ait c049c8f9...)",
-   "20261027-2 deploymentId 01a17d4f-c4c8-74f7-bed1-abbe6ae49b7a (r6, .ait 84d04a5d...)"
-  ],
-  "source_freeze": "ait-r3 combined source freeze, 288 paths, sha 8011f690957c338e09b4fd2c637c9176c0de00a6822f3680065c0ffce9d55405",
-  "unity": "6000.4.3f1, licensed Mac, supervised build-all-r2 2026-10-27T09:37:50Z..09:48:28Z (raid-ait, preview3d-ait)"
+  "base_id": "few-moves-native-base-r4",
+  "bridge": {
+   "bytes": 230594,
+   "sha256": "b99f3df735b2a8d0354437eb56760d7a4ea94aa24ba7a6a0737d022e1d3b84be",
+   "source_archive_sha256": "ab8e809849f0211f23275f02dc7acb04beb252350463539ae5ef2930ec8415dd",
+   "source_base": "few-moves-native-base-r3"
+  },
+  "created_utc": "2026-11-01T11:54:23.943860+00:00",
+  "gate": "gate_pending",
+  "git_head": "050e2747a24cf995945f26598f05efa77ee7458a",
+  "native_inputs": {
+   "all_match_source_freeze": true,
+   "files": 264,
+   "freeze_only": [
+    "global.json",
+    "tests/mobile_ui_contract.test.cjs"
+   ],
+   "scope": "tracked and non-ignored untracked files under Assets/, Packages/, ProjectSettings/",
+   "sha256": "113ecdbe0e34e5f5f1bae47ef5f033c5a9bf66465ab5f3e8cdb3e2359c5a1351"
+  },
+  "purpose": "candidate native base for the existing Toss test-preview pipeline; not an AIT upload or release",
+  "source_builds": {
+   "raid": {
+    "dir": "Builds/GoalLightUI-2026-11-01/webgl-raid-ait-r3",
+    "receipt": "Builds/GoalLightUI-2026-11-01/build-raid-ait-r3.receipt.json",
+    "receipt_sha256": "d7075ee245ee7d49730c00bd04d9d33d2944b0947d8d353ec2a86a8bba46b6fe"
+   },
+   "solo": {
+    "dir": "Builds/GoalLightUI-2026-11-01/webgl-preview3d-ait-r3",
+    "receipt": "Builds/GoalLightUI-2026-11-01/build-preview3d-ait-r3.receipt.json",
+    "receipt_sha256": "9ac1f54cad659c20ae12490b948f42516a3403604f60cfa73d438ea15bb09acb"
+   }
+  },
+  "source_freeze": {
+   "entries": 266,
+   "path": "Builds/GoalLightUI-2026-11-01/SOURCE-FREEZE-combined-r3.sha256",
+   "sha256": "d6d0490940e7ad7bdf42c90afcb1b923f2c07a73817ff47dd6758f1081ea73f9",
+   "verified_matching": 266
+  },
+  "source_review": {
+   "path": "Builds/GoalLightUI-2026-11-01/review/INDEPENDENT-SOURCE-REVIEW-r3.md",
+   "scope": "PASS_R3_SOURCE_AND_MOCK_SCOPE; not Toss app, physical device, AIT upload or release",
+   "sha256": "d99bd5b4ba2f24feb3542c86ddd399f3c0ad2449bf6395298ec1d19d4e9285dd"
+  },
+  "state": "provisional",
+  "transform": {
+   "code_url_only_changed": true,
+   "per_mode_native_outputs_otherwise_byte_identical": true,
+   "shared_wasm": "shared/Build/617c1ecb412a365768405d12cd56ac96.wasm"
+  },
+  "unity_version": "6000.4.3f1"
  },
  "schema": 1,
  "tar": {
-  "bytes": 20767865,
-  "name": "few-moves-native-base-r3.tar.gz",
-  "sha256": "ab8e809849f0211f23275f02dc7acb04beb252350463539ae5ef2930ec8415dd"
+  "bytes": 20773253,
+  "name": "few-moves-native-base-r4.tar.gz",
+  "sha256": "0f4d412393e071cd385f273e69975fa2cc404d9cd2cb5493949a2cb95219e26e"
  }
 }

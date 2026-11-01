@@ -24,7 +24,9 @@ namespace Nectorial.SlideEscape.Unity
         private readonly List<GameObject> _dynamicTiles = new List<GameObject>();
         private readonly Sprite[] _sprites;
         private readonly Sprite _whiteSprite;
+        private readonly Sprite _goalFocusSprite;
         private readonly Material _atlasMaterial;
+        private readonly Material _goalFocus;
         private readonly Transform _root;
         private RoomDefinition _staticRoom;
         private RoomDefinition _actorRoom;
@@ -51,13 +53,26 @@ namespace Nectorial.SlideEscape.Unity
             _whiteSprite = Sprite.Create(Texture2D.whiteTexture, new Rect(0f, 0f, 1f, 1f),
                 new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
             _whiteSprite.name = "Board-White-Primitive";
+            // Use the full texture UV rectangle so the shared radial shader is centered in 2D as well.
+            Texture2D white = Texture2D.whiteTexture;
+            _goalFocusSprite = Sprite.Create(white, new Rect(0f, 0f, white.width, white.height),
+                new Vector2(0.5f, 0.5f), white.width, 0, SpriteMeshType.FullRect);
+            _goalFocusSprite.name = "Board-Goal-Focus";
             Shader atlasShader = Resources.Load<Shader>("Visuals/MatteSprite");
             if (atlasShader == null)
             {
                 throw new InvalidOperationException("Required matte sprite shader is missing.");
             }
 
+            Shader goalFocusShader = Resources.Load<Shader>("Visuals/GoalFocus");
+            if (goalFocusShader == null || goalFocusShader.name != "Nectorial/GoalFocus" || !goalFocusShader.isSupported)
+            {
+                throw new InvalidOperationException("Required goal focus shader is missing or unsupported.");
+            }
+
             _atlasMaterial = new Material(atlasShader) { name = "Board-Matte-Sprite-Material" };
+            _goalFocus = new Material(goalFocusShader) { name = "Board-Goal-Focus-Material" };
+            _goalFocus.SetColor("_Color", new Color32(102, 181, 212, 255));
             _root = new GameObject("Board").transform;
             Application.quitting += Dispose;
         }
@@ -114,6 +129,11 @@ namespace Nectorial.SlideEscape.Unity
             _movingActor = null;
         }
 
+        public void SetGoalFocus(float intensity)
+        {
+            if (!_disposed) _goalFocus.SetFloat("_Focus", Mathf.Clamp01(intensity));
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -125,7 +145,9 @@ namespace Nectorial.SlideEscape.Unity
             for (int index = 0; index < _sprites.Length; index++)
                 if (_sprites[index] != null) Object.Destroy(_sprites[index]);
             if (_whiteSprite != null) Object.Destroy(_whiteSprite);
+            if (_goalFocusSprite != null) Object.Destroy(_goalFocusSprite);
             if (_atlasMaterial != null) Object.Destroy(_atlasMaterial);
+            if (_goalFocus != null) Object.Destroy(_goalFocus);
         }
 
         private void DrawStaticRoom(RoomDefinition room)
@@ -160,6 +182,8 @@ namespace Nectorial.SlideEscape.Unity
 
         private void DrawGoal(GridPoint point)
         {
+            AddVisual(_staticTiles, "Goal Focus", _goalFocusSprite, Color.white, point,
+                new Vector2(1f, 1f), Vector2.zero, 2, _goalFocus);
             AddAtlas(_staticTiles, "Goal", 2, Goal, point, 0.48f, 4);
         }
 

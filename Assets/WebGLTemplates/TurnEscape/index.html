@@ -19,31 +19,33 @@
     .utility-bar { width:min(100%,560px); justify-self:center; min-width:0; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:3px; }
     .top-actions { display:flex; align-items:center; flex:none; gap:6px; }
     .moves { flex:none; min-height:36px; display:inline-flex; align-items:center; padding:0 11px; border:2px solid var(--ink); border-radius:9px; background:var(--pad); color:var(--paper); font-size:16px; font-weight:850; font-variant-numeric:tabular-nums; white-space:nowrap; }
-    .quick-retry,.icon-button { min-height:48px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); }
-    .quick-retry:enabled:active,.icon-button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
-    .quick-retry { flex:none; min-width:78px; padding:0 10px; font-size:15px; font-weight:800; }
+    .quick-retry,.icon-button { position:relative; min-height:48px; border:0; background:transparent; isolation:isolate; }
+    .quick-retry::before,.icon-button::before { content:""; position:absolute; z-index:-1; left:50%; top:50%; height:36px; border:1px solid var(--line); border-radius:10px; background:var(--surface); box-shadow:0 2px 0 var(--line); transform:translate(-50%,-50%); }
+    .quick-retry::before { width:66px; } .icon-button::before { width:36px; }
+    .quick-retry:enabled:active::before,.icon-button:enabled:active::before { transform:translate(-50%,calc(-50% + 2px)); box-shadow:none; }
+    .quick-retry { flex:none; min-width:68px; padding:0 6px; font-size:14px; font-weight:800; white-space:nowrap; }
     .icon-button { min-width:48px; display:grid; place-items:center; padding:0; font-size:21px; }
     .icon-button svg { width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; }
-    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:32px minmax(0,1fr) 234px; gap:4px; }
-    .goal-hint { grid-row:1; display:flex; align-items:center; justify-content:center; gap:9px; min-width:0; margin:0; color:var(--ink); font-size:clamp(18px,5.4vw,21px); line-height:1.25; font-weight:800; text-align:center; white-space:nowrap; }
-    .goal-mark { width:14px; height:14px; flex:none; border-radius:50%; background:#669bd3; box-shadow:0 0 0 3px color-mix(in srgb,#669bd3 28%,transparent); }
-    .goal-piece { color:var(--blue); font-weight:850; }
-    .board-stage { grid-row:2; position:relative; min-width:0; min-height:0; width:100%; overflow:hidden; display:grid; place-items:center; }
+    .play-layout { min-width:0; min-height:0; width:100%; display:grid; grid-template-rows:auto auto; align-content:center; gap:24px; }
+    .board-stage { grid-row:1; position:relative; min-width:0; min-height:0; width:100%; overflow:hidden; display:grid; place-items:center; }
     .game { min-width:0; min-height:0; width:100%; height:100%; display:grid; place-items:center; }
+    .play-layout.solo-3d-crop .game { align-self:start; }
     canvas { display:block; width:100%; height:auto; max-width:100%; max-height:100%; aspect-ratio:1; border:0; border-radius:0; background:var(--stage); image-rendering:pixelated; }
     .feedback { position:absolute; z-index:2; left:50%; bottom:4px; width:min(calc(100% - 20px),360px); margin:0; padding:7px 9px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--ink); font-size:14px; line-height:1.3; text-align:center; transform:translateX(-50%); }
-    .control-slot { grid-row:3; min-height:0; display:grid; place-items:center; }
-    .play-controls { width:100%; height:234px; display:grid; grid-template-rows:48px 168px; justify-items:center; gap:18px; }
+    .control-slot { grid-row:2; min-height:min-content; display:grid; place-items:center; }
+    .play-controls { width:100%; height:168px; display:grid; grid-template-rows:168px; justify-items:center; gap:0; }
+    .play-layout.has-pieces .play-controls { height:234px; grid-template-rows:48px 168px; gap:18px; }
     .play-controls[hidden] { display:grid!important; visibility:hidden; pointer-events:none; }
     .piece-row { grid-row:1; width:100%; min-height:48px; display:flex; align-items:center; justify-content:center; }
-    .piece-row[hidden] { display:flex!important; visibility:hidden; pointer-events:none; }
+    .piece-row[hidden] { display:none!important; }
     .piece-chips { display:flex; align-items:center; justify-content:center; gap:6px; }
     .piece-chip { min-width:48px; min-height:48px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:9px; background:var(--surface); }
     .piece-chip[aria-pressed="true"] { border-color:var(--focus); box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--focus) 38%,transparent); }
     .piece-mark { width:22px; height:22px; display:block; border:2px solid color-mix(in srgb,var(--blue) 65%,var(--ink)); border-radius:50%; background:var(--blue); }
     .piece-chip[data-piece-index="1"] .piece-mark { border-color:color-mix(in srgb,var(--amber) 65%,var(--ink)); border-radius:2px; background:var(--amber); transform:rotate(45deg); }
     .piece-chip[data-piece-index="2"] .piece-mark { border-color:color-mix(in srgb,var(--teal) 65%,var(--ink)); border-radius:2px; background:var(--teal); }
-    .direction-console { grid-row:2; position:relative; width:180px; height:168px; margin:0 auto; }
+    .direction-console { grid-row:1; position:relative; width:180px; height:168px; margin:0 auto; }
+    .play-layout.has-pieces .direction-console { grid-row:2; }
     .dpad-base { position:absolute; inset:0; z-index:0; pointer-events:none; filter:drop-shadow(0 4px 0 var(--pad-edge)); }
     .dpad-base::before,.dpad-base::after { position:absolute; content:""; border-radius:14px; background:var(--pad); }
     .dpad-base::before { left:62px; top:0; width:56px; height:164px; } .dpad-base::after { left:0; top:56px; width:180px; height:52px; }
@@ -88,7 +90,13 @@
     .result-actions button { min-height:48px; padding:0 9px; border:2px solid var(--ink); border-radius:12px; background:var(--surface); box-shadow:0 3px 0 var(--pad-edge); font-size:14px; }
     .result-actions button:enabled:active { transform:translateY(2px); box-shadow:0 1px 0 var(--pad-edge); }
     .result-actions .result-next { border-color:var(--ink); background:var(--ink); color:#fff; }
-    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:32px minmax(0,1fr); gap:4px; } .goal-hint { grid-column:1; grid-row:1; } .board-stage { grid-column:1; grid-row:2; } .control-slot { grid-column:2; grid-row:1 / span 2; } }
+    @media (orientation:landscape) and (max-height:520px) { .play-layout { grid-template-columns:minmax(0,1fr) 190px; grid-template-rows:minmax(0,1fr); align-content:stretch; align-items:center; gap:24px; } .board-stage { grid-column:1; grid-row:1; } .control-slot { grid-column:2; grid-row:1; } }
+    /* Short landscape keeps the pad inside the OS home-area boundary; 56px targets become 44px after scaling. */
+    @media (orientation:landscape) and (max-height:360px) {
+      .play-controls { height:132px; grid-template-rows:132px; }
+      .play-layout.has-pieces .play-controls { height:188px; grid-template-rows:48px 132px; gap:8px; }
+      .direction-console { transform:scale(calc(11 / 14)); transform-origin:top center; }
+    }
     @media (max-height:520px) and (orientation:portrait) { html,body { overflow-y:auto; } main#app { min-height:520px; height:auto; } }
     @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
   </style>
@@ -97,10 +105,9 @@
   <main id="app">
     <header class="utility-bar">
       <span id="turn-runline" class="moves">0번 이동</span>
-      <div class="top-actions"><button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button><button id="help-toggle" class="icon-button" type="button" aria-label="놀이 방법">?</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
+      <div class="top-actions"><button id="restart-top" class="quick-retry" type="button" data-game-action="Restart" disabled>↻ 다시</button><button id="menu-toggle" class="icon-button" type="button" disabled aria-label="게임 메뉴">☰</button></div>
     </header>
     <section class="play-layout" aria-label="Few Moves">
-      <p class="goal-hint"><span class="goal-mark" aria-hidden="true"></span><span><strong class="goal-piece">파란 말</strong>을 목표 칸에 넣어요</span></p>
       <section class="board-stage" aria-label="게임 보드">
         <section class="game">
           <canvas id="unity-canvas" tabindex="0" aria-label="Few Moves 보드"></canvas>
@@ -151,7 +158,8 @@
         <div class="menu-actions">
           <button id="menu-continue" class="primary" type="button">계속하기</button>
           <button id="menu-save" type="button">저장하기</button>
-          <a href="../index.html">다른 모드</a>
+          <button id="help-toggle" type="button">놀이 방법</button>
+          <a id="menu-modes" href="../index.html">다른 모드</a>
           <button id="menu-start-over" type="button">처음부터 하기</button>
         </div>
       </section>
@@ -190,6 +198,10 @@
   <script>
     var canvas = document.querySelector("#unity-canvas");
     var boardStage = document.querySelector(".board-stage");
+    var playLayout = document.querySelector(".play-layout");
+    var controlSlot = document.querySelector(".control-slot");
+    var canvasGame = document.querySelector(".game");
+    var solo3DCanvasCrop = false;
     var unityInstance = null;
     var gameActionButtons = Array.from(document.querySelectorAll("button[data-game-action]"));
     var pieceButtons = Array.from(document.querySelectorAll("button[data-piece-index]"));
@@ -203,6 +215,7 @@
     var menuConfirmation = document.querySelector("#menu-confirmation");
     var menuContinueButton = document.querySelector("#menu-continue");
     var menuSaveButton = document.querySelector("#menu-save");
+    var menuModesLink = document.querySelector("#menu-modes");
     var menuStartOverButton = document.querySelector("#menu-start-over");
     var menuStartOverConfirmButton = document.querySelector("#menu-start-over-confirm");
     var menuStartOverCancelButton = document.querySelector("#menu-start-over-cancel");
@@ -235,17 +248,35 @@
     var copyOperationId = 0;
     var menuConfirming = false;
     var menuReturnsToResult = false;
+    var helpReturnsToMenu = false;
 
     function sizeCanvasToStage() {
-      if (!boardStage || !canvas || typeof boardStage.getBoundingClientRect !== "function") return;
-      var bounds = boardStage.getBoundingClientRect();
-      var side = Math.floor(Math.min(bounds.width, bounds.height, 560));
+      if (!playLayout || !boardStage || !playControls || !canvas || typeof playLayout.getBoundingClientRect !== "function" || typeof playControls.getBoundingClientRect !== "function") return;
+      var bounds = playLayout.getBoundingClientRect();
+      // The grid slot can compress before a resize; use the actual fixed-height controls, not that track.
+      var controls = playControls.getBoundingClientRect();
+      var landscape = !!(window.matchMedia && window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches);
+      var width = landscape ? bounds.width - 190 - 24 : bounds.width;
+      var height = landscape ? bounds.height : bounds.height - controls.height - 24;
+      var side = Math.floor(Math.min(width, height, 560));
       if (!Number.isFinite(side) || side < 1) return;
+      // Only the fixed-camera 8×8 solo 3D product crops its known empty lower 8%.
+      // Keep the square canvas and its .game parent at the original render size: max-height must not rescale it.
+      var lowerBlankCrop = solo3DCanvasCrop ? Math.floor(side * 0.08) : 0;
+      boardStage.style.height = (side - lowerBlankCrop) + "px";
+      if (canvasGame) canvasGame.style.height = solo3DCanvasCrop ? side + "px" : "100%";
       canvas.style.width = side + "px";
       canvas.style.height = side + "px";
     }
-    if (boardStage && typeof ResizeObserver === "function") {
-      new ResizeObserver(sizeCanvasToStage).observe(boardStage);
+    function configureCanvasPresentation(productName) {
+      solo3DCanvasCrop = productName === "Few Moves 3D Preview";
+      playLayout.classList.toggle("solo-3d-crop", solo3DCanvasCrop);
+      sizeCanvasToStage();
+    }
+    if (playLayout && playControls && typeof ResizeObserver === "function") {
+      var playResizeObserver = new ResizeObserver(sizeCanvasToStage);
+      playResizeObserver.observe(playLayout);
+      playResizeObserver.observe(playControls);
     }
     if (window.addEventListener) window.addEventListener("resize", sizeCanvasToStage);
     sizeCanvasToStage();
@@ -408,7 +439,12 @@
       openLocalDialog(menuDialog);
       renderMenu(currentState);
     }
+    function isMenuInteractive() {
+      // showModal may be unavailable; never rely on native inertness for guarded menu actions.
+      return menuDialog.open && !helpDialog.open && !shareDialog.open;
+    }
     function closeMenu() {
+      if (!isMenuInteractive() || menuConfirming) return;
       setMenuConfirmation(false);
       closeLocalDialog(menuDialog);
     }
@@ -524,8 +560,9 @@
       });
     }
     function renderPieceButtons(state) {
-      // A selector with a single piece has nothing to choose; its slot stays reserved so the pad does not move.
+      // Single-piece rooms use just the pad; multi-piece rooms keep the selector and its 18px separation.
       pieceRow.hidden = !(!!state && state.initialized === true && state.pieceCount > 1);
+      playLayout.classList.toggle("has-pieces", !pieceRow.hidden);
       pieceButtons.forEach(function (button) {
         var index = Number(button.dataset.pieceIndex);
         var visible = !!state && state.initialized && index >= 0 && index < state.pieceCount;
@@ -566,6 +603,7 @@
       setFeedback(usefulStateFeedback(state));
       renderGameButtons();
       renderPieceButtons(state);
+      sizeCanvasToStage();
       renderMenu(state);
       if (!canShareState(state) && shareDialog.open) closeSharePanel();
       if (shareDialog.open) renderSharePanel();
@@ -590,6 +628,7 @@
       resultShareButton.disabled = true;
       renderGameButtons();
       renderPieceButtons(null);
+      sizeCanvasToStage();
       setFeedback(message);
     }
     function receiveState(json) {
@@ -675,21 +714,42 @@
       openMenu(false);
     });
     helpButton.addEventListener("click", function () {
-      if (isOverlayOpen()) return;
+      if (!isMenuInteractive() || menuConfirming) return;
+      helpReturnsToMenu = true;
+      // Native dialogs already stack for result sharing; keep the menu and its return state underneath help.
       openLocalDialog(helpDialog);
     });
-    helpCloseButton.addEventListener("click", function () { closeLocalDialog(helpDialog); });
-    menuSaveButton.addEventListener("click", function () { sendGameAction("Save"); });
+    function closeHelp() {
+      var returnsToMenu = helpReturnsToMenu;
+      helpReturnsToMenu = false;
+      closeLocalDialog(helpDialog);
+      if (returnsToMenu) {
+        openLocalDialog(menuDialog);
+        renderMenu(currentState);
+      }
+    }
+    helpCloseButton.addEventListener("click", closeHelp);
+    menuSaveButton.addEventListener("click", function () {
+      if (!isMenuInteractive() || menuConfirming) return;
+      sendGameAction("Save");
+    });
+    menuModesLink.addEventListener("click", function (event) {
+      // Native Enter activation also produces click; guard navigation when fallback dialogs are nonmodal.
+      if (!isMenuInteractive() || menuConfirming) event.preventDefault();
+    });
     menuStartOverButton.addEventListener("click", function () {
-      if (!isActionAllowed("StartOver")) return;
+      if (!isMenuInteractive() || menuConfirming || !isActionAllowed("StartOver")) return;
       setMenuConfirmation(true);
     });
     menuStartOverConfirmButton.addEventListener("click", function () {
-      if (!menuConfirming || !isActionAllowed("StartOver")) return;
+      if (!isMenuInteractive() || !menuConfirming || !isActionAllowed("StartOver")) return;
       setMenuConfirmation(false);
       sendGameAction("StartOver");
     });
-    menuStartOverCancelButton.addEventListener("click", function () { setMenuConfirmation(false); });
+    menuStartOverCancelButton.addEventListener("click", function () {
+      if (!isMenuInteractive() || !menuConfirming) return;
+      setMenuConfirmation(false);
+    });
     menuContinueButton.addEventListener("click", closeMenu);
     resultMenuButton.addEventListener("click", openMenuFromResult);
     resultShareButton.addEventListener("click", openSharePanel);
@@ -697,9 +757,10 @@
     shareNativeButton.addEventListener("click", function () { requestNativeShare(); });
     shareCloseButton.addEventListener("click", closeSharePanel);
     resultDialog.addEventListener("cancel", function (event) { event.preventDefault(); });
-    helpDialog.addEventListener("cancel", function (event) { event.preventDefault(); closeLocalDialog(helpDialog); });
+    helpDialog.addEventListener("cancel", function (event) { event.preventDefault(); closeHelp(); });
     menuDialog.addEventListener("cancel", function (event) {
       event.preventDefault();
+      if (!isMenuInteractive()) return;
       if (menuConfirming) {
         setMenuConfirmation(false);
         return;
@@ -736,6 +797,7 @@
       productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
       productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}}
     };
+    configureCanvasPresentation(config.productName);
     var script = document.createElement("script");
     script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
     script.onload = function () {
@@ -757,6 +819,14 @@
       var reduced = false;
       try { reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch (error) {}
       unityInstance.SendMessage("GameBootstrap", "SetReducedMotion", reduced ? "true" : "false");
+    }
+    if (window.matchMedia) {
+      var reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      if (reducedMotionQuery && typeof reducedMotionQuery.addEventListener === "function") {
+        reducedMotionQuery.addEventListener("change", reportReducedMotionPreference);
+      } else if (reducedMotionQuery && typeof reducedMotionQuery.addListener === "function") {
+        reducedMotionQuery.addListener(reportReducedMotionPreference);
+      }
     }
   </script>
 </body>

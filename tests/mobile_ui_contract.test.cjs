@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
+const { readFileSync, readdirSync } = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
@@ -57,12 +57,16 @@ function element(options = {}) {
   };
 }
 
-function createHarness() {
+function createHarness(options = {}) {
   const actionButtons = ["Up", "Down", "Left", "Right", "Restart", "Restart", "Next"].map((action) =>
     element({ dataset: { gameAction: action }, tag: "button" }));
   const pieceButtons = [0, 1, 2].map((index) => element({ dataset: { pieceIndex: String(index) }, tag: "button" }));
   const elements = {
     "#unity-canvas": element(),
+    ".board-stage": element(),
+    ".play-layout": element(),
+    ".control-slot": element(),
+    ".game": element(),
     "#menu-toggle": element({ tag: "button" }),
     "#help-toggle": element({ tag: "button" }),
     "#help-dialog": element({ tag: "dialog" }),
@@ -72,6 +76,7 @@ function createHarness() {
     "#menu-confirmation": element(),
     "#menu-continue": element({ tag: "button" }),
     "#menu-save": element({ tag: "button" }),
+    "#menu-modes": element({ tag: "a" }),
     "#menu-start-over": element({ tag: "button" }),
     "#menu-start-over-confirm": element({ tag: "button" }),
     "#menu-start-over-cancel": element({ tag: "button" }),
@@ -98,6 +103,17 @@ function createHarness() {
     "#piece-row": element(),
     "#turn-runline": element()
   };
+  if (options.modalFallback) {
+    ["#menu-dialog", "#help-dialog", "#result-dialog", "#share-dialog"].forEach((selector) => {
+      if (options.modalFallback === "missing") delete elements[selector].showModal;
+      else elements[selector].showModal = () => { throw new Error("native modal unavailable"); };
+    });
+  }
+  const layoutBounds = { width: 390, height: 740 };
+  const viewport = { landscape: false, shortLandscape: false };
+  elements[".play-layout"].getBoundingClientRect = () => layoutBounds;
+  elements[".control-slot"].getBoundingClientRect = () => ({ height: viewport.shortLandscape ? (elements[".play-layout"].classList.contains("has-pieces") ? 188 : 132) : (elements[".play-layout"].classList.contains("has-pieces") ? 234 : 168) });
+  elements["#play-controls"].getBoundingClientRect = () => ({ height: viewport.shortLandscape ? (elements[".play-layout"].classList.contains("has-pieces") ? 188 : 132) : (elements[".play-layout"].classList.contains("has-pieces") ? 234 : 168) });
   const documentHandlers = {};
   const navigator = {};
   const sandbox = {
@@ -113,12 +129,12 @@ function createHarness() {
       },
       addEventListener(type, handler) { documentHandlers[type] = handler; }
     },
-    window: { dispatchEvent() {} }
+    window: { dispatchEvent() {}, matchMedia(query) { return { matches: query.includes("orientation") && viewport.landscape }; } }
   };
   vm.runInNewContext(runtime, sandbox, { filename: "mobile-ui-runtime.js" });
   const sent = [];
   sandbox.unityInstance = { SendMessage: (receiver, method, action) => sent.push({ receiver, method, action }) };
-  return { actionButtons, pieceButtons, documentHandlers, elements, navigator, sandbox, sent };
+  return { actionButtons, pieceButtons, documentHandlers, elements, navigator, sandbox, sent, layoutBounds, viewport };
 }
 
 function state(extra = {}) {
@@ -234,9 +250,11 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.doesNotMatch(board.match(/public void AdvanceTransition[\s\S]*?public void CompleteTransition/)[0], /new GameObject/);
   assert.doesNotMatch(board.match(/public void Render[\s\S]*?public bool BeginTransition/)[0], /ClearDynamicTiles/);
   assert.match(template, /--paper:#eee7d8; --surface:#faf5e9; --ink:#293238/);
-  assert.match(template, /grid-template-rows:32px minmax\(0,1fr\) 234px/);
-  assert.match(template, /\.play-controls \{[^}]*height:234px;[^}]*grid-template-rows:48px 168px;[^}]*gap:18px;/, "selector row and pad are clearly separated");
-  assert.match(template, /\.direction-console \{ grid-row:2; position:relative; width:180px; height:168px/);
+  assert.match(template, /\.play-layout \{[^}]*grid-template-rows:auto auto;[^}]*align-content:center; gap:24px;/, "the board canvas and controls form one centered group with a 24px gap");
+  assert.match(template, /\.play-controls \{[^}]*height:168px;[^}]*grid-template-rows:168px;/, "single-piece play reserves only the existing pad");
+  assert.match(template, /\.play-layout\.has-pieces \.play-controls \{[^}]*height:234px;[^}]*grid-template-rows:48px 168px;[^}]*gap:18px;/, "multiple pieces retain selector height and 18px separation");
+  assert.match(template, /\.direction-console \{ grid-row:1; position:relative; width:180px; height:168px/);
+  assert.match(template, /\.play-layout\.has-pieces \.direction-console \{ grid-row:2; \}/);
   assert.match(template, /\.direction-button \{ position:absolute; z-index:2; width:56px; height:56px/);
   assert.match(template, /\.dpad-base::before \{ left:62px; top:0; width:56px; height:164px; \} \.dpad-base::after \{ left:0; top:56px; width:180px; height:52px; \}/);
   assert.match(template, /\.dpad-base \{[^}]*drop-shadow\(0 4px 0 /, "4px pad shadow ends exactly at the 168px console edge");
@@ -247,10 +265,14 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(template, /\.piece-mark \{[^}]*border-radius:50%/);
   assert.match(template, /data-piece-index="1"\] \.piece-mark \{[^}]*rotate\(45deg\)/);
   assert.match(template, /data-piece-index="2"\] \.piece-mark \{[^}]*background:var\(--teal\)/);
-  assert.match(template, /class="goal-hint"><span class="goal-mark" aria-hidden="true"><\/span><span><strong class="goal-piece">파란 말<\/strong>을 목표 칸에 넣어요<\/span>/);
-  assert.match(template, /\.goal-hint \{[^}]*font-size:clamp\(18px,/, "quest line stays at least 18px");
+  assert.doesNotMatch(template, /goal-hint|goal-mark|goal-piece|파란 말<\/strong>을 목표 칸에 넣어요/, "the approved layout has no objective text or reserved objective row");
+  assert.match(template, /\.quick-retry,\.icon-button \{[^}]*min-height:48px;/, "compact faces retain full 48px targets");
+  assert.match(template, /\.quick-retry::before,\.icon-button::before \{[^}]*height:36px;/, "top controls have 36px visible faces");
+  const header = template.match(/<header class="utility-bar">[\s\S]*?<\/header>/)[0];
+  assert.doesNotMatch(header, /help-toggle/, "help is removed from the HUD");
+  assert.match(template, /<section id="menu-main"[\s\S]*?<button id="help-toggle" type="button">놀이 방법<\/button>/, "help is reachable inside the menu");
   assert.match(template, /현재 진행을 지우고 첫 번째 판부터 다시 시작해요/);
-  assert.match(template, /Math\.floor\(Math\.min\(bounds\.width, bounds\.height, 560\)\)/);
+  assert.match(template, /Math\.floor\(Math\.min\(width, height, 560\)\)/);
   assert.match(template, /id="turn-runline" class="moves">0번 이동/);
   assert.match(template, /class="top-actions"><button id="restart-top" class="quick-retry"[^>]*data-game-action="Restart"/);
   assert.match(template, /\.utility-bar \{ width:min\(100%,560px\); justify-self:center;/, "HUD stays on the board axis on wide screens");
@@ -263,14 +285,14 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(template, /--stage:#f0ece2/, "page paper matches the Unity camera background");
   assert.match(template, /html,body \{[^}]*background:var\(--stage\)/);
   assert.match(template, /id="piece-row" class="piece-row" hidden/, "selector row starts hidden until a multi-piece state arrives");
-  assert.match(template, /\.piece-row\[hidden\] \{ display:flex!important; visibility:hidden; pointer-events:none; \}/, "hidden selector keeps its slot so the pad does not move");
+  assert.match(template, /\.piece-row\[hidden\] \{ display:none!important; \}/, "single-piece play removes the 66px hidden selector reservation");
   assert.match(template, /data-piece-index="0"/);
   assert.match(template, /id="menu-save"[^>]*>저장하기/);
   assert.match(template, /id="menu-start-over"[^>]*>처음부터 하기/);
   assert.match(template, /id="result-menu"[^>]*>메뉴/);
   assert.match(template, /result-par/);
   assert.doesNotMatch(template, /width:340px|width:96px/);
-  assert.match(template, /<a href="\.\.\/index\.html">다른 모드<\/a>/);
+  assert.match(template, /<a id="menu-modes" href="\.\.\/index\.html">다른 모드<\/a>/);
   assert.match(template, /#result-dialog/);
   assert.doesNotMatch(template, /#share-entry/);
   assert.match(runtime, /typeof state\.transitioning !== "boolean"/);
@@ -284,14 +306,127 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.match(runtime, /event\.repeat/);
   assert.doesNotMatch(runtime, /focusCanvas/);
 
+  for (const modalFallback of ["missing", "throws"]) {
+    const fallback = createHarness({ modalFallback });
+    fallback.sandbox.window.__nectorial.receiveState(JSON.stringify(state()));
+    fallback.elements["#menu-toggle"].dispatch("click");
+    fallback.elements["#help-toggle"].dispatch("click");
+    assert.equal(fallback.elements["#help-dialog"].open, true, `${modalFallback}: help opens in nonmodal fallback`);
+    function modesNavigationPrevented() {
+      let prevented = false;
+      fallback.elements["#menu-modes"].dispatch("click", { preventDefault() { prevented = true; } });
+      return prevented;
+    }
+    assert.equal(modesNavigationPrevented(), true, `${modalFallback}: help blocks underlying mode-link pointer navigation`);
+    assert.equal(keyboard(fallback, "Enter", "Enter", fallback.elements["#menu-modes"]), false, "native link activation is checked through its following click");
+    assert.equal(modesNavigationPrevented(), true, `${modalFallback}: help blocks the Enter-generated native link click`);
+    const beforeCoveredMenu = fallback.sent.length;
+    ["#menu-save", "#menu-start-over", "#menu-start-over-confirm", "#menu-start-over-cancel", "#menu-continue"].forEach((selector) => fallback.elements[selector].dispatch("click"));
+    fallback.elements["#menu-dialog"].dispatch("cancel", { preventDefault() {} });
+    assert.equal(fallback.sent.length, beforeCoveredMenu, `${modalFallback}: covered menu cannot save or reset through fallback`);
+    assert.equal(fallback.sandbox.menuConfirming, false, `${modalFallback}: covered menu cannot enter reset confirmation`);
+    assert.equal(fallback.elements["#menu-dialog"].open, true, `${modalFallback}: covered continue/Escape cannot close the underlying menu`);
+    fallback.elements["#help-close"].dispatch("click");
+    assert.equal(modesNavigationPrevented(), false, `${modalFallback}: ordinary menu mode navigation stays available`);
+    fallback.elements["#menu-save"].dispatch("click");
+    assert.equal(fallback.sent.at(-1).action, "Save", `${modalFallback}: closing help restores ordinary save access`);
+    fallback.elements["#menu-start-over"].dispatch("click");
+    const beforeConfirmation = fallback.sent.length;
+    assert.equal(modesNavigationPrevented(), true, `${modalFallback}: reset confirmation also blocks the hidden main-menu mode link`);
+    fallback.elements["#menu-save"].dispatch("click");
+    fallback.elements["#menu-continue"].dispatch("click");
+    fallback.elements["#help-toggle"].dispatch("click");
+    assert.equal(fallback.sent.length, beforeConfirmation, `${modalFallback}: reset confirmation blocks main-menu save`);
+    assert.equal(fallback.sandbox.menuConfirming, true, `${modalFallback}: main-menu continue cannot bypass reset confirmation`);
+    assert.equal(fallback.elements["#help-dialog"].open, false, `${modalFallback}: help cannot open through the hidden confirmation panel`);
+    fallback.elements["#help-dialog"].open = true;
+    fallback.elements["#menu-start-over-confirm"].dispatch("click");
+    assert.equal(fallback.sent.length, beforeConfirmation, `${modalFallback}: even a stale visible confirm stays blocked beneath help`);
+    fallback.elements["#help-dialog"].open = false;
+    fallback.elements["#menu-start-over-confirm"].dispatch("click");
+    assert.equal(fallback.sent.at(-1).action, "StartOver", `${modalFallback}: explicit confirmation works after the covering layer closes`);
+    assert.equal(fallback.sent.length, beforeConfirmation + 1);
+  }
+
+  const slideRoomsPath = path.join(repoRoot, "Assets/Nectorial/Resources/SlideRooms");
+  const slideRooms = readdirSync(slideRoomsPath).filter((name) => name.endsWith(".json"));
+  assert.ok(slideRooms.length > 0);
+  slideRooms.forEach((name) => {
+    const room = JSON.parse(readFileSync(path.join(slideRoomsPath, name), "utf8"));
+    assert.equal(room.Width, 8, `${name}: the fixed-camera 3D lower-blank crop assumes 8×8 rooms`);
+    assert.equal(room.Height, 8, `${name}: the fixed-camera 3D lower-blank crop assumes 8×8 rooms`);
+  });
+  const crop = createHarness();
+  crop.layoutBounds.width = 377;
+  crop.layoutBounds.height = 795;
+  crop.sandbox.configureCanvasPresentation("Few Moves 3D Preview");
+  assert.equal(crop.elements["#unity-canvas"].style.width, "377px");
+  assert.equal(crop.elements["#unity-canvas"].style.height, "377px", "crop keeps the square canvas display/render extent unchanged");
+  assert.equal(crop.elements[".game"].style.height, "377px", "the canvas parent cannot impose a shorter max-height");
+  assert.equal(crop.elements[".board-stage"].style.height, "347px", "only the known 30px lower blank is clipped at a 377px canvas");
+  crop.sandbox.window.__nectorial.receiveState(JSON.stringify(state()));
+  assert.equal(crop.elements[".board-stage"].style.height, "347px", "multi-piece rooms preserve the same crop and their own selector spacing");
+  crop.layoutBounds.width = 304;
+  crop.layoutBounds.height = 511;
+  crop.elements[".control-slot"].getBoundingClientRect = () => ({ height: 183 });
+  crop.sandbox.sizeCanvasToStage();
+  assert.equal(crop.elements["#unity-canvas"].style.height, "253px", "320×568 multi-piece regression: subtract the actual 234px controls, never the compressed 183px grid slot");
+  assert.equal(crop.elements[".board-stage"].style.height, "233px");
+  assert.ok(233 + 24 + 234 <= crop.layoutBounds.height, "cropped stage + gap + full pad/selector must fit the real play area");
+  assert.match(template, /\.control-slot \{[^}]*min-height:min-content;/, "the controls grid slot cannot shrink beneath its content");
+  crop.layoutBounds.width = 377;
+  crop.layoutBounds.height = 795;
+  crop.sandbox.configureCanvasPresentation("Few Moves");
+  assert.equal(crop.elements[".board-stage"].style.height, "377px", "the 2D product keeps the whole canvas");
+  assert.equal(crop.elements[".game"].style.height, "100%");
+  assert.equal(crop.elements[".play-layout"].classList.contains("solo-3d-crop"), false);
+  assert.match(template, /configureCanvasPresentation\(config\.productName\)/, "product selection uses the actual build's product name");
+  assert.match(template, /\.play-layout\.solo-3d-crop \.game \{ align-self:start; \}/, "crop removes only the bottom, never the top of the board");
+
+  const compact = createHarness();
+  compact.viewport.landscape = true;
+  compact.viewport.shortLandscape = true;
+  compact.layoutBounds.width = 552;
+  compact.layoutBounds.height = 188; // 320 - SDK top47 - bottom34 - HUD48 - gap3.
+  compact.sandbox.window.__nectorial.receiveState(JSON.stringify(state({ pieceCount: 2 })));
+  assert.equal(compact.elements["#play-controls"].getBoundingClientRect().height, 188);
+  assert.equal(compact.elements["#unity-canvas"].style.height, "188px", "short Toss landscape fits both board and multi-piece controls inside the safe area");
+  assert.equal(56 * 11 / 14, 44, "compact direction targets retain 44px after visual scaling");
+  compact.sandbox.window.__nectorial.receiveState(JSON.stringify(state({ pieceCount: 1 })));
+  assert.equal(compact.elements["#play-controls"].getBoundingClientRect().height, 132, "a single piece has no selector reservation even in compact landscape");
+  compact.viewport.landscape = false;
+  compact.viewport.shortLandscape = false;
+  compact.layoutBounds.width = 304;
+  compact.layoutBounds.height = 400;
+  compact.sandbox.window.__nectorial.receiveState(JSON.stringify(state({ pieceCount: 2 })));
+  assert.equal(compact.elements["#play-controls"].getBoundingClientRect().height, 234, "portrait retains the approved full-size controls");
+  assert.match(template, /@media \(orientation:landscape\) and \(max-height:360px\) \{[\s\S]*?\.play-controls \{ height:132px; grid-template-rows:132px; \}[\s\S]*?height:188px; grid-template-rows:48px 132px; gap:8px;[\s\S]*?transform:scale\(calc\(11 \/ 14\)\); transform-origin:top center;/, "compact geometry is restricted to short landscape");
+
+  const motionHarness = createHarness();
+  const motionQuery = { matches: false, addEventListener(type, handler) { assert.equal(type, "change"); this.onChange = handler; } };
+  motionHarness.sandbox.window.matchMedia = () => motionQuery;
+  const motionRuntime = template.slice(template.indexOf("    function reportReducedMotionPreference()"), template.lastIndexOf("  </script>"));
+  vm.runInNewContext(motionRuntime, motionHarness.sandbox);
+  motionHarness.sandbox.reportReducedMotionPreference();
+  assert.equal(motionHarness.sent.at(-1).action, "false");
+  motionQuery.matches = true;
+  motionQuery.onChange();
+  assert.equal(motionHarness.sent.at(-1).method, "SetReducedMotion");
+  assert.equal(motionHarness.sent.at(-1).action, "true", "OS reduced-motion changes reach Unity after startup");
+  delete motionHarness.sandbox.window.matchMedia;
+  vm.runInNewContext(motionRuntime, motionHarness.sandbox);
+  assert.doesNotThrow(() => motionHarness.sandbox.reportReducedMotionPreference(), "missing matchMedia keeps the existing guarded fallback");
+
   const h = createHarness();
   const receive = (next) => h.sandbox.window.__nectorial.receiveState(JSON.stringify(next));
   const body = { closest() { return null; } };
   receive(state());
   assert.equal(h.pieceButtons[0].attributes["aria-pressed"], "true", "target piece starts selected at zero cost");
   assert.equal(h.elements["#turn-runline"].textContent, "0번 이동");
+  h.elements["#menu-toggle"].dispatch("click");
   h.elements["#help-toggle"].dispatch("click");
-  assert.equal(h.elements["#help-dialog"].open, true, "help is reachable without leaving the board");
+  assert.equal(h.elements["#menu-dialog"].open, true, "the menu stays underneath help with its return state intact");
+  assert.equal(h.elements["#help-dialog"].open, true, "help is reachable from the menu");
   const beforeHelpInput = h.sent.length;
   h.actionButtons.find((button) => button.dataset.gameAction === "Up").dispatch("click");
   h.pieceButtons[1].dispatch("click");
@@ -299,6 +434,13 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.sent.length, beforeHelpInput, "help blocks touch and keyboard game actions");
   h.elements["#help-close"].dispatch("click");
   assert.equal(h.elements["#help-dialog"].open, false);
+  assert.equal(h.elements["#menu-dialog"].open, true, "closing help returns to the menu");
+  h.elements["#help-toggle"].dispatch("click");
+  let helpCancelPrevented = false;
+  h.elements["#help-dialog"].dispatch("cancel", { preventDefault() { helpCancelPrevented = true; } });
+  assert.equal(helpCancelPrevented, true);
+  assert.equal(h.elements["#menu-dialog"].open, true, "Escape from help also restores the menu");
+  h.elements["#menu-continue"].dispatch("click");
 
   h.elements["#menu-toggle"].dispatch("click");
   assert.equal(h.elements["#menu-dialog"].open, true, "the persistent-menu action is available from regular play");
@@ -425,6 +567,12 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.elements["#piece-row"].hidden, false, "multi-piece rooms show the piece selector");
   receive(state({ pieceCount: 1, selectedPieceIndex: 0, fingerprint: "single-piece" }));
   assert.equal(h.elements["#piece-row"].hidden, true, "a single-piece room shows no selector");
+  assert.equal(h.elements[".play-layout"].classList.contains("has-pieces"), false);
+  h.layoutBounds.width = 304;
+  h.layoutBounds.height = 400;
+  h.sandbox.sizeCanvasToStage();
+  assert.equal(h.elements["#unity-canvas"].style.height, "208px", "a short portrait fits board + 24px + 168px pad exactly");
+  assert.equal(h.elements[".board-stage"].style.height, "208px", "the stage has no centered empty space below its canvas");
   const beforeSingleSelection = h.sent.length;
   assert.equal(keyboard(h, "Digit1", "1", body), false, "a lone piece has nothing to select");
   h.pieceButtons[0].dispatch("click");
@@ -433,6 +581,15 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   assert.equal(h.sent.at(-1).action, "Right");
   receive(state({ fingerprint: "multi-piece-again" }));
   assert.equal(h.elements["#piece-row"].hidden, false, "the selector returns for multi-piece rooms");
+  assert.equal(h.elements[".play-layout"].classList.contains("has-pieces"), true);
+  assert.equal(h.elements["#unity-canvas"].style.height, "142px", "selector and its 18px gap fit without consuming the canvas-to-controls gap");
+  h.viewport.landscape = true;
+  h.layoutBounds.width = 552;
+  h.layoutBounds.height = 263;
+  h.sandbox.sizeCanvasToStage();
+  assert.equal(h.elements["#unity-canvas"].style.height, "263px", "568×320 landscape uses board beside the unchanged 234px multi-piece controls");
+  assert.match(template, /grid-template-columns:minmax\(0,1fr\) 190px;[^}]*gap:24px;/);
+  h.viewport.landscape = false;
 
   const selectionCount = h.sent.length;
   h.pieceButtons[1].dispatch("click");
@@ -481,6 +638,10 @@ function keyboard(harness, code, key, target, repeat = false, modifiers = {}) {
   h.elements["#result-menu"].dispatch("click");
   assert.equal(h.elements["#menu-dialog"].open, true, "the clear result exposes a menu path even on the final room");
   assert.equal(h.elements["#result-dialog"].open, false, "the result is temporarily behind the menu, not discarded");
+  h.elements["#help-toggle"].dispatch("click");
+  assert.equal(h.elements["#result-dialog"].open, false, "result remains suspended during menu help");
+  h.elements["#help-close"].dispatch("click");
+  assert.equal(h.elements["#menu-dialog"].open, true, "result-menu help returns to that menu");
   h.elements["#menu-continue"].dispatch("click");
   assert.equal(h.elements["#result-dialog"].open, true, "leaving the clear-state menu restores the result overlay");
 

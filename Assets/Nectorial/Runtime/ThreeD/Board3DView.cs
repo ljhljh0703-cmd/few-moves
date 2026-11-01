@@ -15,6 +15,8 @@ namespace Nectorial.SlideEscape.Unity
         private const string ShadowShaderName = "Nectorial/Preview3DContactShadow";
         private const string LitShaderResource = "Visuals3D/Preview3DLit";
         private const string ShadowShaderResource = "Visuals3D/Preview3DContactShadow";
+        private const string GoalFocusShaderName = "Nectorial/GoalFocus";
+        private const string GoalFocusShaderResource = "Visuals/GoalFocus";
         private const float GoalMarkerDiameter = 0.34f;
         // Presentation-only proportions: taller walls and puck read as solid pieces under the tilted camera.
         private const float WallHeight = 0.44f;
@@ -33,6 +35,7 @@ namespace Nectorial.SlideEscape.Unity
         private static readonly Color HelperTeal = new Color32(55, 126, 120, 255);
         private static readonly Color Selection = new Color32(93, 137, 96, 255);
         private static readonly Color ShadowTint = new Color(0.16f, 0.2f, 0.22f, 0.24f);
+        private static readonly Color GoalFocusTint = new Color32(102, 181, 212, 255);
 
         private readonly Preview3DMeshLibrary _library;
         private readonly List<Object> _ownedAssets = new List<Object>();
@@ -42,6 +45,7 @@ namespace Nectorial.SlideEscape.Unity
         private readonly Material _tray;
         private readonly Material _target;
         private readonly Material _goal;
+        private readonly Material _goalFocus;
         private readonly Material _helperAmber;
         private readonly Material _helperTeal;
         private readonly Material _selection;
@@ -69,8 +73,10 @@ namespace Nectorial.SlideEscape.Unity
             view = null;
             Shader lit = Resources.Load<Shader>(LitShaderResource);
             Shader shadow = Resources.Load<Shader>(ShadowShaderResource);
-            if (lit == null || shadow == null || lit.name != LitShaderName || shadow.name != ShadowShaderName ||
-                !lit.isSupported || !shadow.isSupported)
+            Shader goalFocus = Resources.Load<Shader>(GoalFocusShaderResource);
+            if (lit == null || shadow == null || goalFocus == null || lit.name != LitShaderName ||
+                shadow.name != ShadowShaderName || goalFocus.name != GoalFocusShaderName ||
+                !lit.isSupported || !shadow.isSupported || !goalFocus.isSupported)
             {
                 error = "preview3d_shader_unavailable";
                 return false;
@@ -78,11 +84,11 @@ namespace Nectorial.SlideEscape.Unity
 
             Preview3DMeshLibrary library;
             if (!Preview3DMeshLibrary.TryLoad(out library, out error)) return false;
-            view = new Board3DView(library, lit, shadow);
+            view = new Board3DView(library, lit, shadow, goalFocus);
             return true;
         }
 
-        private Board3DView(Preview3DMeshLibrary library, Shader lit, Shader shadow)
+        private Board3DView(Preview3DMeshLibrary library, Shader lit, Shader shadow, Shader goalFocus)
         {
             _library = library;
             _floor = Own(CreateMaterial(lit, "Preview3D-Floor", Floor));
@@ -91,6 +97,7 @@ namespace Nectorial.SlideEscape.Unity
             _tray = Own(CreateMaterial(lit, "Preview3D-Tray", Tray, 0.03f, 0f));
             _target = Own(CreateMaterial(lit, "Preview3D-Target", Target, 0.14f, 0.03f));
             _goal = Own(CreateMaterial(lit, "Preview3D-Goal", Goal));
+            _goalFocus = Own(CreateMaterial(goalFocus, "Preview3D-GoalFocus", GoalFocusTint));
             _helperAmber = Own(CreateMaterial(lit, "Preview3D-HelperAmber", HelperAmber));
             _helperTeal = Own(CreateMaterial(lit, "Preview3D-HelperTeal", HelperTeal));
             _selection = Own(CreateMaterial(lit, "Preview3D-Selection", Selection));
@@ -153,6 +160,11 @@ namespace Nectorial.SlideEscape.Unity
             _movingActor = null;
         }
 
+        public void SetGoalFocus(float intensity)
+        {
+            if (!_disposed) _goalFocus.SetFloat("_Focus", Mathf.Clamp01(intensity));
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
@@ -194,6 +206,9 @@ namespace Nectorial.SlideEscape.Unity
             // disc is narrowed at runtime (height untouched) and drawn with the blue goal material. It rests on
             // the floor top, above the 0.07 floor thickness.
             GridPoint goal = room.Goal;
+            // A single-cell transparent quad lies below the disk and pieces; its shader provides the soft halo.
+            _staticObjects.Add(AddQuad(_root, "Goal Focus", _goalFocus,
+                new Vector3(goal.X, _library.FloorTop + 0.0005f, -goal.Y), 1f));
             GameObject marker = AddImported(_staticObjects, _root, "Goal", "GoalDisk", _goal,
                 new Vector3(goal.X, _library.FloorTop + 0.001f, -goal.Y));
             Preview3DMeshLibrary.Piece disk = _library["GoalDisk"];
@@ -265,7 +280,7 @@ namespace Nectorial.SlideEscape.Unity
             return visual;
         }
 
-        private void AddQuad(Transform parent, string name, Material material, Vector3 position, float size)
+        private GameObject AddQuad(Transform parent, string name, Material material, Vector3 position, float size)
         {
             var visual = new GameObject(name);
             visual.transform.SetParent(parent, false);
@@ -273,6 +288,7 @@ namespace Nectorial.SlideEscape.Unity
             visual.transform.localScale = new Vector3(size, 1f, size);
             visual.AddComponent<MeshFilter>().sharedMesh = _quad;
             AddRenderer(visual, material);
+            return visual;
         }
 
         private void AddBox(Transform parent, Material material, Vector3 position, Vector3 size)

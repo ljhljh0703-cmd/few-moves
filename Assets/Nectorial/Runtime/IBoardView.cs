@@ -12,5 +12,7 @@ namespace Nectorial.SlideEscape.Unity
         void AdvanceTransition(float progress);
         void CompleteTransition(RoomDefinition room, GameState state, int selectedPieceIndex);
         void CancelTransition();
+        // Presentation-only intensity for the goal halo; 0 is its resting appearance.
+        void SetGoalFocus(float intensity);
     }
 }

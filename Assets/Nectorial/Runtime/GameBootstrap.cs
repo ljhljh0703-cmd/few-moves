@@ -40,6 +40,7 @@ namespace Nectorial.SlideEscape.Unity
         private int _pendingPlatformShareRequestId;
         private int _platformShareResultRequestId;
         private Coroutine _transitionRoutine;
+        private Coroutine _goalFocusRoutine;
         private Coroutine _saveTimeoutRoutine;
         private Coroutine _platformManualSaveUiTimeoutRoutine;
         private GameState _transitionBefore;
@@ -119,6 +120,7 @@ namespace Nectorial.SlideEscape.Unity
         public void SetReducedMotion(string value)
         {
             _reducedMotion = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+            if (_reducedMotion) StopGoalFocus();
         }
 
         public void RetryPlatformStartup()
@@ -252,6 +254,7 @@ namespace Nectorial.SlideEscape.Unity
 
         private void BeginTransition(GameState previous, GameState next, GameMove move, string completedMessage)
         {
+            if (next.Status == RunStatus.Cleared) StopGoalFocus();
             _transitionEpoch++;
             int epoch = _transitionEpoch;
             _transitioning = true;
@@ -298,6 +301,7 @@ namespace Nectorial.SlideEscape.Unity
             _message = completedMessage;
             _transitioning = false;
             _transitionRoutine = null;
+            StartGoalFocus();
             ReportMotion("complete");
             ClearMotionObservation();
             AutosaveCurrentState();
@@ -306,6 +310,7 @@ namespace Nectorial.SlideEscape.Unity
 
         private void CancelTransition()
         {
+            StopGoalFocus();
             if (_transitioning) ReportMotion("cancel");
             _transitionEpoch++;
             _transitioning = false;
@@ -317,6 +322,42 @@ namespace Nectorial.SlideEscape.Unity
 
             if (_board != null) _board.CancelTransition();
             ClearMotionObservation();
+        }
+
+        // Two finite 1.05-second pulses, matching the approved focus cue. The resting glow remains static.
+        private void StartGoalFocus()
+        {
+            StopGoalFocus();
+            if (_reducedMotion || _board == null || _state == null || _state.Status != RunStatus.Playing) return;
+            _goalFocusRoutine = StartCoroutine(AnimateGoalFocus());
+        }
+
+        private void StopGoalFocus()
+        {
+            if (_goalFocusRoutine != null)
+            {
+                StopCoroutine(_goalFocusRoutine);
+                _goalFocusRoutine = null;
+            }
+
+            if (_board != null) _board.SetGoalFocus(0f);
+        }
+
+        private IEnumerator AnimateGoalFocus()
+        {
+            const float CycleDuration = 1.05f;
+            const float TotalDuration = CycleDuration * 2f;
+            float elapsed = 0f;
+            while (elapsed < TotalDuration)
+            {
+                float focus = 0.5f - 0.5f * Mathf.Cos(elapsed * 2f * Mathf.PI / CycleDuration);
+                _board.SetGoalFocus(focus);
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
+            }
+
+            if (_board != null) _board.SetGoalFocus(0f);
+            _goalFocusRoutine = null;
         }
 
         private void ReportMotion(string phase)
@@ -894,6 +935,7 @@ namespace Nectorial.SlideEscape.Unity
             _selectedPieceIndex = _room.TargetPieceIndex;
             _message = "처음부터 시작했습니다";
             _board.Render(_room, _state, _selectedPieceIndex);
+            StartGoalFocus();
             RequestManualSave();
         }
 
@@ -915,6 +957,7 @@ namespace Nectorial.SlideEscape.Unity
             _message = "이 방을 다시 시작했습니다";
             AutosaveCurrentState();
             _board.Render(_room, _state, _selectedPieceIndex);
+            StartGoalFocus();
             PublishState();
         }
 
